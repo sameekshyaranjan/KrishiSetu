@@ -1,6 +1,8 @@
+const bcrypt = require('bcryptjs');
 const OTP = require('../models/OTP');
 const Farmer = require('../models/Farmer');
 const Trader = require('../models/Trader');
+const Admin = require('../models/Admin');
 const generateOTP = require('../utils/generateOTP');
 const { generateAccessToken, generateRefreshToken } = require('../utils/generateToken');
 
@@ -116,4 +118,38 @@ const verifyTraderOTP = async (req, res, next) => {
   }
 };
 
-module.exports = { sendFarmerOTP, verifyFarmerOTP, sendTraderOTP, verifyTraderOTP };
+const adminLogin = async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required' });
+    }
+
+    const admin = await Admin.findOne({ email });
+
+    if (!admin) {
+      return res.status(401).json({ message: 'Invalid email or password' });
+    }
+
+    const isMatch = await bcrypt.compare(password, admin.password);
+
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Invalid email or password' });
+    }
+
+    const payload = { id: admin._id, role: 'admin' };
+    const accessToken = generateAccessToken(payload);
+    const refreshToken = generateRefreshToken(payload);
+
+    res.status(200).json({
+      accessToken,
+      refreshToken,
+      admin: { _id: admin._id, name: admin.name, email: admin.email, role: admin.role },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { sendFarmerOTP, verifyFarmerOTP, sendTraderOTP, verifyTraderOTP, adminLogin };

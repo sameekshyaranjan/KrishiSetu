@@ -5,6 +5,7 @@ const {
   verifyFarmerOTP,
   sendTraderOTP,
   verifyTraderOTP,
+  adminLogin,
 } = require('../controllers/authController');
 
 // Farmer auth
@@ -15,4 +16,8 @@ router.post('/verify-otp', verifyFarmerOTP);
 router.post('/trader/send-otp', sendTraderOTP);
 router.post('/trader/verify-otp', verifyTraderOTP);
 
+// Admin auth
+router.post('/admin/login', adminLogin);
+
 module.exports = router;
+
