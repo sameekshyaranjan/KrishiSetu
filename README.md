@@ -14,8 +14,9 @@ KrishiSetu is a comprehensive MERN-stack Agri-Marketplace designed to directly c
 
 ## 🛠️ Tech Stack
 - **Backend:** Node.js, Express.js
-- **Database:** MongoDB, Mongoose (ODM)
-- **Authentication:** JWT (jsonwebtoken), Twilio SMS *(Upcoming)*
+- **Database (Persistent):** MongoDB, Mongoose (ODM)
+- **Database (In-Memory/Cache):** Redis (Upstash), ioredis
+- **Authentication:** JWT (jsonwebtoken), bcryptjs, Twilio SMS *(Upcoming)*
 - **Frontend:** React.js *(Upcoming)*
 - **Real-Time:** Socket.io *(Upcoming)*
 
@@ -45,7 +46,6 @@ The application leverages advanced NoSQL concepts including **Polymorphic Refere
 | `Trader` | Verified buyers placing bids (Mobile OTP Auth) |
 | `Crop` | Inventory listings linked to Farmers |
 | `Bid` | Negotiation records between Traders and Farmers |
-| `OTP` | Self-destructing secure tokens (MongoDB TTL) |
 | `Transaction` | Payment tracking for completed deals |
 | `MandiPrice` | Wholesale market prices from government APIs |
 | `Message` | Chat system with double polymorphic references |
@@ -55,8 +55,12 @@ The application leverages advanced NoSQL concepts including **Polymorphic Refere
 | `Scheme` | Government scheme directory for farmer awareness |
 | `AuditLog` | Platform activity logging for admin accountability |
 
-## 🔐 Middleware
-- **Auth Middleware (`protect`):** Validates JWT Bearer tokens on protected routes, attaches decoded user payload to `req.user`, and returns `401 Unauthorized` for missing or invalid tokens.
+## 🔐 Security & Middleware Architecture
+- **Auth Middleware (`protect`):** Validates JWT Bearer tokens on protected routes, attaches the decoded user payload to `req.user`, and prevents unauthorized access.
+- **RBAC Middleware (`authorize`):** Role-Based Access Control ensuring only specific roles (e.g., `admin`, `farmer`, `trader`) can access certain endpoints.
+- **Dual-Token System:** Utilizes both short-lived Access Tokens (15m) and long-lived Refresh Tokens (7d) for optimal security without degrading UX.
+- **In-Memory OTP Caching:** 6-digit OTPs are stored in Redis with millisecond-precision `EX` TTL to eliminate disk I/O overhead and prevent replay attacks.
+- **Zero Trust Routing:** Endpoints like `/api/farmers/profile` strictly rely on the encrypted JWT payload for identity verification rather than trusting URL parameters, eliminating IDOR vulnerabilities.
 
 ## 💻 Local Setup
 
