@@ -1,6 +1,6 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const OTP = require('../models/OTP');
+const redisClient = require('../config/redis');
 const Farmer = require('../models/Farmer');
 const Trader = require('../models/Trader');
 const Admin = require('../models/Admin');
@@ -18,7 +18,7 @@ const sendFarmerOTP = async (req, res, next) => {
     const otp = generateOTP();
     console.log(`[DEV] OTP ${otp} → ${mobile}`);
 
-    await OTP.create({ mobile, otp });
+    await redisClient.set(`otp:${mobile}`, otp, 'EX', 300);
     res.status(200).json({ message: 'OTP sent successfully', mobile });
   } catch (error) {
     next(error);
@@ -33,17 +33,17 @@ const verifyFarmerOTP = async (req, res, next) => {
       return res.status(400).json({ message: 'Mobile number and OTP are required' });
     }
 
-    const otpRecord = await OTP.findOne({ mobile }).sort({ createdAt: -1 });
+    const storedOtp = await redisClient.get(`otp:${mobile}`);
 
-    if (!otpRecord) {
+    if (!storedOtp) {
       return res.status(400).json({ message: 'OTP expired or not found. Please request a new one.' });
     }
 
-    if (otpRecord.otp !== otp) {
+    if (storedOtp !== otp) {
       return res.status(400).json({ message: 'Invalid OTP. Please try again.' });
     }
 
-    await OTP.deleteMany({ mobile });
+    await redisClient.del(`otp:${mobile}`);
 
     let farmer = await Farmer.findOne({ mobile });
     let isNewUser = false;
@@ -74,7 +74,7 @@ const sendTraderOTP = async (req, res, next) => {
     const otp = generateOTP();
     console.log(`[DEV] OTP ${otp} → trader ${mobile}`);
 
-    await OTP.create({ mobile, otp });
+    await redisClient.set(`otp:${mobile}`, otp, 'EX', 300);
     res.status(200).json({ message: 'OTP sent successfully', mobile });
   } catch (error) {
     next(error);
@@ -89,17 +89,17 @@ const verifyTraderOTP = async (req, res, next) => {
       return res.status(400).json({ message: 'Mobile number and OTP are required' });
     }
 
-    const otpRecord = await OTP.findOne({ mobile }).sort({ createdAt: -1 });
+    const storedOtp = await redisClient.get(`otp:${mobile}`);
 
-    if (!otpRecord) {
+    if (!storedOtp) {
       return res.status(400).json({ message: 'OTP expired or not found. Please request a new one.' });
     }
 
-    if (otpRecord.otp !== otp) {
+    if (storedOtp !== otp) {
       return res.status(400).json({ message: 'Invalid OTP. Please try again.' });
     }
 
-    await OTP.deleteMany({ mobile });
+    await redisClient.del(`otp:${mobile}`);
 
     let trader = await Trader.findOne({ mobile });
     let isNewUser = false;
