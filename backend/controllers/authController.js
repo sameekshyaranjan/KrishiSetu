@@ -1,4 +1,5 @@
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const OTP = require('../models/OTP');
 const Farmer = require('../models/Farmer');
 const Trader = require('../models/Trader');
@@ -152,4 +153,29 @@ const adminLogin = async (req, res, next) => {
   }
 };
 
-module.exports = { sendFarmerOTP, verifyFarmerOTP, sendTraderOTP, verifyTraderOTP, adminLogin };
+
+
+const refreshToken = async (req, res, next) => {
+  try {
+    const token = req.body.refreshToken;
+
+    if (!token) {
+      return res.status(401).json({ message: 'Refresh token is required' });
+    }
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
+      
+      const payload = { id: decoded.id, role: decoded.role };
+      const newAccessToken = generateAccessToken(payload);
+
+      res.status(200).json({ accessToken: newAccessToken });
+    } catch (error) {
+      return res.status(401).json({ message: 'Invalid or expired refresh token' });
+    }
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { sendFarmerOTP, verifyFarmerOTP, sendTraderOTP, verifyTraderOTP, adminLogin, refreshToken };

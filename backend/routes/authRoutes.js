@@ -6,6 +6,7 @@ const {
   sendTraderOTP,
   verifyTraderOTP,
   adminLogin,
+  refreshToken,
 } = require('../controllers/authController');
 
 // Farmer auth
@@ -19,5 +20,9 @@ router.post('/trader/verify-otp', verifyTraderOTP);
 // Admin auth
 router.post('/admin/login', adminLogin);
 
+// Token management
+router.post('/refresh-token', refreshToken);
+
 module.exports = router;
+
 
