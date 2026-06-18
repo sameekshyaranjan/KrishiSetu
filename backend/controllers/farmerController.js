@@ -54,7 +54,7 @@ const registerFarmerByAdmin = async (req, res, next) => {
 
     const farmer = await Farmer.create({
       mobile,
-      name: name || mobile, // Fallback name to mobile if not provided
+      name: name || mobile,
       state,
       district,
       village,
