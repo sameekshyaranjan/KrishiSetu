@@ -35,4 +35,26 @@ const updateTraderProfile = async (req, res, next) => {
   }
 };
 
-module.exports = { getTraderProfile, updateTraderProfile };
+const updateTraderVerification = async (req, res, next) => {
+  try {
+    const { status } = req.body;
+
+    if (!['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ message: 'Status must be either approved or rejected' });
+    }
+
+    const trader = await Trader.findById(req.params.traderId);
+    if (!trader) {
+      return res.status(404).json({ message: 'Trader not found' });
+    }
+
+    trader.verificationStatus = status;
+    await trader.save();
+
+    res.status(200).json({ message: `Trader ${status} successfully`, trader });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { getTraderProfile, updateTraderProfile, updateTraderVerification };
