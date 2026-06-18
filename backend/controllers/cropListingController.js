@@ -62,4 +62,55 @@ const getListingById = async (req, res, next) => {
   }
 };
 
-module.exports = { createCropListing, getMyListings, getAllListings, getListingById };
+const updateCropListing = async (req, res, next) => {
+  try {
+    const listing = await Crop.findById(req.params.id);
+
+    if (!listing) {
+      return res.status(404).json({ message: 'Listing not found' });
+    }
+
+    if (listing.farmer.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'You are not authorized to update this listing' });
+    }
+
+    const { name, category, quantity, unit, basePrice, description, images } = req.body;
+
+    listing.name = name || listing.name;
+    listing.category = category || listing.category;
+    listing.quantity = quantity || listing.quantity;
+    listing.unit = unit || listing.unit;
+    listing.basePrice = basePrice || listing.basePrice;
+    listing.description = description || listing.description;
+    listing.images = images || listing.images;
+
+    const updatedListing = await listing.save();
+
+    res.status(200).json(updatedListing);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const deleteCropListing = async (req, res, next) => {
+  try {
+    const listing = await Crop.findById(req.params.id);
+
+    if (!listing) {
+      return res.status(404).json({ message: 'Listing not found' });
+    }
+
+    if (listing.farmer.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'You are not authorized to delete this listing' });
+    }
+
+    listing.status = 'removed';
+    await listing.save();
+
+    res.status(200).json({ message: 'Listing removed successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { createCropListing, getMyListings, getAllListings, getListingById, updateCropListing, deleteCropListing };
