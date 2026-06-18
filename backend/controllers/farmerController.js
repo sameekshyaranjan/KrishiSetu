@@ -39,4 +39,34 @@ const updateFarmerProfile = async (req, res, next) => {
   }
 };
 
-module.exports = { getFarmerProfile, updateFarmerProfile };
+const registerFarmerByAdmin = async (req, res, next) => {
+  try {
+    const { mobile, name, state, district, village, cropsGrown, landArea, language } = req.body;
+
+    if (!mobile) {
+      return res.status(400).json({ message: 'Mobile number is required to register a farmer' });
+    }
+
+    const farmerExists = await Farmer.findOne({ mobile });
+    if (farmerExists) {
+      return res.status(400).json({ message: 'Farmer with this mobile number already exists' });
+    }
+
+    const farmer = await Farmer.create({
+      mobile,
+      name: name || mobile, // Fallback name to mobile if not provided
+      state,
+      district,
+      village,
+      cropsGrown,
+      landArea,
+      language
+    });
+
+    res.status(201).json(farmer);
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { getFarmerProfile, updateFarmerProfile, registerFarmerByAdmin };
