@@ -6,6 +6,7 @@ const connectDB = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
 const farmerRoutes = require('./routes/farmerRoutes');
 const traderRoutes = require('./routes/traderRoutes');
+const cropListingRoutes = require('./routes/cropListingRoutes');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 
 dotenv.config();
@@ -23,6 +24,7 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/farmers', farmerRoutes);
 app.use('/api/traders', traderRoutes);
+app.use('/api/listings', cropListingRoutes);
 
 app.get('/', (req, res) => {
   res.json({ message: 'KrishiSetu API running' });
