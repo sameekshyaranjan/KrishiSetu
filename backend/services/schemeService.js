@@ -1,9 +1,6 @@
 const GovernmentScheme = require('../models/GovernmentScheme');
 
-// Mock function representing scraping government websites with axios and cheerio
 const fetchSchemesFromGov = () => {
-  // In reality, this would use axios to fetch HTML and cheerio to parse it.
-  // For now, we return mock data that simulates the scraped result.
   return [
     {
       name: 'PM Kisan Samman Nidhi (PM-KISAN)',
@@ -33,8 +30,6 @@ const saveSchemesToDB = async () => {
   const schemes = fetchSchemesFromGov();
   
   for (const scheme of schemes) {
-    // Upsert the scheme by name. We set isPublished to false explicitly 
-    // so the admin must review the newly scraped schemes.
     await GovernmentScheme.findOneAndUpdate(
       { name: scheme.name },
       { ...scheme, isPublished: false },
