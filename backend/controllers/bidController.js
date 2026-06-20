@@ -32,4 +32,29 @@ const placeBid = async (req, res, next) => {
   }
 };
 
-module.exports = { placeBid };
+const getBidsForListing = async (req, res, next) => {
+  try {
+    const bids = await Bid.find({ crop: req.params.cropId })
+      .populate('trader', 'name mobile companyName')
+      .sort({ amount: -1 });
+
+    res.status(200).json(bids);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getMyBids = async (req, res, next) => {
+  try {
+    const bids = await Bid.find({ trader: req.user.id })
+      .populate('crop', 'name category basePrice status')
+      .populate('farmer', 'name village district mobile')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(bids);
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { placeBid, getBidsForListing, getMyBids };
