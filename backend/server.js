@@ -10,6 +10,7 @@ const cropListingRoutes = require('./routes/cropListingRoutes');
 const bidRoutes = require('./routes/bidRoutes');
 const priceRoutes = require('./routes/priceRoutes');
 const schemeRoutes = require('./routes/schemeRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 const { initCronJobs } = require('./jobs/cronJobs');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 
@@ -34,6 +35,7 @@ app.use('/api/listings', cropListingRoutes);
 app.use('/api/bids', bidRoutes);
 app.use('/api/prices', priceRoutes);
 app.use('/api/schemes', schemeRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 app.get('/', (req, res) => {
   res.json({ message: 'KrishiSetu API running' });
