@@ -22,7 +22,7 @@ const savePricesToDB = async () => {
     await MandiPrice.findOneAndUpdate(
       { commodity: price.commodity, market: price.market, arrivalDate: price.arrivalDate },
       price,
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     );
   }
 
