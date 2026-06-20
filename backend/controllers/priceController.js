@@ -1,10 +1,7 @@
 const MandiPrice = require('../models/MandiPrice');
-const { savePricesToDB } = require('../services/priceService');
 
 const getPrices = async (req, res, next) => {
   try {
-    await savePricesToDB();
-
     const filter = {};
     if (req.query.commodity) filter.commodity = { $regex: req.query.commodity, $options: 'i' };
     if (req.query.district) filter.district = { $regex: req.query.district, $options: 'i' };

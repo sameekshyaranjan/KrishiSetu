@@ -9,11 +9,14 @@ const traderRoutes = require('./routes/traderRoutes');
 const cropListingRoutes = require('./routes/cropListingRoutes');
 const bidRoutes = require('./routes/bidRoutes');
 const priceRoutes = require('./routes/priceRoutes');
+const { initCronJobs } = require('./jobs/cronJobs');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 
 dotenv.config();
 
 connectDB();
+
+initCronJobs();
 
 const app = express();
 
