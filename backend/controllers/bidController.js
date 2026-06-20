@@ -1,5 +1,6 @@
 const Bid = require('../models/Bid');
 const Crop = require('../models/Crop');
+const { createNotification } = require('../utils/createNotification');
 
 const placeBid = async (req, res, next) => {
   try {
@@ -25,6 +26,13 @@ const placeBid = async (req, res, next) => {
       amount,
       message
     });
+
+    createNotification(
+      crop.farmer,
+      'Farmer',
+      'New Bid Received',
+      `A trader has placed a bid of ₹${amount} for your crop listing.`
+    );
 
     res.status(201).json(bid);
   } catch (error) {
@@ -78,6 +86,14 @@ const updateBid = async (req, res, next) => {
     bid.message = message || bid.message;
 
     const updatedBid = await bid.save();
+
+    createNotification(
+      bid.farmer,
+      'Farmer',
+      'Bid Updated',
+      `A trader has updated their bid to ₹${amount}.`
+    );
+
     res.status(200).json(updatedBid);
   } catch (error) {
     next(error);
@@ -136,6 +152,13 @@ const respondToBid = async (req, res, next) => {
     if (status === 'accepted') {
       await Crop.findByIdAndUpdate(bid.crop, { status: 'sold' });
     }
+
+    createNotification(
+      bid.trader,
+      'Trader',
+      `Bid ${status.charAt(0).toUpperCase() + status.slice(1)}`,
+      `Your bid has been ${status} by the farmer.`
+    );
 
     res.status(200).json({ message: `Bid ${status} successfully`, bid });
   } catch (error) {
