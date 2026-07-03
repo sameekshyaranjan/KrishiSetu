@@ -1,4 +1,6 @@
 const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
 const dotenv = require('dotenv');
 const cors = require('cors');
 const morgan = require('morgan');
@@ -21,6 +23,29 @@ connectDB();
 initCronJobs();
 
 const app = express();
+
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  },
+});
+
+io.on('connection', (socket) => {
+  const userId = socket.handshake.query.userId;
+  if (userId) {
+    socket.join(userId);
+    console.log(`[Socket] User connected and joined room: ${userId}`);
+  } else {
+    console.log(`[Socket] Anonymous user connected: ${socket.id}`);
+  }
+
+  socket.on('disconnect', () => {
+    console.log(`[Socket] User disconnected: ${userId || socket.id}`);
+  });
+});
 
 // Middleware
 app.use(cors());
@@ -47,6 +72,8 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
+module.exports = { io };
