@@ -59,6 +59,16 @@ const publishScheme = async (req, res, next) => {
     scheme.isPublished = true;
     await scheme.save();
 
+    const auditEmitter = require('../utils/auditEmitter');
+    auditEmitter.emit('log', {
+      action: 'Scheme Published',
+      performedBy: req.user.id,
+      performedByModel: req.user.role === 'admin' ? 'Admin' : 'Farmer', 
+      targetId: scheme._id,
+      targetModel: 'GovernmentScheme',
+      details: { schemeName: scheme.name }
+    });
+
     res.status(200).json({ message: 'Scheme published successfully', scheme });
   } catch (error) {
     next(error);

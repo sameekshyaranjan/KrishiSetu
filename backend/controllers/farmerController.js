@@ -63,6 +63,16 @@ const registerFarmerByAdmin = async (req, res, next) => {
       language
     });
 
+    const auditEmitter = require('../utils/auditEmitter');
+    auditEmitter.emit('log', {
+      action: 'Farmer Registered By Admin',
+      performedBy: req.user.id,
+      performedByModel: req.user.role === 'admin' ? 'Admin' : 'Trader',
+      targetId: farmer._id,
+      targetModel: 'Farmer',
+      details: { mobile }
+    });
+
     res.status(201).json(farmer);
   } catch (error) {
     next(error);

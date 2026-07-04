@@ -51,6 +51,16 @@ const updateTraderVerification = async (req, res, next) => {
     trader.verificationStatus = status;
     await trader.save();
 
+    const auditEmitter = require('../utils/auditEmitter');
+    auditEmitter.emit('log', {
+      action: 'Trader Verification Updated',
+      performedBy: req.user.id,
+      performedByModel: req.user.role === 'admin' ? 'Admin' : 'Trader', 
+      targetId: trader._id,
+      targetModel: 'Trader',
+      details: { status }
+    });
+
     res.status(200).json({ message: `Trader ${status} successfully`, trader });
   } catch (error) {
     next(error);
