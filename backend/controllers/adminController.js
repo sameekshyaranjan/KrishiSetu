@@ -60,4 +60,89 @@ const getDashboardStats = async (req, res, next) => {
   }
 };
 
-module.exports = { getDashboardStats };
+const getAllFarmers = async (req, res, next) => {
+  try {
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const skip = (page - 1) * limit;
+
+    const query = {};
+    if (req.query.search) {
+      query.name = { $regex: req.query.search, $options: 'i' };
+    }
+    if (req.query.district) {
+      query.district = req.query.district;
+    }
+
+    const [farmers, total] = await Promise.all([
+      Farmer.find(query).skip(skip).limit(limit).sort({ createdAt: -1 }),
+      Farmer.countDocuments(query)
+    ]);
+
+    res.status(200).json({
+      success: true,
+      count: farmers.length,
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+      data: farmers
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getAllTraders = async (req, res, next) => {
+  try {
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const skip = (page - 1) * limit;
+
+    const query = {};
+    if (req.query.verificationStatus) {
+      query.verificationStatus = req.query.verificationStatus;
+    }
+
+    const [traders, total] = await Promise.all([
+      Trader.find(query).skip(skip).limit(limit).sort({ createdAt: -1 }),
+      Trader.countDocuments(query)
+    ]);
+
+    res.status(200).json({
+      success: true,
+      count: traders.length,
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+      data: traders
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getFarmerById = async (req, res, next) => {
+  try {
+    const farmer = await Farmer.findById(req.params.id);
+    if (!farmer) {
+      return res.status(404).json({ message: 'Farmer not found' });
+    }
+    res.status(200).json(farmer);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getTraderById = async (req, res, next) => {
+  try {
+    const trader = await Trader.findById(req.params.id);
+    if (!trader) {
+      return res.status(404).json({ message: 'Trader not found' });
+    }
+    res.status(200).json(trader);
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { getDashboardStats, getAllFarmers, getAllTraders, getFarmerById, getTraderById };

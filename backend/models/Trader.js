@@ -26,7 +26,8 @@ const traderSchema = new mongoose.Schema({
   verificationStatus: {
     type: String,
     enum: ['pending', 'approved', 'rejected'],
-    default: 'pending'
+    default: 'pending',
+    index: true
   },
   documents: [{
     type: String

@@ -3,7 +3,8 @@ const mongoose = require('mongoose');
 const farmerSchema = new mongoose.Schema({
   name: {
     type: String,
-    required: [true, 'Please provide the farmer name']
+    required: [true, 'Please provide the farmer name'],
+    index: true
   },
   mobile: {
     type: String,
@@ -15,7 +16,8 @@ const farmerSchema = new mongoose.Schema({
     type: String
   },
   district: {
-    type: String
+    type: String,
+    index: true
   },
   state: {
     type: String
