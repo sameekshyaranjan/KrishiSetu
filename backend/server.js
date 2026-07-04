@@ -1,6 +1,7 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
 const cors = require('cors');
 const morgan = require('morgan');
@@ -15,12 +16,15 @@ const schemeRoutes = require('./routes/schemeRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const { initCronJobs } = require('./jobs/cronJobs');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
+const auditEmitter = require('./utils/auditEmitter');
 
 dotenv.config();
 
 connectDB();
 
 initCronJobs();
+
+// Test the Audit Emitter (Removed)
 
 const app = express();
 
@@ -33,17 +37,31 @@ const io = new Server(server, {
   },
 });
 
+io.use((socket, next) => {
+  const token = socket.handshake.auth.token || socket.handshake.query.token;
+  if (!token) {
+    return next(new Error('Authentication error: No token provided'));
+  }
+  
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    socket.user = decoded;
+    next();
+  } catch (err) {
+    return next(new Error('Authentication error: Invalid token'));
+  }
+});
+
 io.on('connection', (socket) => {
-  const userId = socket.handshake.query.userId;
+  const userId = socket.user.id;
+  
   if (userId) {
     socket.join(userId);
-    console.log(`[Socket] User connected and joined room: ${userId}`);
-  } else {
-    console.log(`[Socket] Anonymous user connected: ${socket.id}`);
+    console.log(`[Socket] Secure user connected and joined room: ${userId}`);
   }
 
   socket.on('disconnect', () => {
-    console.log(`[Socket] User disconnected: ${userId || socket.id}`);
+    console.log(`[Socket] Secure user disconnected: ${userId}`);
   });
 });
 
