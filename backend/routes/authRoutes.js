@@ -8,13 +8,14 @@ const {
   adminLogin,
   refreshToken,
 } = require('../controllers/authController');
+const { otpLimiter } = require('../middleware/rateLimiter');
 
 // Farmer auth
-router.post('/send-otp', sendFarmerOTP);
+router.post('/send-otp', otpLimiter, sendFarmerOTP);
 router.post('/verify-otp', verifyFarmerOTP);
 
 // Trader auth
-router.post('/trader/send-otp', sendTraderOTP);
+router.post('/trader/send-otp', otpLimiter, sendTraderOTP);
 router.post('/trader/verify-otp', verifyTraderOTP);
 
 // Admin auth

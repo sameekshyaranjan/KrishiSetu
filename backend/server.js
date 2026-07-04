@@ -18,6 +18,7 @@ const adminRoutes = require('./routes/adminRoutes');
 const { initCronJobs } = require('./jobs/cronJobs');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 const auditEmitter = require('./utils/auditEmitter');
+const { globalLimiter } = require('./middleware/rateLimiter');
 
 dotenv.config();
 
@@ -28,6 +29,8 @@ initCronJobs();
 // Test the Audit Emitter (Removed)
 
 const app = express();
+
+app.use(globalLimiter);
 
 const server = http.createServer(app);
 
