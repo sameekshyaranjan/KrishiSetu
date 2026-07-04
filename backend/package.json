@@ -30,6 +30,7 @@
     "node-cron": "^4.4.1",
     "nodemailer": "^9.0.3",
     "rate-limit-redis": "^5.0.0",
+    "razorpay": "^2.9.6",
     "socket.io": "^4.8.3",
     "twilio": "^6.0.2"
   },

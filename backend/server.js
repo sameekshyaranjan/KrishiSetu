@@ -16,6 +16,7 @@ const schemeRoutes = require('./routes/schemeRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const smsRoutes = require('./routes/smsRoutes');
+const transactionRoutes = require('./routes/transactionRoutes');
 const { initCronJobs } = require('./jobs/cronJobs');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 const auditEmitter = require('./utils/auditEmitter');
@@ -89,6 +90,7 @@ app.use('/api/schemes', schemeRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/sms', smsRoutes);
+app.use('/api/transactions', transactionRoutes);
 
 app.get('/', (req, res) => {
   res.json({ message: 'KrishiSetu API running' });

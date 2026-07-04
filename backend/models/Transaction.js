@@ -26,6 +26,10 @@ const transactionSchema = new mongoose.Schema({
     enum: ['pending', 'initiated', 'completed', 'failed'],
     default: 'pending'
   },
+  paymentMethod: {
+    type: String,
+    enum: ['razorpay', 'manual']
+  },
   paymentGatewayId: {
     type: String
   },
