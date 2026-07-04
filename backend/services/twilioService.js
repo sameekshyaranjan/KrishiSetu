@@ -1,7 +1,6 @@
 const twilio = require('twilio');
 const Farmer = require('../models/Farmer');
-// Note: We don't have a MandiPrice model yet, so we will stub the prices for now
-// const MandiPrice = require('../models/MandiPrice'); 
+const { getPriceMessage, getFallbackMessage, getMissingCropsMessage, getHeaderMessage } = require('../utils/smsTemplates');
 
 const sendPricesSMS = async (mobile, language = 'en') => {
   try {
@@ -9,14 +8,21 @@ const sendPricesSMS = async (mobile, language = 'en') => {
 
     let messageBody = '';
     
+    // If the farmer exists, use their preferred language. Otherwise use the passed language or fallback to 'en'.
+    const preferredLang = farmer ? farmer.language : language;
+
     if (!farmer) {
-      messageBody = 'Please register on KrishiSetu to receive live Mandi prices for your crops.';
+      messageBody = getFallbackMessage(preferredLang);
     } else if (!farmer.cropsGrown || farmer.cropsGrown.length === 0) {
-      messageBody = `Hello ${farmer.name}, please update your profile with the crops you grow to receive daily prices.`;
+      messageBody = getMissingCropsMessage(farmer.name, preferredLang);
     } else {
-      // Mocking Mandi Prices since we haven't built the scraping engine yet
-      const mockedPrices = farmer.cropsGrown.map(crop => `${crop}: ₹${Math.floor(Math.random() * 2000 + 1000)}/Q`).join(', ');
-      messageBody = `KrishiSetu Karnataka APMC Live Prices:\n${mockedPrices}`;
+      // Mocking Mandi Prices
+      const mockedPrices = farmer.cropsGrown.map(crop => {
+        const fakePrice = Math.floor(Math.random() * 2000 + 1000);
+        return getPriceMessage(crop, fakePrice, preferredLang);
+      }).join('\n');
+      
+      messageBody = `${getHeaderMessage(preferredLang)}${mockedPrices}`;
     }
 
     // Development Mock: Bypass Twilio
