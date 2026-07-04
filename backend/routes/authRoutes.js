@@ -1,24 +1,38 @@
 const express = require('express');
 const router = express.Router();
 const {
-  sendFarmerOTP,
-  verifyFarmerOTP,
-  sendTraderOTP,
-  verifyTraderOTP,
+  registerUser,
+  verifyRegistrationOTP,
+  loginWithPassword,
+  sendLoginOTP,
+  verifyLoginOTP,
+  forgotPassword,
+  resetPassword,
   adminLogin,
   refreshToken,
 } = require('../controllers/authController');
 const { otpLimiter } = require('../middleware/rateLimiter');
 const validate = require('../middleware/validate');
-const { sendOTPValidator, verifyOTPValidator } = require('../middleware/validators/authValidators');
+const { 
+  registerValidator, 
+  verifyOTPValidator, 
+  loginValidator, 
+  emailOnlyValidator, 
+  resetPasswordValidator 
+} = require('../middleware/validators/authValidators');
 
-// Farmer auth
-router.post('/send-otp', otpLimiter, sendOTPValidator, validate, sendFarmerOTP);
-router.post('/verify-otp', verifyOTPValidator, validate, verifyFarmerOTP);
+// Registration Flow
+router.post('/register', otpLimiter, registerValidator, validate, registerUser);
+router.post('/register/verify', verifyOTPValidator, validate, verifyRegistrationOTP);
 
-// Trader auth
-router.post('/trader/send-otp', otpLimiter, sendOTPValidator, validate, sendTraderOTP);
-router.post('/trader/verify-otp', verifyOTPValidator, validate, verifyTraderOTP);
+// Login Flows
+router.post('/login', loginValidator, validate, loginWithPassword);
+router.post('/login/otp', otpLimiter, emailOnlyValidator, validate, sendLoginOTP);
+router.post('/login/otp/verify', verifyOTPValidator, validate, verifyLoginOTP);
+
+// Password Reset Flows
+router.post('/password/forgot', otpLimiter, emailOnlyValidator, validate, forgotPassword);
+router.post('/password/reset', resetPasswordValidator, validate, resetPassword);
 
 // Admin auth
 router.post('/admin/login', adminLogin);
@@ -27,5 +41,3 @@ router.post('/admin/login', adminLogin);
 router.post('/refresh-token', refreshToken);
 
 module.exports = router;
-
-

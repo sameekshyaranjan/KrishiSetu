@@ -4,122 +4,209 @@ const redisClient = require('../config/redis');
 const Farmer = require('../models/Farmer');
 const Trader = require('../models/Trader');
 const Admin = require('../models/Admin');
-const generateOTP = require('../utils/generateOTP');
 const { generateAccessToken, generateRefreshToken } = require('../utils/generateToken');
+const sendEmail = require('../utils/sendEmail');
 
-const sendFarmerOTP = async (req, res, next) => {
+const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
+
+const findUserByEmail = async (email) => {
+  let user = await Farmer.findOne({ email }).select('+password');
+  if (user) return { user, role: 'farmer' };
+  
+  user = await Trader.findOne({ email }).select('+password');
+  if (user) return { user, role: 'trader' };
+  
+  return { user: null, role: null };
+};
+
+exports.registerUser = async (req, res, next) => {
   try {
-    const { mobile } = req.body;
+    const { role, email, ...userData } = req.body;
+    const lowerEmail = email.toLowerCase();
+    
+    if (!['farmer', 'trader'].includes(role)) {
+      return res.status(400).json({ message: 'Invalid role specified' });
+    }
 
-    if (!mobile || !/^\d{10}$/.test(mobile)) {
-      return res.status(400).json({ message: 'Please provide a valid 10-digit mobile number' });
+    const { user: existingUser } = await findUserByEmail(lowerEmail);
+    if (existingUser) {
+      return res.status(400).json({ message: 'Email already registered' });
     }
 
     const otp = generateOTP();
-    console.log(`[DEV] OTP ${otp} → ${mobile}`);
+    await redisClient.set(`rl:register:otp:${lowerEmail}`, otp, 'EX', 300);
+    await redisClient.set(`rl:register:data:${lowerEmail}`, JSON.stringify({ role, email: lowerEmail, ...userData }), 'EX', 300);
 
-    await redisClient.set(`otp:${mobile}`, otp, 'EX', 300);
-    res.status(200).json({ message: 'OTP sent successfully', mobile });
+    await sendEmail({
+      email: lowerEmail,
+      subject: 'KrishiSetu Registration OTP',
+      message: `Your OTP for KrishiSetu registration is: ${otp}. It will expire in 5 minutes.`
+    });
+
+    res.status(200).json({ message: 'OTP sent to email for verification' });
   } catch (error) {
     next(error);
   }
 };
 
-const verifyFarmerOTP = async (req, res, next) => {
+exports.verifyRegistrationOTP = async (req, res, next) => {
   try {
-    const { mobile, otp } = req.body;
+    const { email, otp } = req.body;
+    const lowerEmail = email.toLowerCase();
 
-    if (!mobile || !otp) {
-      return res.status(400).json({ message: 'Mobile number and OTP are required' });
+    const storedOtp = await redisClient.get(`rl:register:otp:${lowerEmail}`);
+    if (!storedOtp || storedOtp !== otp) {
+      return res.status(400).json({ message: 'Invalid or expired OTP' });
     }
 
-    const storedOtp = await redisClient.get(`otp:${mobile}`);
-
-    if (!storedOtp) {
-      return res.status(400).json({ message: 'OTP expired or not found. Please request a new one.' });
+    const userDataStr = await redisClient.get(`rl:register:data:${lowerEmail}`);
+    if (!userDataStr) {
+      return res.status(400).json({ message: 'Registration session expired. Please register again.' });
     }
+    const { role, ...userData } = JSON.parse(userDataStr);
 
-    if (storedOtp !== otp) {
-      return res.status(400).json({ message: 'Invalid OTP. Please try again.' });
-    }
+    let newUser;
+    if (role === 'farmer') newUser = await Farmer.create(userData);
+    else if (role === 'trader') newUser = await Trader.create(userData);
 
-    await redisClient.del(`otp:${mobile}`);
+    await redisClient.del(`rl:register:otp:${lowerEmail}`);
+    await redisClient.del(`rl:register:data:${lowerEmail}`);
 
-    let farmer = await Farmer.findOne({ mobile });
-    let isNewUser = false;
-
-    if (!farmer) {
-      farmer = await Farmer.create({ name: mobile, mobile });
-      isNewUser = true;
-    }
-
-    const payload = { id: farmer._id, role: 'farmer' };
+    const payload = { id: newUser._id, role };
     const accessToken = generateAccessToken(payload);
     const refreshToken = generateRefreshToken(payload);
 
-    res.status(200).json({ accessToken, refreshToken, farmer, isNewUser });
+    res.status(201).json({ user: newUser, accessToken, refreshToken });
   } catch (error) {
     next(error);
   }
 };
 
-const sendTraderOTP = async (req, res, next) => {
+exports.loginWithPassword = async (req, res, next) => {
   try {
-    const { mobile } = req.body;
+    const { email, password } = req.body;
+    const lowerEmail = email.toLowerCase();
 
-    if (!mobile || !/^\d{10}$/.test(mobile)) {
-      return res.status(400).json({ message: 'Please provide a valid 10-digit mobile number' });
+    const { user, role } = await findUserByEmail(lowerEmail);
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid email or password' });
+    }
+
+    const isMatch = await user.matchPassword(password);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Invalid email or password' });
+    }
+
+    const payload = { id: user._id, role };
+    const accessToken = generateAccessToken(payload);
+    const refreshToken = generateRefreshToken(payload);
+
+    // Don't send password hash back
+    const userObject = user.toObject();
+    delete userObject.password;
+
+    res.status(200).json({ user: userObject, accessToken, refreshToken });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.sendLoginOTP = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const lowerEmail = email.toLowerCase();
+
+    const { user } = await findUserByEmail(lowerEmail);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
     }
 
     const otp = generateOTP();
-    console.log(`[DEV] OTP ${otp} → trader ${mobile}`);
+    await redisClient.set(`rl:login:otp:${lowerEmail}`, otp, 'EX', 300);
 
-    await redisClient.set(`otp:${mobile}`, otp, 'EX', 300);
-    res.status(200).json({ message: 'OTP sent successfully', mobile });
+    await sendEmail({
+      email: lowerEmail,
+      subject: 'KrishiSetu Login OTP',
+      message: `Your OTP for KrishiSetu login is: ${otp}. It will expire in 5 minutes.`
+    });
+
+    res.status(200).json({ message: 'Login OTP sent to email' });
   } catch (error) {
     next(error);
   }
 };
 
-const verifyTraderOTP = async (req, res, next) => {
+exports.verifyLoginOTP = async (req, res, next) => {
   try {
-    const { mobile, otp } = req.body;
+    const { email, otp } = req.body;
+    const lowerEmail = email.toLowerCase();
 
-    if (!mobile || !otp) {
-      return res.status(400).json({ message: 'Mobile number and OTP are required' });
+    const storedOtp = await redisClient.get(`rl:login:otp:${lowerEmail}`);
+    if (!storedOtp || storedOtp !== otp) {
+      return res.status(400).json({ message: 'Invalid or expired OTP' });
     }
 
-    const storedOtp = await redisClient.get(`otp:${mobile}`);
+    const { user, role } = await findUserByEmail(lowerEmail);
+    await redisClient.del(`rl:login:otp:${lowerEmail}`);
 
-    if (!storedOtp) {
-      return res.status(400).json({ message: 'OTP expired or not found. Please request a new one.' });
-    }
-
-    if (storedOtp !== otp) {
-      return res.status(400).json({ message: 'Invalid OTP. Please try again.' });
-    }
-
-    await redisClient.del(`otp:${mobile}`);
-
-    let trader = await Trader.findOne({ mobile });
-    let isNewUser = false;
-
-    if (!trader) {
-      trader = await Trader.create({ name: mobile, mobile });
-      isNewUser = true;
-    }
-
-    const payload = { id: trader._id, role: 'trader' };
+    const payload = { id: user._id, role };
     const accessToken = generateAccessToken(payload);
     const refreshToken = generateRefreshToken(payload);
 
-    res.status(200).json({ accessToken, refreshToken, trader, isNewUser });
+    res.status(200).json({ user, accessToken, refreshToken });
   } catch (error) {
     next(error);
   }
 };
 
-const adminLogin = async (req, res, next) => {
+exports.forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const lowerEmail = email.toLowerCase();
+
+    const { user } = await findUserByEmail(lowerEmail);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const otp = generateOTP();
+    await redisClient.set(`rl:reset:otp:${lowerEmail}`, otp, 'EX', 300);
+
+    await sendEmail({
+      email: lowerEmail,
+      subject: 'KrishiSetu Password Reset OTP',
+      message: `Your OTP to reset your KrishiSetu password is: ${otp}. It will expire in 5 minutes.`
+    });
+
+    res.status(200).json({ message: 'Password reset OTP sent to email' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.resetPassword = async (req, res, next) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+    const lowerEmail = email.toLowerCase();
+
+    const storedOtp = await redisClient.get(`rl:reset:otp:${lowerEmail}`);
+    if (!storedOtp || storedOtp !== otp) {
+      return res.status(400).json({ message: 'Invalid or expired OTP' });
+    }
+
+    const { user } = await findUserByEmail(lowerEmail);
+    
+    user.password = newPassword;
+    await user.save();
+    await redisClient.del(`rl:reset:otp:${lowerEmail}`);
+
+    res.status(200).json({ message: 'Password reset successfully. You can now login.' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.adminLogin = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
@@ -153,29 +240,17 @@ const adminLogin = async (req, res, next) => {
   }
 };
 
-
-
-const refreshToken = async (req, res, next) => {
+exports.refreshToken = async (req, res, next) => {
   try {
     const token = req.body.refreshToken;
-
     if (!token) {
       return res.status(401).json({ message: 'Refresh token is required' });
     }
-
-    try {
-      const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
-      
-      const payload = { id: decoded.id, role: decoded.role };
-      const newAccessToken = generateAccessToken(payload);
-
-      res.status(200).json({ accessToken: newAccessToken });
-    } catch (error) {
-      return res.status(401).json({ message: 'Invalid or expired refresh token' });
-    }
+    const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
+    const payload = { id: decoded.id, role: decoded.role };
+    const newAccessToken = generateAccessToken(payload);
+    res.status(200).json({ accessToken: newAccessToken });
   } catch (error) {
-    next(error);
+    return res.status(401).json({ message: 'Invalid or expired refresh token' });
   }
 };
-
-module.exports = { sendFarmerOTP, verifyFarmerOTP, sendTraderOTP, verifyTraderOTP, adminLogin, refreshToken };
