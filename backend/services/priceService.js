@@ -1,32 +1,102 @@
+const axios = require('axios');
 const MandiPrice = require('../models/MandiPrice');
+const auditEmitter = require('../utils/auditEmitter');
 
-const fetchMockMandiPrices = () => {
-  const today = new Date();
+const fetchAgmarknetPrices = async () => {
+  try {
+    const apiKey = process.env.AGMARKNET_API_KEY;
+    const resourceId = process.env.AGMARKNET_RESOURCE_ID || '9ef84268-d588-465a-a308-a864a43d0070';
+    
+    let records = [];
 
-  return [
-    { commodity: 'Tomato', market: 'Pune APMC', district: 'Pune', state: 'Maharashtra', minPrice: 800, maxPrice: 1400, modalPrice: 1100, arrivalDate: today, unit: 'Quintal' },
-    { commodity: 'Onion', market: 'Lasalgaon APMC', district: 'Nashik', state: 'Maharashtra', minPrice: 600, maxPrice: 1000, modalPrice: 800, arrivalDate: today, unit: 'Quintal' },
-    { commodity: 'Wheat', market: 'Indore APMC', district: 'Indore', state: 'Madhya Pradesh', minPrice: 2100, maxPrice: 2400, modalPrice: 2250, arrivalDate: today, unit: 'Quintal' },
-    { commodity: 'Rice', market: 'Raipur APMC', district: 'Raipur', state: 'Chhattisgarh', minPrice: 1800, maxPrice: 2200, modalPrice: 2000, arrivalDate: today, unit: 'Quintal' },
-    { commodity: 'Potato', market: 'Agra APMC', district: 'Agra', state: 'Uttar Pradesh', minPrice: 700, maxPrice: 1100, modalPrice: 900, arrivalDate: today, unit: 'Quintal' },
-    { commodity: 'Sugarcane', market: 'Kolhapur APMC', district: 'Kolhapur', state: 'Maharashtra', minPrice: 280, maxPrice: 320, modalPrice: 300, arrivalDate: today, unit: 'Quintal' },
-    { commodity: 'Soybean', market: 'Latur APMC', district: 'Latur', state: 'Maharashtra', minPrice: 3800, maxPrice: 4200, modalPrice: 4000, arrivalDate: today, unit: 'Quintal' },
-    { commodity: 'Cotton', market: 'Akola APMC', district: 'Akola', state: 'Maharashtra', minPrice: 5500, maxPrice: 6200, modalPrice: 5900, arrivalDate: today, unit: 'Quintal' },
-  ];
-};
+    // Development Mock: If API key is missing or dummy, generate fake data matching Karnataka APMCs
+    if (!apiKey || apiKey === 'dummy_key_for_now' || process.env.NODE_ENV === 'development') {
+      console.log('[DEV MOCK] Generating fake Agmarknet prices for Karnataka...');
+      const karnatakaDistricts = ['Bengaluru Urban', 'Mysuru', 'Hubballi', 'Belagavi'];
+      const crops = ['Tomato', 'Potato', 'Onion', 'Rice', 'Wheat'];
+      
+      for (const district of karnatakaDistricts) {
+        for (const crop of crops) {
+          const fakePrice = Math.floor(Math.random() * 2000 + 1000);
+          records.push({
+            state: 'Karnataka',
+            district: district,
+            market: `${district} APMC`,
+            commodity: crop,
+            variety: 'Common',
+            arrival_date: new Date().toISOString().split('T')[0],
+            min_price: fakePrice - 200,
+            max_price: fakePrice + 200,
+            modal_price: fakePrice
+          });
+        }
+      }
+    } else {
+      // Production: Fetch real data from data.gov.in
+      console.log('Fetching live prices from Agmarknet API...');
+      const url = `https://api.data.gov.in/resource/${resourceId}?api-key=${apiKey}&format=json&filters[state]=Karnataka`;
+      const response = await axios.get(url);
+      
+      if (response.data && response.data.records) {
+        records = response.data.records;
+      }
+    }
 
-const savePricesToDB = async () => {
-  const prices = fetchMockMandiPrices();
-
-  for (const price of prices) {
-    await MandiPrice.findOneAndUpdate(
-      { commodity: price.commodity, market: price.market, arrivalDate: price.arrivalDate },
-      price,
-      { upsert: true, returnDocument: 'after' }
-    );
+    if (records.length > 0) {
+      await savePricesToDB(records);
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error fetching Agmarknet prices:', error);
+    return false;
   }
-
-  console.log(`Mandi prices updated: ${prices.length} records`);
 };
 
-module.exports = { fetchMockMandiPrices, savePricesToDB };
+const savePricesToDB = async (records) => {
+  try {
+    let savedCount = 0;
+    
+    for (const record of records) {
+      const priceData = {
+        state: record.state,
+        district: record.district,
+        market: record.market,
+        commodity: record.commodity,
+        variety: record.variety,
+        minPrice: parseFloat(record.min_price),
+        maxPrice: parseFloat(record.max_price),
+        modalPrice: parseFloat(record.modal_price),
+        arrivalDate: new Date(record.arrival_date),
+        unit: 'Quintal'
+      };
+
+      // Upsert: Update if exists, Insert if new
+      await MandiPrice.findOneAndUpdate(
+        { 
+          market: priceData.market, 
+          commodity: priceData.commodity, 
+          arrivalDate: priceData.arrivalDate 
+        },
+        priceData,
+        { upsert: true, new: true }
+      );
+      savedCount++;
+    }
+
+    console.log(`Successfully saved ${savedCount} Mandi prices to MongoDB.`);
+    
+    auditEmitter.emit('auditLog', {
+      action: 'SYSTEM_CRON',
+      entityId: null,
+      entityModel: 'MandiPrice',
+      performedBy: 'SYSTEM',
+      details: { message: `Updated ${savedCount} Mandi prices from Agmarknet` }
+    });
+
+  } catch (error) {
+    console.error('Error saving prices to DB:', error);
+  }
+};
+
+module.exports = { fetchAgmarknetPrices };

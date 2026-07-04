@@ -1,11 +1,12 @@
 const cron = require('node-cron');
-const { savePricesToDB } = require('../services/priceService');
+const { fetchAgmarknetPrices } = require('../services/priceService');
 const { saveSchemesToDB } = require('../services/schemeService');
 
 const initCronJobs = () => {
-  cron.schedule('0 6 * * *', async () => {
-    console.log('Running daily Mandi price refresh...');
-    await savePricesToDB();
+  // Run every day at midnight to update Mandi Prices
+  cron.schedule('0 0 * * *', async () => {
+    console.log('[CRON] Running daily Mandi price update...');
+    await fetchAgmarknetPrices();
   });
 
   cron.schedule('0 0 * * *', async () => {
