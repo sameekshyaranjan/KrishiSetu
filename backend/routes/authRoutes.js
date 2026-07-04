@@ -9,14 +9,16 @@ const {
   refreshToken,
 } = require('../controllers/authController');
 const { otpLimiter } = require('../middleware/rateLimiter');
+const validate = require('../middleware/validate');
+const { sendOTPValidator, verifyOTPValidator } = require('../middleware/validators/authValidators');
 
 // Farmer auth
-router.post('/send-otp', otpLimiter, sendFarmerOTP);
-router.post('/verify-otp', verifyFarmerOTP);
+router.post('/send-otp', otpLimiter, sendOTPValidator, validate, sendFarmerOTP);
+router.post('/verify-otp', verifyOTPValidator, validate, verifyFarmerOTP);
 
 // Trader auth
-router.post('/trader/send-otp', otpLimiter, sendTraderOTP);
-router.post('/trader/verify-otp', verifyTraderOTP);
+router.post('/trader/send-otp', otpLimiter, sendOTPValidator, validate, sendTraderOTP);
+router.post('/trader/verify-otp', verifyOTPValidator, validate, verifyTraderOTP);
 
 // Admin auth
 router.post('/admin/login', adminLogin);
