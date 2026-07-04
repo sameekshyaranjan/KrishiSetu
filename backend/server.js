@@ -19,6 +19,8 @@ const { initCronJobs } = require('./jobs/cronJobs');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 const auditEmitter = require('./utils/auditEmitter');
 const { globalLimiter } = require('./middleware/rateLimiter');
+const helmet = require('helmet');
+const mongoSanitize = require('express-mongo-sanitize');
 
 dotenv.config();
 
@@ -26,10 +28,9 @@ connectDB();
 
 initCronJobs();
 
-// Test the Audit Emitter (Removed)
-
 const app = express();
 
+app.use(helmet());
 app.use(globalLimiter);
 
 const server = http.createServer(app);
