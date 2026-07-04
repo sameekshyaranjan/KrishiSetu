@@ -1,87 +1,85 @@
 # KrishiSetu (Agricultural B2B Marketplace) 🌾
 
-KrishiSetu is a digital bridge connecting Farmers directly with commercial Traders, bypassing traditional middlemen. It provides a transparent, auction-style bidding marketplace for agricultural commodities, along with daily Mandi prices, government scheme discovery, and automated notifications.
+KrishiSetu is a digital bridge connecting Farmers directly with commercial Traders, bypassing traditional middlemen. It provides a transparent, auction-style bidding marketplace for agricultural commodities, along with real-time API integrations for Mandi prices, government schemes, financial transactions, and weather alerts.
 
-This repository currently contains the **Backend API**, built with Node.js, Express, and MongoDB.
-
-## 🚀 Features Built So Far (Stages 1–44)
-
-### 🔐 Authentication & Roles (OTP-Based)
-- **Farmers & Traders**: Passwordless login using Mobile OTPs (simulated via Redis).
-- **Admins**: Secure Email/Password login using bcrypt.
-- **Role-Based Access Control (RBAC)**: Strict middleware ensuring traders can't access farmer features, and vice-versa.
-- **JWT Management**: Access and Refresh token generation with secure payloads.
-
-### 🚜 Core Marketplace (Crop Listings & Bidding)
-- **Crop Listings**: Farmers can create, read, update, and delete crop listings.
-- **Bidding System**: 
-  - Traders can place bids (with a hard minimum validation against the farmer's base price).
-  - Traders can update or withdraw their pending bids.
-  - Farmers can view all bids on their listings and Accept/Reject them.
-  - Auto-state management (Accepting a bid automatically marks the crop as 'sold').
-
-### 📈 External Data Services (Mandi Prices & Gov Schemes)
-- **Mandi Prices**: 
-  - Daily automated cron job that fetches mock prices from APMC markets across India.
-  - Search APIs to filter prices by commodity, state, and district.
-- **Government Schemes**:
-  - Nightly automated cron job that scrapes agricultural schemes.
-  - **Draft/Publish Workflow**: Scraped schemes are saved as hidden drafts. Admins must review and manually publish them before Farmers can see them.
-
-### 🔔 Notification System
-- **Polymorphic Architecture**: A single Notification model dynamically references either a `Farmer` or `Trader` using Mongoose `refPath`.
-- **Event-Driven**: Background notifications trigger automatically when:
-  - A Trader places a bid.
-  - A Trader updates a bid.
-  - A Farmer accepts/rejects a bid.
-- **Endpoints**: Fetch all, Mark as Read, Mark All as Read (using optimized bulk MongoDB updates).
+**Current Build Status:** Backend Phase 2 (Completed up to Stage 60 / 107)
 
 ---
 
-## 🛠 Tech Stack
-- **Runtime**: Node.js
-- **Framework**: Express.js
-- **Database**: MongoDB (Mongoose ORM)
-- **Caching**: Redis (for OTP temporary storage)
-- **Task Scheduling**: node-cron
+## 🚀 Key Architectural Features
+
+### 1. The "Karnataka Pivot" (Hyper-Local Architecture)
+Unlike generic platforms, KrishiSetu is currently heavily optimized for the state of Karnataka. 
+- All MongoDB schemas (`Farmer`, `Trader`, `ColdStorage`) strictly validate against a hardcoded array of Karnataka's 13 primary agricultural districts.
+- Prevents out-of-state data pollution and ensures logistics remain highly localized.
+
+### 2. Hybrid Transaction Engine
+KrishiSetu facilitates the financial closure of accepted bids via a dual-engine:
+- **Online:** Integrated with Razorpay SDK. Includes backend cryptographic HMAC-SHA256 signature verification to prevent frontend payment spoofing.
+- **Offline:** A secure Manual Payment tracking endpoint (`/api/transactions/manual`) to log cash or direct UPI transfers.
+
+### 3. Geospatial Cold Storage Locator
+Built using **GeoJSON** data structures and MongoDB `2dsphere` indexes. The backend uses the `$near` geospatial operator to calculate the exact distance between a farmer's GPS coordinates and nearby cold storage facilities, returning results sorted by proximity in milliseconds.
+
+### 4. Enterprise Security & Architecture
+- **Authentication:** Decoupled registration endpoints (`/api/auth/register/farmer` & `/trader`) with robust Email/Password bcrypt hashing.
+- **Protection:** Helmet.js for HTTP header sanitization, Express-Validator for strict payload formatting, and Redis-backed Rate Limiting to prevent brute-force and DDoS attacks.
+- **Real-Time Engine:** Socket.io WebSockets push live notifications to clients the millisecond a bid is placed or accepted.
+- **Audit Logging:** An Event-Driven Node.js `EventEmitter` asynchronously tracks all critical system mutations (Bids, Auth, Admin actions) without blocking the main HTTP request thread.
 
 ---
 
-## 💻 How to Run Locally
+## 🔌 Third-Party API Integrations (With Dev Mocks)
 
-### 1. Prerequisites
-- Node.js (v18+)
-- MongoDB (Local or Atlas URL)
-- Redis Server (Running on default port 6379)
+To optimize development speed and completely eliminate API costs during local testing, KrishiSetu implements sophisticated **Development Mocks** for all 3rd-party services.
 
-### 2. Environment Variables
+1. **Twilio SMS/Voice:** 
+   - Intercepts farmer missed-calls, queries live prices, and generates multi-language (i18n) SMS templates in Kannada, Hindi, and English. 
+   - *Mock:* Logs the translated SMS directly to the backend terminal.
+2. **Agmarknet (Govt API):** 
+   - Daily cron jobs fetch official Mandi prices.
+3. **Razorpay:** 
+   - *Mock:* Simulates Order IDs and validates dummy frontend signatures.
+4. **OpenWeatherMap:** 
+   - Custom Agricultural Risk Engine (`weatherService.js`) evaluates wind speed (>60km/h) and rainfall intensity.
+   - *Mock:* Injects randomized severe weather scenarios to safely test cron-job warning triggers.
+
+---
+
+## 💻 Tech Stack
+- **Runtime:** Node.js (v18+)
+- **Framework:** Express.js
+- **Database:** MongoDB (Mongoose ORM)
+- **Caching & Rate Limiting:** Redis (Upstash)
+- **Real-Time:** Socket.io
+- **Security:** bcryptjs, jsonwebtoken (JWT), Helmet.js
+- **Job Scheduling:** node-cron
+
+---
+
+## 🛠️ How to Run Locally
+
+### 1. Environment Variables
 Create a `.env` file in the `backend` directory:
 ```env
 PORT=5000
-MONGO_URI=mongodb://127.0.0.1:27017/krishisetu
+MONGO_URI=mongodb+srv://<user>:<password>@cluster.mongodb.net/krishisetu
 JWT_SECRET=your_jwt_secret
 JWT_REFRESH_SECRET=your_refresh_secret
 NODE_ENV=development
+REDIS_URL=rediss://default:your_redis_token@your-upstash-url.io:6379
 ```
 
-### 3. Installation
+### 2. Installation & Startup
 ```bash
 cd backend
 npm install
-```
-
-### 4. Start Server
-```bash
-# Development mode (with nodemon)
 npm run dev
-
-# Production mode
-npm start
 ```
 
 ---
 
-## 📍 Up Next (Phase 1 Backend Wrap-up)
-- **Stage 45-46**: Twilio SMS Integration.
-- **Stage 47-49**: Insight Services (Mock Weather API & AI Crop Advisory).
-- **Stage 50+**: Admin Moderation tools, search pagination, and system-wide rate-limiting.
+## ⏭️ Up Next (Backend Finalization)
+- **Stages 61-62:** Automated Cron Jobs (Price drop alerts & Harvest reminders).
+- **Stages 64-66:** Lot Sheet PDF Generators & API Pagination.
+- **Stages 67-68:** In-App Direct Messaging between Farmers & Traders.

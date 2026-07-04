@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const {
-  registerUser,
+  registerFarmer,
+  registerTrader,
   verifyRegistrationOTP,
   loginWithPassword,
   sendLoginOTP,
@@ -14,7 +15,8 @@ const {
 const { otpLimiter } = require('../middleware/rateLimiter');
 const validate = require('../middleware/validate');
 const { 
-  registerValidator, 
+  registerFarmerValidator,
+  registerTraderValidator, 
   verifyOTPValidator, 
   loginValidator, 
   emailOnlyValidator, 
@@ -22,7 +24,8 @@ const {
 } = require('../middleware/validators/authValidators');
 
 // Registration Flow
-router.post('/register', otpLimiter, registerValidator, validate, registerUser);
+router.post('/register/farmer', otpLimiter, registerFarmerValidator, validate, registerFarmer);
+router.post('/register/trader', otpLimiter, registerTraderValidator, validate, registerTrader);
 router.post('/register/verify', verifyOTPValidator, validate, verifyRegistrationOTP);
 
 // Login Flows

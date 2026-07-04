@@ -1,10 +1,22 @@
 const { body } = require('express-validator');
 
-const registerValidator = [
+const registerFarmerValidator = [
   body('name').isString().notEmpty().withMessage('Name is required'),
   body('email').isEmail().withMessage('Valid email is required'),
   body('mobile').isString().matches(/^\d{10}$/).withMessage('Valid 10-digit mobile number is required'),
-  body('password').isString().isLength({ min: 8 }).withMessage('Password must be at least 8 characters long')
+  body('password').isString().isLength({ min: 8 }).withMessage('Password must be at least 8 characters long'),
+  body('state').optional().isString(),
+  body('district').optional().isString()
+];
+
+const registerTraderValidator = [
+  body('name').isString().notEmpty().withMessage('Name is required'),
+  body('companyName').optional().isString(), // specific to trader
+  body('email').isEmail().withMessage('Valid email is required'),
+  body('mobile').isString().matches(/^\d{10}$/).withMessage('Valid 10-digit mobile number is required'),
+  body('password').isString().isLength({ min: 8 }).withMessage('Password must be at least 8 characters long'),
+  body('state').optional().isString(),
+  body('district').optional().isString()
 ];
 
 const verifyOTPValidator = [
@@ -28,7 +40,8 @@ const resetPasswordValidator = [
 ];
 
 module.exports = {
-  registerValidator,
+  registerFarmerValidator,
+  registerTraderValidator,
   verifyOTPValidator,
   loginValidator,
   emailOnlyValidator,

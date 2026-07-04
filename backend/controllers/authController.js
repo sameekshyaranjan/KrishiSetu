@@ -19,15 +19,11 @@ const findUserByEmail = async (email) => {
   return { user: null, role: null };
 };
 
-exports.registerUser = async (req, res, next) => {
+exports.registerFarmer = async (req, res, next) => {
   try {
-    const { role, email, ...userData } = req.body;
+    const { email, ...userData } = req.body;
     const lowerEmail = email.toLowerCase();
     
-    if (!['farmer', 'trader'].includes(role)) {
-      return res.status(400).json({ message: 'Invalid role specified' });
-    }
-
     const { user: existingUser } = await findUserByEmail(lowerEmail);
     if (existingUser) {
       return res.status(400).json({ message: 'Email already registered' });
@@ -35,12 +31,38 @@ exports.registerUser = async (req, res, next) => {
 
     const otp = generateOTP();
     await redisClient.set(`rl:register:otp:${lowerEmail}`, otp, 'EX', 300);
-    await redisClient.set(`rl:register:data:${lowerEmail}`, JSON.stringify({ role, email: lowerEmail, ...userData }), 'EX', 300);
+    await redisClient.set(`rl:register:data:${lowerEmail}`, JSON.stringify({ role: 'farmer', email: lowerEmail, ...userData }), 'EX', 300);
 
     await sendEmail({
       email: lowerEmail,
       subject: 'KrishiSetu Registration OTP',
-      message: `Your OTP for KrishiSetu registration is: ${otp}. It will expire in 5 minutes.`
+      message: `Your OTP for KrishiSetu farmer registration is: ${otp}. It will expire in 5 minutes.`
+    });
+
+    res.status(200).json({ message: 'OTP sent to email for verification' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.registerTrader = async (req, res, next) => {
+  try {
+    const { email, companyName, ...userData } = req.body;
+    const lowerEmail = email.toLowerCase();
+    
+    const { user: existingUser } = await findUserByEmail(lowerEmail);
+    if (existingUser) {
+      return res.status(400).json({ message: 'Email already registered' });
+    }
+
+    const otp = generateOTP();
+    await redisClient.set(`rl:register:otp:${lowerEmail}`, otp, 'EX', 300);
+    await redisClient.set(`rl:register:data:${lowerEmail}`, JSON.stringify({ role: 'trader', email: lowerEmail, companyName, ...userData }), 'EX', 300);
+
+    await sendEmail({
+      email: lowerEmail,
+      subject: 'KrishiSetu Registration OTP',
+      message: `Your OTP for KrishiSetu trader registration is: ${otp}. It will expire in 5 minutes.`
     });
 
     res.status(200).json({ message: 'OTP sent to email for verification' });
