@@ -18,10 +18,14 @@ const farmerSchema = new mongoose.Schema({
   },
   district: {
     type: String,
-    index: true
+    required: true,
+    index: true,
+    enum: ['Bengaluru Urban', 'Bengaluru Rural', 'Mysuru', 'Hubballi', 'Dharwad', 'Belagavi', 'Mangaluru', 'Tumakuru', 'Mandya', 'Hassan', 'Kalaburagi', 'Raichur', 'Ballari']
   },
   state: {
-    type: String
+    type: String,
+    default: 'Karnataka',
+    enum: ['Karnataka']
   },
   cropsGrown: [{
     type: String
@@ -38,7 +42,7 @@ const farmerSchema = new mongoose.Schema({
   },
   language: {
     type: String,
-    default: 'en'
+    default: 'kn'
   },
   email: {
     type: String,

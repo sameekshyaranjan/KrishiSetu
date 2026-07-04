@@ -25,6 +25,17 @@ const traderSchema = new mongoose.Schema({
     unique: true,
     match: [/^\d{10}$/, 'Please provide a valid 10-digit mobile number']
   },
+  district: {
+    type: String,
+    required: true,
+    index: true,
+    enum: ['Bengaluru Urban', 'Bengaluru Rural', 'Mysuru', 'Hubballi', 'Dharwad', 'Belagavi', 'Mangaluru', 'Tumakuru', 'Mandya', 'Hassan', 'Kalaburagi', 'Raichur', 'Ballari']
+  },
+  state: {
+    type: String,
+    default: 'Karnataka',
+    enum: ['Karnataka']
+  },
   companyName: {
     type: String
   },
