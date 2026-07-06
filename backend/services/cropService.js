@@ -1,5 +1,6 @@
 const Crop = require('../models/Crop');
 const { createNotification } = require('../utils/createNotification');
+const redisClient = require('../config/redis');
 
 const sendHarvestReminders = async () => {
   try {
@@ -47,4 +48,61 @@ const sendHarvestReminders = async () => {
   }
 };
 
-module.exports = { sendHarvestReminders };
+const expireStaleCrops = async () => {
+  try {
+    console.log('[CRON] Scanning for stale crop listings...');
+    
+    const now = new Date();
+    
+    const perishableDate = new Date();
+    perishableDate.setDate(now.getDate() - 14);
+
+    const nonPerishableDate = new Date();
+    nonPerishableDate.setDate(now.getDate() - 60);
+
+    const perishableCategories = ['vegetables', 'fruits', 'flowers']; // flowers not in enum but safe check
+    
+    // Find expired perishables
+    const expiredPerishables = await Crop.find({
+      status: 'available',
+      category: { $in: perishableCategories },
+      createdAt: { $lte: perishableDate }
+    });
+
+    // Find expired non-perishables
+    const expiredNonPerishables = await Crop.find({
+      status: 'available',
+      category: { $nin: perishableCategories },
+      createdAt: { $lte: nonPerishableDate }
+    });
+
+    const allExpired = [...expiredPerishables, ...expiredNonPerishables];
+
+    if (allExpired.length > 0) {
+      const expiredIds = allExpired.map(crop => crop._id);
+      
+      await Crop.updateMany(
+        { _id: { $in: expiredIds } },
+        { status: 'expired' }
+      );
+
+      for (const crop of allExpired) {
+        await createNotification(
+          crop.farmer,
+          'Farmer',
+          'Listing Expired',
+          `Your listing for ${crop.name} has expired because it was inactive for too long. Please renew it if you still wish to sell.`
+        );
+      }
+
+      await redisClient.incr('crops_feed_version');
+      console.log(`[ALERT] Auto-expired ${allExpired.length} stale listings.`);
+    } else {
+      console.log('[CRON] No stale listings found.');
+    }
+  } catch (error) {
+    console.error('Error expiring stale crops:', error);
+  }
+};
+
+module.exports = { sendHarvestReminders, expireStaleCrops };

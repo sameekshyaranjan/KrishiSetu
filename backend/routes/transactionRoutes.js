@@ -5,7 +5,8 @@ const {
   verifyRazorpayPayment,
   recordManualTransaction,
   getMyTransactions,
-  getTransactionById
+  getTransactionById,
+  updateLogisticsStatus
 } = require('../controllers/transactionController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -16,5 +17,6 @@ router.post('/razorpay/verify', verifyRazorpayPayment);
 router.post('/manual', recordManualTransaction);
 router.get('/my-transactions', getMyTransactions);
 router.get('/:id', getTransactionById);
+router.put('/:id/logistics', updateLogisticsStatus);
 
 module.exports = router;

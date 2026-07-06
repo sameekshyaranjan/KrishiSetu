@@ -80,18 +80,17 @@ const verifyRazorpayPayment = async (req, res, next) => {
 
     if (isAuthentic) {
       const tx = await Transaction.findByIdAndUpdate(transactionId, {
-        paymentStatus: 'completed',
-        paymentGatewayId: razorpay_payment_id
+        paymentStatus: 'held_in_escrow'
       }, { new: true }).populate('trader');
       
       createNotification(
         tx.farmer,
         'Farmer',
-        'Payment Received',
-        `Payment of ₹${tx.amount} has been successfully received from ${tx.trader?.name || 'a trader'}.`
+        'Payment in Escrow',
+        `Payment of ₹${tx.amount} has been successfully placed in escrow by ${tx.trader?.name || 'a trader'}. Please prepare the crop for pickup/delivery.`
       );
 
-      res.status(200).json({ message: 'Payment verified successfully' });
+      res.status(200).json({ message: 'Payment verified and held in escrow' });
     } else {
       const tx = await Transaction.findByIdAndUpdate(transactionId, {
         paymentStatus: 'failed'
@@ -130,6 +129,7 @@ const recordManualTransaction = async (req, res, next) => {
       amount,
       paymentMethod: 'manual',
       paymentStatus: 'completed',
+      logisticsStatus: 'delivered',
       transactionDate: Date.now()
     });
 
@@ -185,10 +185,60 @@ const getTransactionById = async (req, res, next) => {
   }
 };
 
+const updateLogisticsStatus = async (req, res, next) => {
+  try {
+    const { status } = req.body;
+    
+    if (!['pending', 'in_transit', 'delivered'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid logistics status' });
+    }
+
+    const tx = await Transaction.findById(req.params.id).populate('farmer trader cropListing');
+    if (!tx) return res.status(404).json({ message: 'Transaction not found' });
+
+    if (tx.farmer._id.toString() !== req.user.id && tx.trader._id.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Not authorized to update logistics status' });
+    }
+
+    tx.logisticsStatus = status;
+
+    if (status === 'delivered') {
+      tx.paymentStatus = 'payout_released';
+      console.log(`\n[PAYOUT SIMULATION] Releasing ₹${tx.amount} from Escrow to Farmer: ${tx.farmer.name}\n`);
+
+      createNotification(
+        tx.farmer._id,
+        'Farmer',
+        'Payout Released',
+        `Crop delivery confirmed! ₹${tx.amount} has been released from escrow to your bank account.`
+      );
+      createNotification(
+        tx.trader._id,
+        'Trader',
+        'Delivery Confirmed',
+        `Delivery of ${tx.cropListing.name} confirmed. Thank you for using KrishiSetu.`
+      );
+    } else if (status === 'in_transit') {
+      createNotification(
+        tx.trader._id,
+        'Trader',
+        'Crop In Transit',
+        `Your crop ${tx.cropListing.name} is now in transit.`
+      );
+    }
+
+    await tx.save();
+    res.status(200).json({ message: 'Logistics status updated', transaction: tx });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createRazorpayOrder,
   verifyRazorpayPayment,
   recordManualTransaction,
   getMyTransactions,
-  getTransactionById
+  getTransactionById,
+  updateLogisticsStatus
 };

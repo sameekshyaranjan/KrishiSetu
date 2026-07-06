@@ -38,7 +38,7 @@ const cropSchema = new mongoose.Schema({
   }],
   status: {
     type: String,
-    enum: ['available', 'sold', 'removed'],
+    enum: ['available', 'sold', 'removed', 'expired'],
     default: 'available'
   },
   harvestStatus: {

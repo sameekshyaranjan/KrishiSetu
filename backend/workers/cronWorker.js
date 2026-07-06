@@ -2,7 +2,7 @@ const { Worker } = require('bullmq');
 const redisClient = require('../config/redis');
 const { fetchAgmarknetPrices, checkPriceAlerts } = require('../services/priceService');
 const { saveSchemesToDB } = require('../services/schemeService');
-const { sendHarvestReminders } = require('../services/cropService');
+const { sendHarvestReminders, expireStaleCrops } = require('../services/cropService');
 
 console.log('[Worker] Booting up cronWorker...');
 
@@ -21,6 +21,9 @@ const cronWorker = new Worker('cronQueue', async (job) => {
       break;
     case 'sendHarvestReminders':
       await sendHarvestReminders();
+      break;
+    case 'expireStaleCrops':
+      await expireStaleCrops();
       break;
     default:
       console.warn(`[Worker] Unknown job name: ${job.name}`);

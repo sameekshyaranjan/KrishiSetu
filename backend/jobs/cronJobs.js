@@ -31,6 +31,11 @@ const initCronJobs = async () => {
       repeat: { pattern: '0 6 * * *' }
     });
 
+    // Expire Stale Crops - 1:00 AM every day
+    await cronQueue.add('expireStaleCrops', {}, {
+      repeat: { pattern: '0 1 * * *' }
+    });
+
     console.log('[Queue] Daily jobs successfully scheduled in BullMQ.');
   } catch (error) {
     console.error('[Queue] Error scheduling jobs:', error);
