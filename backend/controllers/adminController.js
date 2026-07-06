@@ -4,6 +4,7 @@ const Crop = require('../models/Crop');
 const Bid = require('../models/Bid');
 const Transaction = require('../models/Transaction');
 const GovernmentScheme = require('../models/GovernmentScheme');
+const AuditLog = require('../models/AuditLog');
 const redisClient = require('../config/redis');
 
 const getDashboardStats = async (req, res, next) => {
@@ -145,4 +146,40 @@ const getTraderById = async (req, res, next) => {
   }
 };
 
-module.exports = { getDashboardStats, getAllFarmers, getAllTraders, getFarmerById, getTraderById };
+const getAuditLogs = async (req, res, next) => {
+  try {
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const skip = (page - 1) * limit;
+
+    const query = {};
+    if (req.query.performedByModel) {
+      query.performedByModel = req.query.performedByModel;
+    }
+    if (req.query.action) {
+      query.action = req.query.action;
+    }
+
+    const [logs, total] = await Promise.all([
+      AuditLog.find(query)
+        .populate('performedBy', 'name email mobile')
+        .skip(skip)
+        .limit(limit)
+        .sort({ createdAt: -1 }),
+      AuditLog.countDocuments(query)
+    ]);
+
+    res.status(200).json({
+      success: true,
+      count: logs.length,
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+      data: logs
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { getDashboardStats, getAllFarmers, getAllTraders, getFarmerById, getTraderById, getAuditLogs };
