@@ -2,6 +2,7 @@ const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const Transaction = require('../models/Transaction');
 const Bid = require('../models/Bid');
+const { paginate } = require('../utils/paginate');
 
 const createRazorpayOrder = async (req, res, next) => {
   try {
@@ -118,13 +119,20 @@ const getMyTransactions = async (req, res, next) => {
     const role = req.user.role; // injected by protect middleware
     const filter = role === 'farmer' ? { farmer: req.user.id } : { trader: req.user.id };
 
-    const transactions = await Transaction.find(filter)
-      .populate('cropListing', 'title variety quantity expectedPrice')
-      .populate('farmer', 'name district state mobile')
-      .populate('trader', 'name companyName mobile')
-      .sort({ transactionDate: -1 });
+    const result = await paginate(
+      Transaction,
+      filter,
+      req.query.page,
+      req.query.limit,
+      [
+        { path: 'cropListing', select: 'title variety quantity expectedPrice' },
+        { path: 'farmer', select: 'name district state mobile' },
+        { path: 'trader', select: 'name companyName mobile' }
+      ],
+      { transactionDate: -1 }
+    );
 
-    res.status(200).json(transactions);
+    res.status(200).json(result);
   } catch (error) {
     next(error);
   }

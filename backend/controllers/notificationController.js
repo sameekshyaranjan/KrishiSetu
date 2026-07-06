@@ -1,11 +1,18 @@
 const Notification = require('../models/Notification');
+const { paginate } = require('../utils/paginate');
 
 const getMyNotifications = async (req, res, next) => {
   try {
-    const notifications = await Notification.find({ recipientId: req.user.id })
-      .sort({ createdAt: -1 });
+    const result = await paginate(
+      Notification,
+      { recipientId: req.user.id },
+      req.query.page,
+      req.query.limit,
+      null,
+      { createdAt: -1 }
+    );
     
-    res.status(200).json(notifications);
+    res.status(200).json(result);
   } catch (error) {
     next(error);
   }

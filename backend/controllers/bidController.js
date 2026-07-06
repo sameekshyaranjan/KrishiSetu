@@ -1,6 +1,7 @@
 const Bid = require('../models/Bid');
 const Crop = require('../models/Crop');
 const { createNotification } = require('../utils/createNotification');
+const { paginate } = require('../utils/paginate');
 
 const placeBid = async (req, res, next) => {
   try {
@@ -42,11 +43,16 @@ const placeBid = async (req, res, next) => {
 
 const getBidsForListing = async (req, res, next) => {
   try {
-    const bids = await Bid.find({ crop: req.params.cropId })
-      .populate('trader', 'name mobile companyName')
-      .sort({ amount: -1 });
+    const result = await paginate(
+      Bid,
+      { crop: req.params.cropId },
+      req.query.page,
+      req.query.limit,
+      { path: 'trader', select: 'name mobile companyName' },
+      { amount: -1 }
+    );
 
-    res.status(200).json(bids);
+    res.status(200).json(result);
   } catch (error) {
     next(error);
   }
@@ -54,12 +60,19 @@ const getBidsForListing = async (req, res, next) => {
 
 const getMyBids = async (req, res, next) => {
   try {
-    const bids = await Bid.find({ trader: req.user.id })
-      .populate('crop', 'name category basePrice status')
-      .populate('farmer', 'name village district mobile')
-      .sort({ createdAt: -1 });
+    const result = await paginate(
+      Bid,
+      { trader: req.user.id },
+      req.query.page,
+      req.query.limit,
+      [
+        { path: 'crop', select: 'name category basePrice status' },
+        { path: 'farmer', select: 'name village district mobile' }
+      ],
+      { createdAt: -1 }
+    );
 
-    res.status(200).json(bids);
+    res.status(200).json(result);
   } catch (error) {
     next(error);
   }
