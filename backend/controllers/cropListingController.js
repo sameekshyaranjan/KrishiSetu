@@ -1,10 +1,16 @@
 const Crop = require('../models/Crop');
+const Farmer = require('../models/Farmer');
 const { generateLotSheet } = require('../utils/generateLotSheet');
 const { paginate } = require('../utils/paginate');
 const redisClient = require('../config/redis');
 
 const createCropListing = async (req, res, next) => {
   try {
+    const farmer = await Farmer.findById(req.user.id);
+    if (!farmer || !farmer.district || !farmer.state || !farmer.mobile) {
+      return res.status(403).json({ message: 'Please complete your profile (district, state, and mobile number) before creating a crop listing.' });
+    }
+
     const { name, category, quantity, unit, basePrice, description } = req.body;
     
     let images = [];
