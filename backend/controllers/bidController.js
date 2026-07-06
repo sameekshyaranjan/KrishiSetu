@@ -213,4 +213,48 @@ const respondToBid = async (req, res, next) => {
   }
 };
 
-module.exports = { placeBid, getBidsForListing, getMyBids, updateBid, withdrawBid, respondToBid };
+const undoAcceptBid = async (req, res, next) => {
+  try {
+    const bid = await Bid.findById(req.params.id);
+    if (!bid) return res.status(404).json({ message: 'Bid not found' });
+    
+    if (bid.farmer.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'You are not authorized to undo this bid' });
+    }
+
+    if (bid.status !== 'accepted') {
+      return res.status(400).json({ message: 'Can only undo accepted bids' });
+    }
+
+    // Check if within 15 minutes cooling off period
+    const timeDiff = Date.now() - bid.updatedAt.getTime();
+    if (timeDiff > 15 * 60 * 1000) {
+      return res.status(400).json({ message: 'Cooling off period (15 minutes) has expired. Cannot undo.' });
+    }
+
+    // Check if trader has already initiated payment
+    const Transaction = require('../models/Transaction');
+    const tx = await Transaction.findOne({ bid: bid._id });
+    if (tx && tx.paymentStatus !== 'failed') {
+      return res.status(400).json({ message: 'Trader has already initiated payment. Cannot undo.' });
+    }
+
+    bid.status = 'pending';
+    await bid.save();
+
+    await Crop.findByIdAndUpdate(bid.crop, { status: 'available' });
+
+    // Restore other bids that were rejected during the fat-finger acceptance
+    const recentTime = new Date(Date.now() - 16 * 60 * 1000);
+    await Bid.updateMany(
+      { crop: bid.crop, status: 'rejected', updatedAt: { $gte: recentTime } },
+      { status: 'pending' }
+    );
+
+    res.status(200).json({ message: 'Bid acceptance undone successfully. Crop is available again.', bid });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { placeBid, getBidsForListing, getMyBids, updateBid, withdrawBid, respondToBid, undoAcceptBid };
