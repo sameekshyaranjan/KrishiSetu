@@ -19,7 +19,8 @@ const transactionSchema = new mongoose.Schema({
   },
   amount: {
     type: Number,
-    required: [true, 'Transaction amount is required']
+    required: [true, 'Transaction amount is required'],
+    min: 0
   },
   paymentStatus: {
     type: String,

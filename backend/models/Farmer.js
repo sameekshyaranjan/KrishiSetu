@@ -31,7 +31,8 @@ const farmerSchema = new mongoose.Schema({
     type: String
   }],
   landArea: {
-    type: Number
+    type: Number,
+    min: 0
   },
   sowingSeason: {
     type: String

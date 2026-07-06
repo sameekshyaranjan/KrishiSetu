@@ -2,7 +2,9 @@ const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const Transaction = require('../models/Transaction');
 const Bid = require('../models/Bid');
+const Crop = require('../models/Crop');
 const { paginate } = require('../utils/paginate');
+const { createNotification } = require('../utils/createNotification');
 
 const createRazorpayOrder = async (req, res, next) => {
   try {
@@ -77,16 +79,29 @@ const verifyRazorpayPayment = async (req, res, next) => {
     }
 
     if (isAuthentic) {
-      await Transaction.findByIdAndUpdate(transactionId, {
+      const tx = await Transaction.findByIdAndUpdate(transactionId, {
         paymentStatus: 'completed',
         paymentGatewayId: razorpay_payment_id
-      });
+      }, { new: true }).populate('trader');
+      
+      createNotification(
+        tx.farmer,
+        'Farmer',
+        'Payment Received',
+        `Payment of ₹${tx.amount} has been successfully received from ${tx.trader?.name || 'a trader'}.`
+      );
+
       res.status(200).json({ message: 'Payment verified successfully' });
     } else {
-      await Transaction.findByIdAndUpdate(transactionId, {
+      const tx = await Transaction.findByIdAndUpdate(transactionId, {
         paymentStatus: 'failed'
       });
-      res.status(400).json({ message: 'Invalid payment signature' });
+      
+      // Rollback crop and bid statuses
+      await Bid.findByIdAndUpdate(tx.bid, { status: 'pending' });
+      await Crop.findByIdAndUpdate(tx.cropListing, { status: 'available' });
+
+      res.status(400).json({ message: 'Invalid payment signature, transaction failed and rolled back' });
     }
   } catch (error) {
     next(error);

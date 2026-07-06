@@ -17,7 +17,8 @@ const cropSchema = new mongoose.Schema({
   },
   quantity: {
     type: Number,
-    required: [true, 'Please provide the quantity']
+    required: [true, 'Please provide the quantity'],
+    min: 0
   },
   unit: {
     type: String,
@@ -26,7 +27,8 @@ const cropSchema = new mongoose.Schema({
   },
   basePrice: {
     type: Number,
-    required: [true, 'Please provide a base price (minimum expected price)']
+    required: [true, 'Please provide a base price (minimum expected price)'],
+    min: 0
   },
   description: {
     type: String

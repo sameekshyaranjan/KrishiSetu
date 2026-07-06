@@ -18,7 +18,8 @@ const bidSchema = new mongoose.Schema({
   },
   amount: {
     type: Number,
-    required: [true, 'Please provide the bid amount']
+    required: [true, 'Please provide the bid amount'],
+    min: 0
   },
   status: {
     type: String,

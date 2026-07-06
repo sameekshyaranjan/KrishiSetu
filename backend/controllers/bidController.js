@@ -169,6 +169,25 @@ const respondToBid = async (req, res, next) => {
       if (!updatedCrop) {
         return res.status(400).json({ message: 'This crop is no longer available. It may have been sold to someone else.' });
       }
+
+      // Reject all other pending bids for this crop
+      const otherBids = await Bid.find({ crop: bid.crop, _id: { $ne: bid._id }, status: 'pending' });
+      
+      if (otherBids.length > 0) {
+        await Bid.updateMany(
+          { crop: bid.crop, _id: { $ne: bid._id }, status: 'pending' },
+          { status: 'rejected' }
+        );
+
+        for (const otherBid of otherBids) {
+          createNotification(
+            otherBid.trader,
+            'Trader',
+            'Bid Rejected',
+            'Your bid was rejected because the crop was sold to someone else.'
+          );
+        }
+      }
     }
 
     bid.status = status;
