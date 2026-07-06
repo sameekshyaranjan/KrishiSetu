@@ -6,7 +6,8 @@ const {
   getAllListings,
   getListingById,
   updateCropListing,
-  deleteCropListing
+  deleteCropListing,
+  getLotSheet
 } = require('../controllers/cropListingController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
@@ -15,6 +16,7 @@ router.use(protect);
 router.get('/my/listings', authorize('farmer'), getMyListings);
 router.get('/', authorize('trader', 'admin'), getAllListings);
 router.get('/:id', authorize('farmer', 'trader', 'admin'), getListingById);
+router.get('/:id/lot-sheet', authorize('farmer', 'trader', 'admin'), getLotSheet);
 router.post('/', authorize('farmer'), createCropListing);
 router.put('/:id', authorize('farmer'), updateCropListing);
 router.delete('/:id', authorize('farmer'), deleteCropListing);

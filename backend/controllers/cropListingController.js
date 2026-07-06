@@ -1,4 +1,5 @@
 const Crop = require('../models/Crop');
+const { generateLotSheet } = require('../utils/generateLotSheet');
 
 const createCropListing = async (req, res, next) => {
   try {
@@ -113,4 +114,24 @@ const deleteCropListing = async (req, res, next) => {
   }
 };
 
-module.exports = { createCropListing, getMyListings, getAllListings, getListingById, updateCropListing, deleteCropListing };
+const getLotSheet = async (req, res, next) => {
+  try {
+    const listing = await Crop.findById(req.params.id).populate('farmer');
+
+    if (!listing) {
+      return res.status(404).json({ message: 'Crop listing not found' });
+    }
+
+    if (!listing.farmer) {
+      return res.status(404).json({ message: 'Farmer details not found for this listing' });
+    }
+
+    const lotSheet = generateLotSheet(listing, listing.farmer);
+
+    res.status(200).json(lotSheet);
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { createCropListing, getMyListings, getAllListings, getListingById, updateCropListing, deleteCropListing, getLotSheet };
