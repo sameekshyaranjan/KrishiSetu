@@ -140,7 +140,7 @@ const withdrawBid = async (req, res, next) => {
 
 const respondToBid = async (req, res, next) => {
   try {
-    const { status } = req.body;
+    const { status, expectedAmount } = req.body;
 
     if (!['accepted', 'rejected'].includes(status)) {
       return res.status(400).json({ message: 'Status must be either accepted or rejected' });
@@ -160,6 +160,13 @@ const respondToBid = async (req, res, next) => {
     }
 
     if (status === 'accepted') {
+      if (!expectedAmount) {
+        return res.status(400).json({ message: 'expectedAmount is required when accepting a bid to prevent bait-and-switch.' });
+      }
+      if (bid.amount !== expectedAmount) {
+        return res.status(409).json({ message: `The trader has updated this bid amount to ₹${bid.amount}. Please review the new amount before accepting.` });
+      }
+      
       const updatedCrop = await Crop.findOneAndUpdate(
         { _id: bid.crop, status: 'available' },
         { status: 'sold' },
