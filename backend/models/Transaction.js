@@ -24,12 +24,12 @@ const transactionSchema = new mongoose.Schema({
   },
   paymentStatus: {
     type: String,
-    enum: ['pending', 'initiated', 'held_in_escrow', 'completed', 'failed', 'payout_released'],
+    enum: ['pending', 'initiated', 'held_in_escrow', 'completed', 'failed', 'payout_released', 'refunded'],
     default: 'pending'
   },
   logisticsStatus: {
     type: String,
-    enum: ['pending', 'in_transit', 'delivered'],
+    enum: ['pending', 'in_transit', 'delivered', 'disputed', 'resolved'],
     default: 'pending'
   },
   paymentMethod: {

@@ -169,4 +169,49 @@ const suspendUser = async (req, res, next) => {
   }
 };
 
-module.exports = { getDashboardStats, getAllFarmers, getAllTraders, getFarmerById, getTraderById, getAuditLogs, suspendUser };
+const resolveDispute = async (req, res, next) => {
+  try {
+    const { action } = req.body; // 'refund_trader' or 'payout_farmer'
+    
+    if (!['refund_trader', 'payout_farmer'].includes(action)) {
+       return res.status(400).json({ message: "Action must be 'refund_trader' or 'payout_farmer'" });
+    }
+
+    const tx = await Transaction.findById(req.params.id).populate('farmer trader cropListing');
+    if (!tx) return res.status(404).json({ message: 'Transaction not found' });
+
+    if (tx.logisticsStatus !== 'disputed') {
+      return res.status(400).json({ message: 'Transaction is not disputed' });
+    }
+
+    const { createNotification } = require('../utils/createNotification');
+
+    if (action === 'refund_trader') {
+      tx.paymentStatus = 'refunded';
+      console.log(`\n[REFUND SIMULATION] Refunding ₹${tx.amount} to Trader: ${tx.trader.name}\n`);
+      
+      createNotification(tx.trader._id, 'Trader', 'Dispute Resolved', 'Admin resolved the dispute in your favor. A refund has been issued.');
+      createNotification(tx.farmer._id, 'Farmer', 'Dispute Resolved', 'Admin resolved the dispute in favor of the trader. Escrow funds were refunded.');
+      
+      // Revert crop and bid
+      await Bid.findByIdAndUpdate(tx.bid, { status: 'rejected' });
+      await Crop.findByIdAndUpdate(tx.cropListing._id, { status: 'available' });
+
+    } else if (action === 'payout_farmer') {
+      tx.paymentStatus = 'payout_released';
+      console.log(`\n[PAYOUT SIMULATION] Forcing release of ₹${tx.amount} to Farmer: ${tx.farmer.name}\n`);
+      
+      createNotification(tx.farmer._id, 'Farmer', 'Dispute Resolved', 'Admin resolved the dispute in your favor. Funds released from escrow.');
+      createNotification(tx.trader._id, 'Trader', 'Dispute Resolved', 'Admin resolved the dispute in favor of the farmer. Funds paid out.');
+    }
+
+    tx.logisticsStatus = 'resolved';
+    await tx.save();
+
+    res.status(200).json({ message: `Dispute resolved with action: ${action}`, transaction: tx });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { getDashboardStats, getAllFarmers, getAllTraders, getFarmerById, getTraderById, getAuditLogs, suspendUser, resolveDispute };

@@ -6,7 +6,8 @@ const {
   recordManualTransaction,
   getMyTransactions,
   getTransactionById,
-  updateLogisticsStatus
+  updateLogisticsStatus,
+  disputeTransaction
 } = require('../controllers/transactionController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -18,5 +19,6 @@ router.post('/manual', recordManualTransaction);
 router.get('/my-transactions', getMyTransactions);
 router.get('/:id', getTransactionById);
 router.put('/:id/logistics', updateLogisticsStatus);
+router.put('/:id/dispute', disputeTransaction);
 
 module.exports = router;

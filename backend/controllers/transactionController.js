@@ -234,11 +234,46 @@ const updateLogisticsStatus = async (req, res, next) => {
   }
 };
 
+const disputeTransaction = async (req, res, next) => {
+  try {
+    const tx = await Transaction.findById(req.params.id).populate('farmer trader cropListing');
+    if (!tx) return res.status(404).json({ message: 'Transaction not found' });
+
+    if (tx.farmer._id.toString() !== req.user.id && tx.trader._id.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Not authorized to dispute this transaction' });
+    }
+
+    if (tx.paymentStatus !== 'held_in_escrow' || !['pending', 'in_transit', 'delivered'].includes(tx.logisticsStatus)) {
+      return res.status(400).json({ message: 'Transaction cannot be disputed at this stage' });
+    }
+
+    tx.logisticsStatus = 'disputed';
+    await tx.save();
+
+    const otherParty = tx.farmer._id.toString() === req.user.id ? tx.trader._id : tx.farmer._id;
+    const otherPartyRole = tx.farmer._id.toString() === req.user.id ? 'Trader' : 'Farmer';
+    const myRole = req.user.role === 'farmer' ? 'Farmer' : 'Trader';
+
+    const { createNotification } = require('../utils/createNotification');
+    createNotification(
+      otherParty,
+      otherPartyRole,
+      'Transaction Disputed',
+      `The ${myRole} has disputed the transaction for ${tx.cropListing.name}. Escrow is frozen pending Admin review.`
+    );
+
+    res.status(200).json({ message: 'Transaction marked as disputed. Escrow frozen.', transaction: tx });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createRazorpayOrder,
   verifyRazorpayPayment,
   recordManualTransaction,
   getMyTransactions,
   getTransactionById,
-  updateLogisticsStatus
+  updateLogisticsStatus,
+  disputeTransaction
 };
