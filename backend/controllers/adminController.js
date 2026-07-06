@@ -6,6 +6,7 @@ const Transaction = require('../models/Transaction');
 const GovernmentScheme = require('../models/GovernmentScheme');
 const AuditLog = require('../models/AuditLog');
 const redisClient = require('../config/redis');
+const { paginate } = require('../utils/paginate');
 
 const getDashboardStats = async (req, res, next) => {
   try {
@@ -63,10 +64,6 @@ const getDashboardStats = async (req, res, next) => {
 
 const getAllFarmers = async (req, res, next) => {
   try {
-    const page = parseInt(req.query.page, 10) || 1;
-    const limit = parseInt(req.query.limit, 10) || 10;
-    const skip = (page - 1) * limit;
-
     const query = {};
     if (req.query.search) {
       query.name = { $regex: req.query.search, $options: 'i' };
@@ -75,19 +72,8 @@ const getAllFarmers = async (req, res, next) => {
       query.district = req.query.district;
     }
 
-    const [farmers, total] = await Promise.all([
-      Farmer.find(query).skip(skip).limit(limit).sort({ createdAt: -1 }),
-      Farmer.countDocuments(query)
-    ]);
-
-    res.status(200).json({
-      success: true,
-      count: farmers.length,
-      total,
-      page,
-      pages: Math.ceil(total / limit),
-      data: farmers
-    });
+    const result = await paginate(Farmer, query, req.query.page, req.query.limit);
+    res.status(200).json(result);
   } catch (error) {
     next(error);
   }
@@ -95,28 +81,13 @@ const getAllFarmers = async (req, res, next) => {
 
 const getAllTraders = async (req, res, next) => {
   try {
-    const page = parseInt(req.query.page, 10) || 1;
-    const limit = parseInt(req.query.limit, 10) || 10;
-    const skip = (page - 1) * limit;
-
     const query = {};
     if (req.query.verificationStatus) {
       query.verificationStatus = req.query.verificationStatus;
     }
 
-    const [traders, total] = await Promise.all([
-      Trader.find(query).skip(skip).limit(limit).sort({ createdAt: -1 }),
-      Trader.countDocuments(query)
-    ]);
-
-    res.status(200).json({
-      success: true,
-      count: traders.length,
-      total,
-      page,
-      pages: Math.ceil(total / limit),
-      data: traders
-    });
+    const result = await paginate(Trader, query, req.query.page, req.query.limit);
+    res.status(200).json(result);
   } catch (error) {
     next(error);
   }
@@ -148,10 +119,6 @@ const getTraderById = async (req, res, next) => {
 
 const getAuditLogs = async (req, res, next) => {
   try {
-    const page = parseInt(req.query.page, 10) || 1;
-    const limit = parseInt(req.query.limit, 10) || 10;
-    const skip = (page - 1) * limit;
-
     const query = {};
     if (req.query.performedByModel) {
       query.performedByModel = req.query.performedByModel;
@@ -160,23 +127,8 @@ const getAuditLogs = async (req, res, next) => {
       query.action = req.query.action;
     }
 
-    const [logs, total] = await Promise.all([
-      AuditLog.find(query)
-        .populate('performedBy', 'name email mobile')
-        .skip(skip)
-        .limit(limit)
-        .sort({ createdAt: -1 }),
-      AuditLog.countDocuments(query)
-    ]);
-
-    res.status(200).json({
-      success: true,
-      count: logs.length,
-      total,
-      page,
-      pages: Math.ceil(total / limit),
-      data: logs
-    });
+    const result = await paginate(AuditLog, query, req.query.page, req.query.limit, 'performedBy');
+    res.status(200).json(result);
   } catch (error) {
     next(error);
   }

@@ -1,5 +1,6 @@
 const Crop = require('../models/Crop');
 const { generateLotSheet } = require('../utils/generateLotSheet');
+const { paginate } = require('../utils/paginate');
 
 const createCropListing = async (req, res, next) => {
   try {
@@ -38,11 +39,15 @@ const getAllListings = async (req, res, next) => {
     if (req.query.category) filter.category = req.query.category;
     if (req.query.name) filter.name = { $regex: req.query.name, $options: 'i' };
 
-    const listings = await Crop.find(filter)
-      .populate('farmer', 'name village district state mobile')
-      .sort({ createdAt: -1 });
+    const result = await paginate(
+      Crop,
+      filter,
+      req.query.page,
+      req.query.limit,
+      { path: 'farmer', select: 'name village district state mobile' }
+    );
 
-    res.status(200).json(listings);
+    res.status(200).json(result);
   } catch (error) {
     next(error);
   }
