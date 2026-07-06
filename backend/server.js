@@ -19,6 +19,7 @@ const smsRoutes = require('./routes/smsRoutes');
 const transactionRoutes = require('./routes/transactionRoutes');
 const storageRoutes = require('./routes/storageRoutes');
 const { initCronJobs } = require('./jobs/cronJobs');
+require('./workers/cronWorker'); // Initialize BullMQ Worker
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 const auditEmitter = require('./utils/auditEmitter');
 const { globalLimiter } = require('./middleware/rateLimiter');

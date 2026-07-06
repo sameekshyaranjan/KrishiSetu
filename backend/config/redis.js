@@ -3,7 +3,9 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
-const redisClient = new Redis(process.env.REDIS_URL);
+const redisClient = new Redis(process.env.REDIS_URL, {
+  maxRetriesPerRequest: null
+});
 
 redisClient.on('connect', () => {
   console.log('Redis connected successfully');

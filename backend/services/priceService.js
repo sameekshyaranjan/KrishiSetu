@@ -1,5 +1,7 @@
 const axios = require('axios');
 const MandiPrice = require('../models/MandiPrice');
+const Crop = require('../models/Crop');
+const { createNotification } = require('../utils/createNotification');
 const auditEmitter = require('../utils/auditEmitter');
 
 const fetchAgmarknetPrices = async () => {
@@ -99,4 +101,53 @@ const savePricesToDB = async (records) => {
   }
 };
 
-module.exports = { fetchAgmarknetPrices };
+const checkPriceAlerts = async () => {
+  try {
+    console.log('[CRON] Checking for >10% price fluctuations...');
+    const crops = await Crop.find({ status: 'available' }).populate('farmer');
+    
+    // Group crops by commodity and district to avoid redundant DB queries
+    const cropGroups = {};
+    for (const crop of crops) {
+      if (!crop.farmer || !crop.farmer.district) continue;
+      
+      const key = `${crop.name}-${crop.farmer.district}`;
+      if (!cropGroups[key]) {
+        cropGroups[key] = { commodity: crop.name, district: crop.farmer.district, farmers: new Set() };
+      }
+      cropGroups[key].farmers.add(crop.farmer._id.toString());
+    }
+
+    for (const key in cropGroups) {
+      const { commodity, district, farmers } = cropGroups[key];
+      
+      // Fetch the two most recent prices for this commodity in this district
+      const prices = await MandiPrice.find({ commodity, district })
+        .sort({ arrivalDate: -1 })
+        .limit(2);
+        
+      if (prices.length === 2) {
+        const todayPrice = prices[0].modalPrice;
+        const yesterdayPrice = prices[1].modalPrice;
+        
+        if (yesterdayPrice > 0) {
+          const percentChange = ((todayPrice - yesterdayPrice) / yesterdayPrice) * 100;
+          
+          if (Math.abs(percentChange) >= 10) {
+            const direction = percentChange > 0 ? 'spiked' : 'dropped';
+            const message = `Alert: The Mandi price for ${commodity} in ${district} has ${direction} by ${Math.abs(percentChange).toFixed(1)}% today. Current price: ₹${todayPrice}/Quintal.`;
+            
+            for (const farmerId of farmers) {
+              await createNotification(farmerId, 'Farmer', 'Market Price Alert', message);
+            }
+            console.log(`[ALERT] Sent ${direction} notification to ${farmers.size} farmers for ${commodity} in ${district}`);
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error checking price alerts:', error);
+  }
+};
+
+module.exports = { fetchAgmarknetPrices, checkPriceAlerts };
