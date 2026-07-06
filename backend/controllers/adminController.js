@@ -134,4 +134,39 @@ const getAuditLogs = async (req, res, next) => {
   }
 };
 
-module.exports = { getDashboardStats, getAllFarmers, getAllTraders, getFarmerById, getTraderById, getAuditLogs };
+const suspendUser = async (req, res, next) => {
+  try {
+    const { role, id } = req.params;
+    let user;
+    
+    if (role === 'farmer') {
+      user = await Farmer.findById(id);
+    } else if (role === 'trader') {
+      user = await Trader.findById(id);
+    } else {
+      return res.status(400).json({ message: 'Invalid role for suspension. Must be farmer or trader.' });
+    }
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.isSuspended = !user.isSuspended;
+    await user.save();
+
+    if (user.isSuspended) {
+      await redisClient.sadd('suspended_users', id);
+    } else {
+      await redisClient.srem('suspended_users', id);
+    }
+
+    res.status(200).json({ 
+      message: `User ${user.isSuspended ? 'suspended' : 'unsuspended'} successfully`, 
+      isSuspended: user.isSuspended 
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { getDashboardStats, getAllFarmers, getAllTraders, getFarmerById, getTraderById, getAuditLogs, suspendUser };

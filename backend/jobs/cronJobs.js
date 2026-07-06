@@ -36,6 +36,11 @@ const initCronJobs = async () => {
       repeat: { pattern: '0 1 * * *' }
     });
 
+    // Revert Unpaid Bids - Every Hour
+    await cronQueue.add('revertUnpaidBids', {}, {
+      repeat: { pattern: '0 * * * *' }
+    });
+
     console.log('[Queue] Daily jobs successfully scheduled in BullMQ.');
   } catch (error) {
     console.error('[Queue] Error scheduling jobs:', error);

@@ -61,6 +61,14 @@ const traderSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  penaltyCount: {
+    type: Number,
+    default: 0
+  },
+  isSuspended: {
+    type: Boolean,
+    default: false
+  },
   createdAt: {
     type: Date,
     default: Date.now

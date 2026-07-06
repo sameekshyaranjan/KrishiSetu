@@ -3,6 +3,7 @@ const redisClient = require('../config/redis');
 const { fetchAgmarknetPrices, checkPriceAlerts } = require('../services/priceService');
 const { saveSchemesToDB } = require('../services/schemeService');
 const { sendHarvestReminders, expireStaleCrops } = require('../services/cropService');
+const { revertUnpaidBids } = require('../services/bidService');
 
 console.log('[Worker] Booting up cronWorker...');
 
@@ -24,6 +25,9 @@ const cronWorker = new Worker('cronQueue', async (job) => {
       break;
     case 'expireStaleCrops':
       await expireStaleCrops();
+      break;
+    case 'revertUnpaidBids':
+      await revertUnpaidBids();
       break;
     default:
       console.warn(`[Worker] Unknown job name: ${job.name}`);

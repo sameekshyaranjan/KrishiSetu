@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
+const redisClient = require('../config/redis');
 
-const protect = (req, res, next) => {
+const protect = async (req, res, next) => {
   let token;
 
   if (
@@ -17,6 +18,13 @@ const protect = (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded;
+
+    // Fast O(1) Redis check for suspended accounts
+    const isSuspended = await redisClient.sismember('suspended_users', req.user.id);
+    if (isSuspended) {
+      return res.status(403).json({ message: 'Your account has been suspended by the administrator.' });
+    }
+
     next();
   } catch (error) {
     return res.status(401).json({ message: 'Not authorized, token is invalid' });

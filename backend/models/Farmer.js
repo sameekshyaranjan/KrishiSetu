@@ -41,6 +41,10 @@ const farmerSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  isSuspended: {
+    type: Boolean,
+    default: false
+  },
   language: {
     type: String,
     default: 'kn'
