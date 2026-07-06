@@ -56,6 +56,10 @@ const cropSchema = new mongoose.Schema({
   }
 });
 
+cropSchema.index({ status: 1, category: 1 });
+cropSchema.index({ farmer: 1, status: 1 });
+cropSchema.index({ name: 'text' });
+
 const Crop = mongoose.model('Crop', cropSchema);
 
 module.exports = Crop;

@@ -34,6 +34,10 @@ const bidSchema = new mongoose.Schema({
   }
 });
 
+bidSchema.index({ crop: 1, status: 1 });
+bidSchema.index({ trader: 1, createdAt: -1 });
+bidSchema.index({ farmer: 1 });
+
 const Bid = mongoose.model('Bid', bidSchema);
 
 module.exports = Bid;

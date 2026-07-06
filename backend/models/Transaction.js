@@ -42,6 +42,10 @@ const transactionSchema = new mongoose.Schema({
   }
 });
 
+transactionSchema.index({ farmer: 1, transactionDate: -1 });
+transactionSchema.index({ trader: 1, transactionDate: -1 });
+transactionSchema.index({ paymentStatus: 1 });
+
 const Transaction = mongoose.model('Transaction', transactionSchema);
 
 module.exports = Transaction;

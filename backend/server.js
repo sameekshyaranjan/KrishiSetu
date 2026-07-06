@@ -44,8 +44,9 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: '*',
+    origin: process.env.CLIENT_URL || 'http://localhost:5173',
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    credentials: true
   },
 });
 
@@ -94,7 +95,6 @@ socketEmitter.on('newMessage', (message, receiverId) => {
 // Middleware
 app.use(cors());
 app.use(morgan('dev'));
-app.use(express.json());
 
 // Routes
 app.use('/api/auth', authRoutes);
