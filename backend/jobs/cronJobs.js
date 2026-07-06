@@ -26,6 +26,11 @@ const initCronJobs = async () => {
       repeat: { pattern: '30 0 * * *' }
     });
 
+    // Harvest Reminders - 6:00 AM every day
+    await cronQueue.add('sendHarvestReminders', {}, {
+      repeat: { pattern: '0 6 * * *' }
+    });
+
     console.log('[Queue] Daily jobs successfully scheduled in BullMQ.');
   } catch (error) {
     console.error('[Queue] Error scheduling jobs:', error);

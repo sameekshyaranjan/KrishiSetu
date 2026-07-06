@@ -39,6 +39,17 @@ const cropSchema = new mongoose.Schema({
     enum: ['available', 'sold', 'removed'],
     default: 'available'
   },
+  harvestStatus: {
+    type: String,
+    enum: ['pre-harvest', 'post-harvest'],
+    default: 'post-harvest'
+  },
+  expectedHarvestDate: {
+    type: Date,
+    required: function() {
+      return this.harvestStatus === 'pre-harvest';
+    }
+  },
   createdAt: {
     type: Date,
     default: Date.now
