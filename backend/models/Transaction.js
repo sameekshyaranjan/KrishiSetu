@@ -45,6 +45,7 @@ const transactionSchema = new mongoose.Schema({
 transactionSchema.index({ farmer: 1, transactionDate: -1 });
 transactionSchema.index({ trader: 1, transactionDate: -1 });
 transactionSchema.index({ paymentStatus: 1 });
+transactionSchema.index({ bid: 1 }, { unique: true, partialFilterExpression: { bid: { $exists: true, $type: "objectId" } } });
 
 const Transaction = mongoose.model('Transaction', transactionSchema);
 

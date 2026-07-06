@@ -268,11 +268,37 @@ exports.refreshToken = async (req, res, next) => {
     if (!token) {
       return res.status(401).json({ message: 'Refresh token is required' });
     }
+
+    // Check if token is in the blocklist
+    const isBlocklisted = await redisClient.get(`rl:blocklist:${token}`);
+    if (isBlocklisted) {
+      return res.status(401).json({ message: 'Refresh token has been revoked' });
+    }
+
     const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
+    
+    // Add old token to blocklist (TTL 7 days to match token expiry)
+    await redisClient.setex(`rl:blocklist:${token}`, 7 * 24 * 60 * 60, 'revoked');
+
     const payload = { id: decoded.id, role: decoded.role };
     const newAccessToken = generateAccessToken(payload);
-    res.status(200).json({ accessToken: newAccessToken });
+    const newRefreshToken = generateRefreshToken(payload);
+
+    res.status(200).json({ accessToken: newAccessToken, refreshToken: newRefreshToken });
   } catch (error) {
     return res.status(401).json({ message: 'Invalid or expired refresh token' });
+  }
+};
+
+exports.logout = async (req, res, next) => {
+  try {
+    const { refreshToken } = req.body;
+    if (refreshToken) {
+      // Blocklist the refresh token so it cannot be used again
+      await redisClient.setex(`rl:blocklist:${refreshToken}`, 7 * 24 * 60 * 60, 'revoked');
+    }
+    res.status(200).json({ message: 'Logged out successfully' });
+  } catch (error) {
+    next(error);
   }
 };

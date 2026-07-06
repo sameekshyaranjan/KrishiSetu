@@ -26,4 +26,16 @@ const otpLimiter = rateLimit({
   message: { message: 'Too many OTP requests from this IP, please try again after 15 minutes.' }
 });
 
-module.exports = { globalLimiter, otpLimiter };
+const adminLoginLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  limit: 5,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  store: new RedisStore({
+    prefix: 'rl:admin:',
+    sendCommand: (...args) => redisClient.call(...args)
+  }),
+  message: { message: 'Too many admin login attempts from this IP, please try again after an hour.' }
+});
+
+module.exports = { globalLimiter, otpLimiter, adminLoginLimiter };

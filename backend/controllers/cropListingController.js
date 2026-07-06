@@ -30,6 +30,8 @@ const createCropListing = async (req, res, next) => {
       images
     });
 
+    await redisClient.incr('crops_feed_version');
+
     res.status(201).json(crop);
   } catch (error) {
     next(error);
@@ -47,7 +49,8 @@ const getMyListings = async (req, res, next) => {
 
 const getAllListings = async (req, res, next) => {
   try {
-    const cacheKey = `crops:feed:${req.query.category || 'all'}:${req.query.name || 'none'}:${req.query.page || 1}:${req.query.limit || 10}`;
+    const version = await redisClient.get('crops_feed_version') || '1';
+    const cacheKey = `crops:feed:v${version}:${req.query.category || 'all'}:${req.query.name || 'none'}:${req.query.page || 1}:${req.query.limit || 10}`;
 
     const cachedData = await redisClient.get(cacheKey);
     if (cachedData) {
@@ -120,6 +123,8 @@ const updateCropListing = async (req, res, next) => {
 
     const updatedListing = await listing.save();
 
+    await redisClient.incr('crops_feed_version');
+
     res.status(200).json(updatedListing);
   } catch (error) {
     next(error);
@@ -140,6 +145,8 @@ const deleteCropListing = async (req, res, next) => {
 
     listing.status = 'removed';
     await listing.save();
+
+    await redisClient.incr('crops_feed_version');
 
     res.status(200).json({ message: 'Listing removed successfully' });
   } catch (error) {

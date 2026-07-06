@@ -38,6 +38,7 @@ const mandiPriceSchema = new mongoose.Schema({
 });
 
 mandiPriceSchema.index({ commodity: 1, market: 1, arrivalDate: 1 });
+mandiPriceSchema.index({ commodity: 'text' });
 
 const MandiPrice = mongoose.model('MandiPrice', mandiPriceSchema);
 

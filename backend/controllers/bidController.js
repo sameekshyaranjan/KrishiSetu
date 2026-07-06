@@ -159,12 +159,20 @@ const respondToBid = async (req, res, next) => {
       return res.status(400).json({ message: 'Only pending bids can be responded to' });
     }
 
+    if (status === 'accepted') {
+      const updatedCrop = await Crop.findOneAndUpdate(
+        { _id: bid.crop, status: 'available' },
+        { status: 'sold' },
+        { new: true }
+      );
+
+      if (!updatedCrop) {
+        return res.status(400).json({ message: 'This crop is no longer available. It may have been sold to someone else.' });
+      }
+    }
+
     bid.status = status;
     await bid.save();
-
-    if (status === 'accepted') {
-      await Crop.findByIdAndUpdate(bid.crop, { status: 'sold' });
-    }
 
     createNotification(
       bid.trader,

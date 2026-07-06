@@ -14,6 +14,11 @@ const createRazorpayOrder = async (req, res, next) => {
       return res.status(400).json({ message: 'Can only pay for accepted bids.' });
     }
 
+    const existingTx = await Transaction.findOne({ bid });
+    if (existingTx) {
+      return res.status(400).json({ message: 'A transaction for this bid already exists.' });
+    }
+
     const razorpayInstance = new Razorpay({
       key_id: process.env.RAZORPAY_KEY_ID || 'dummy_key_id',
       key_secret: process.env.RAZORPAY_KEY_SECRET || 'dummy_key_secret',
@@ -95,6 +100,11 @@ const recordManualTransaction = async (req, res, next) => {
     const existingBid = await Bid.findById(bid);
     if (!existingBid || existingBid.status !== 'accepted') {
       return res.status(400).json({ message: 'Can only record manual transactions for accepted bids.' });
+    }
+
+    const existingTx = await Transaction.findOne({ bid });
+    if (existingTx) {
+      return res.status(400).json({ message: 'A transaction for this bid already exists.' });
     }
 
     const transaction = await Transaction.create({

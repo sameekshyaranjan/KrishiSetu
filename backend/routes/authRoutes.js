@@ -11,8 +11,10 @@ const {
   resetPassword,
   adminLogin,
   refreshToken,
+  logout,
 } = require('../controllers/authController');
-const { otpLimiter } = require('../middleware/rateLimiter');
+const { otpLimiter, adminLoginLimiter } = require('../middleware/rateLimiter');
+const { protect } = require('../middleware/authMiddleware');
 const validate = require('../middleware/validate');
 const { 
   registerFarmerValidator,
@@ -38,9 +40,10 @@ router.post('/password/forgot', otpLimiter, emailOnlyValidator, validate, forgot
 router.post('/password/reset', resetPasswordValidator, validate, resetPassword);
 
 // Admin auth
-router.post('/admin/login', adminLogin);
+router.post('/admin/login', adminLoginLimiter, adminLogin);
 
 // Token management
 router.post('/refresh-token', refreshToken);
+router.post('/logout', protect, logout);
 
 module.exports = router;
