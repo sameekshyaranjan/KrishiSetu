@@ -77,6 +77,20 @@ io.on('connection', (socket) => {
   });
 });
 
+const socketEmitter = require('./utils/socketEmitter');
+
+socketEmitter.on('new-notification', (notification, recipientId) => {
+  if (io && recipientId) {
+    io.to(recipientId.toString()).emit('new-notification', notification);
+  }
+});
+
+socketEmitter.on('newMessage', (message, receiverId) => {
+  if (io && receiverId) {
+    io.to(receiverId.toString()).emit('newMessage', message);
+  }
+});
+
 // Middleware
 app.use(cors());
 app.use(morgan('dev'));

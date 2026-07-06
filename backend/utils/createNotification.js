@@ -9,12 +9,8 @@ const createNotification = async (recipientId, recipientModel, title, message) =
       message
     });
 
-    // Import io here to avoid circular dependency issues at the top of the file
-    const { io } = require('../server');
-    
-    if (io) {
-      io.to(recipientId.toString()).emit('new-notification', notification);
-    }
+    const socketEmitter = require('./socketEmitter');
+    socketEmitter.emit('new-notification', notification, recipientId);
 
     return notification;
   } catch (error) {

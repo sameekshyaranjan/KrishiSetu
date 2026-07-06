@@ -1,10 +1,23 @@
 const Crop = require('../models/Crop');
 const { generateLotSheet } = require('../utils/generateLotSheet');
 const { paginate } = require('../utils/paginate');
+const redisClient = require('../config/redis');
 
 const createCropListing = async (req, res, next) => {
   try {
-    const { name, category, quantity, unit, basePrice, description, images } = req.body;
+    const { name, category, quantity, unit, basePrice, description } = req.body;
+    
+    let images = [];
+    // 1. If images were sent as string URLs (backwards compatibility)
+    if (req.body.images) {
+      images = Array.isArray(req.body.images) ? req.body.images : [req.body.images];
+    }
+    
+    // 2. If physical files were uploaded via multipart/form-data
+    if (req.files && req.files.length > 0) {
+      const uploadedImages = req.files.map(file => file.path);
+      images = [...images, ...uploadedImages];
+    }
 
     const crop = await Crop.create({
       farmer: req.user.id,
@@ -34,6 +47,16 @@ const getMyListings = async (req, res, next) => {
 
 const getAllListings = async (req, res, next) => {
   try {
+    const cacheKey = `crops:feed:${req.query.category || 'all'}:${req.query.name || 'none'}:${req.query.page || 1}:${req.query.limit || 10}`;
+
+    const cachedData = await redisClient.get(cacheKey);
+    if (cachedData) {
+      return res.status(200).json({
+        source: 'redis',
+        data: JSON.parse(cachedData)
+      });
+    }
+
     const filter = { status: 'available' };
 
     if (req.query.category) filter.category = req.query.category;
@@ -47,7 +70,12 @@ const getAllListings = async (req, res, next) => {
       { path: 'farmer', select: 'name village district state mobile' }
     );
 
-    res.status(200).json(result);
+    await redisClient.setex(cacheKey, 300, JSON.stringify(result));
+
+    res.status(200).json({
+      source: 'mongodb',
+      data: result
+    });
   } catch (error) {
     next(error);
   }

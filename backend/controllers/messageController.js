@@ -45,11 +45,9 @@ const sendMessage = async (req, res, next) => {
       content: content
     });
 
-    // 4. Emit real-time socket event
-    const { io } = require('../server');
-    if (io) {
-      io.to(receiverId.toString()).emit('newMessage', message);
-    }
+    // 4. Emit real-time node event to decouple WebSockets
+    const socketEmitter = require('../utils/socketEmitter');
+    socketEmitter.emit('newMessage', message, receiverId);
 
     res.status(201).json(message);
   } catch (error) {
