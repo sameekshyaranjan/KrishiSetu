@@ -45,6 +45,12 @@ const sendMessage = async (req, res, next) => {
       content: content
     });
 
+    // 4. Emit real-time socket event
+    const { io } = require('../server');
+    if (io) {
+      io.to(receiverId.toString()).emit('newMessage', message);
+    }
+
     res.status(201).json(message);
   } catch (error) {
     next(error);
