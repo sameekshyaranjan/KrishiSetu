@@ -1,45 +1,32 @@
 const mongoose = require('mongoose');
 
 const messageSchema = new mongoose.Schema({
-  senderId: {
+  conversationId: {
     type: mongoose.Schema.Types.ObjectId,
-    required: [true, 'Message must have a sender'],
+    ref: 'Conversation',
+    required: true
+  },
+  sender: {
+    type: mongoose.Schema.Types.ObjectId,
+    required: true,
     refPath: 'senderModel'
   },
   senderModel: {
     type: String,
     required: true,
-    enum: ['Farmer', 'Trader', 'Admin']
-  },
-  receiverId: {
-    type: mongoose.Schema.Types.ObjectId,
-    required: [true, 'Message must have a receiver'],
-    refPath: 'receiverModel'
-  },
-  receiverModel: {
-    type: String,
-    required: true,
-    enum: ['Farmer', 'Trader', 'Admin']
-  },
-  cropId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Crop'
+    enum: ['Farmer', 'Trader']
   },
   content: {
     type: String,
-    required: [true, 'Message content cannot be empty']
+    required: true
   },
   isRead: {
     type: Boolean,
     default: false
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
   }
+}, {
+  timestamps: true
 });
-
-messageSchema.index({ senderId: 1, receiverId: 1 });
 
 const Message = mongoose.model('Message', messageSchema);
 
