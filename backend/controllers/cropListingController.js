@@ -152,6 +152,28 @@ const deleteCropListing = async (req, res, next) => {
     listing.status = 'removed';
     await listing.save();
 
+    const Bid = require('../models/Bid');
+    const { createNotification } = require('../utils/createNotification');
+
+    // Cascade: Reject all pending bids to prevent "Ghost Bids"
+    const pendingBids = await Bid.find({ crop: listing._id, status: 'pending' });
+    
+    if (pendingBids.length > 0) {
+      await Bid.updateMany(
+        { crop: listing._id, status: 'pending' },
+        { status: 'rejected' }
+      );
+
+      for (const bid of pendingBids) {
+        createNotification(
+          bid.trader,
+          'Trader',
+          'Listing Removed',
+          `The farmer has removed the listing for ${listing.name}. Your pending bid was automatically rejected.`
+        );
+      }
+    }
+
     await redisClient.incr('crops_feed_version');
 
     res.status(200).json({ message: 'Listing removed successfully' });
