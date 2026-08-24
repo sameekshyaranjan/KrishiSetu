@@ -132,19 +132,19 @@ app.get('/health', (req, res) => {
 });
 
 // Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/farmers', farmerRoutes);
-app.use('/api/traders', traderRoutes);
-app.use('/api/listings', cropListingRoutes);
-app.use('/api/bids', bidRoutes);
-app.use('/api/prices', priceRoutes);
-app.use('/api/schemes', schemeRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/sms', smsRoutes);
-app.use('/api/transactions', transactionRoutes);
-app.use('/api/storage', storageRoutes);
-app.use('/api/messages', messageRoutes);
+app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/farmers', farmerRoutes);
+app.use('/api/v1/traders', traderRoutes);
+app.use('/api/v1/listings', cropListingRoutes);
+app.use('/api/v1/bids', bidRoutes);
+app.use('/api/v1/prices', priceRoutes);
+app.use('/api/v1/schemes', schemeRoutes);
+app.use('/api/v1/notifications', notificationRoutes);
+app.use('/api/v1/admin', adminRoutes);
+app.use('/api/v1/sms', smsRoutes);
+app.use('/api/v1/transactions', transactionRoutes);
+app.use('/api/v1/storage', storageRoutes);
+app.use('/api/v1/messages', messageRoutes);
 
 app.get('/', (req, res) => {
   res.json({ message: 'KrishiSetu API running' });
