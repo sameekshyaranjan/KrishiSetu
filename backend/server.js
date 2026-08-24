@@ -22,7 +22,10 @@ const transactionRoutes = require('./routes/transactionRoutes');
 const storageRoutes = require('./routes/storageRoutes');
 const messageRoutes = require('./routes/messageRoutes');
 const { initCronJobs } = require('./jobs/cronJobs');
-require('./workers/cronWorker'); // Initialize BullMQ Worker
+const cronWorker = require('./workers/cronWorker'); // Initialize BullMQ Worker
+const { cronQueue } = require('./config/bullmq');
+const mongoose = require('mongoose');
+const redisClient = require('./config/redis');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 const auditEmitter = require('./utils/auditEmitter');
 const { globalLimiter } = require('./middleware/rateLimiter');
@@ -159,5 +162,36 @@ const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
+// Graceful Shutdown (Stage 70.8)
+const shutdown = async () => {
+  console.log('\n[System] SIGTERM/SIGINT received. Shutting down gracefully...');
+  
+  server.close(() => {
+    console.log('[System] HTTP server closed.');
+  });
+
+  try {
+    if (cronWorker) await cronWorker.close();
+    console.log('[System] BullMQ Worker closed.');
+    
+    if (cronQueue) await cronQueue.close();
+    console.log('[System] BullMQ Queue closed.');
+
+    await mongoose.connection.close();
+    console.log('[System] MongoDB connection closed.');
+
+    if (redisClient.isReady) await redisClient.quit();
+    console.log('[System] Redis connection closed.');
+    
+    process.exit(0);
+  } catch (error) {
+    console.error('[System] Error during shutdown:', error);
+    process.exit(1);
+  }
+};
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
 
 module.exports = { io };
