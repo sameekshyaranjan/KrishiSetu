@@ -106,6 +106,31 @@ socketEmitter.on('newMessage', (message, receiverId) => {
 app.use(cors());
 app.use(morgan('dev'));
 
+// Health Check Endpoint (Stage 70.6)
+app.get('/health', (req, res) => {
+  const mongoose = require('mongoose');
+  const redisClient = require('./config/redis');
+  
+  const isMongoConnected = mongoose.connection.readyState === 1;
+  const isRedisConnected = redisClient.isReady;
+
+  if (isMongoConnected && isRedisConnected) {
+    return res.status(200).json({ 
+      status: 'OK', 
+      mongo: 'connected', 
+      redis: 'connected',
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  return res.status(503).json({ 
+    status: 'Service Unavailable', 
+    mongo: isMongoConnected ? 'connected' : 'disconnected', 
+    redis: isRedisConnected ? 'connected' : 'disconnected',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/farmers', farmerRoutes);
