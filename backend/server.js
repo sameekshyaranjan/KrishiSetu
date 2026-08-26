@@ -22,6 +22,8 @@ const transactionRoutes = require('./routes/transactionRoutes');
 const storageRoutes = require('./routes/storageRoutes');
 const messageRoutes = require('./routes/messageRoutes');
 const exportRoutes = require('./routes/exportRoutes');
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./config/swagger');
 const { initCronJobs } = require('./jobs/cronJobs');
 const cronWorker = require('./workers/cronWorker'); // Initialize BullMQ Worker
 const { cronQueue } = require('./config/bullmq');
@@ -42,7 +44,7 @@ initCronJobs();
 
 const app = express();
 
-app.use(helmet());
+app.use(helmet({ contentSecurityPolicy: false }));
 app.use(globalLimiter);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -111,6 +113,9 @@ socketEmitter.on('newMessage', (message, receiverId) => {
 app.use(cors());
 app.use(morgan('dev'));
 
+// Swagger Documentation UI (Stage 70.14)
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
 // Health Check Endpoint (Stage 70.6)
 app.get('/health', (req, res) => {
   const mongoose = require('mongoose');
@@ -153,7 +158,7 @@ app.use('/api/v1/messages', messageRoutes);
 app.use('/api/v1/export', exportRoutes);
 
 app.get('/', (req, res) => {
-  res.json({ message: 'KrishiSetu API running' });
+  res.json({ message: 'KrishiSetu API running. View docs at /api-docs' });
 });
 
 // Error handling
@@ -164,6 +169,7 @@ const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`);
+  logger.info(`Swagger documentation available at http://localhost:${PORT}/api-docs`);
 });
 
 // Graceful Shutdown (Stage 70.8)
