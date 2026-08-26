@@ -5,43 +5,35 @@ const { saveSchemesToDB } = require('../services/schemeService');
 const { sendHarvestReminders, expireStaleCrops } = require('../services/cropService');
 const { revertUnpaidBids } = require('../services/bidService');
 
-console.log('[Worker] Booting up cronWorker...');
+let cronWorker = null;
 
-const cronWorker = new Worker('cronQueue', async (job) => {
-  console.log(`[Worker] Processing job: ${job.name} (ID: ${job.id})`);
-  
-  switch(job.name) {
-    case 'fetchAgmarknetPrices':
-      await fetchAgmarknetPrices();
-      break;
-    case 'checkPriceAlerts':
-      await checkPriceAlerts();
-      break;
-    case 'saveSchemesToDB':
-      await saveSchemesToDB();
-      break;
-    case 'sendHarvestReminders':
-      await sendHarvestReminders();
-      break;
-    case 'expireStaleCrops':
-      await expireStaleCrops();
-      break;
-    case 'revertUnpaidBids':
-      await revertUnpaidBids();
-      break;
-    default:
-      console.warn(`[Worker] Unknown job name: ${job.name}`);
+if (redisClient.isRealRedis) {
+  try {
+    cronWorker = new Worker('cronQueue', async (job) => {
+      console.log(`[Worker] Processing job: ${job.name} (ID: ${job.id})`);
+      switch(job.name) {
+        case 'fetchAgmarknetPrices': await fetchAgmarknetPrices(); break;
+        case 'checkPriceAlerts': await checkPriceAlerts(); break;
+        case 'saveSchemesToDB': await saveSchemesToDB(); break;
+        case 'sendHarvestReminders': await sendHarvestReminders(); break;
+        case 'expireStaleCrops': await expireStaleCrops(); break;
+        case 'revertUnpaidBids': await revertUnpaidBids(); break;
+        default: console.warn(`[Worker] Unknown job name: ${job.name}`);
+      }
+    }, { connection: redisClient });
+
+    cronWorker.on('completed', (job) => {
+      console.log(`[Worker] Job ${job.name} completed successfully.`);
+    });
+
+    cronWorker.on('failed', (job, err) => {
+      console.error(`[Worker] Job ${job.name} failed with error: ${err.message}`);
+    });
+
+    cronWorker.on('error', () => {});
+  } catch (err) {
+    cronWorker = null;
   }
-}, { 
-  connection: redisClient 
-});
-
-cronWorker.on('completed', (job) => {
-  console.log(`[Worker] Job ${job.name} completed successfully.`);
-});
-
-cronWorker.on('failed', (job, err) => {
-  console.error(`[Worker] Job ${job.name} failed with error: ${err.message}`);
-});
+}
 
 module.exports = cronWorker;

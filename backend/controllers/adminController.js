@@ -262,6 +262,33 @@ const getRevenueAnalytics = async (req, res, next) => {
   }
 };
 
+const getDeletedListings = async (req, res, next) => {
+  try {
+    const result = await paginate(Crop, { status: 'removed' }, req.query.page, req.query.limit, 'farmer');
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const restoreListing = async (req, res, next) => {
+  try {
+    const crop = await Crop.findById(req.params.id);
+    if (!crop) return res.status(404).json({ message: 'Crop listing not found' });
+
+    if (crop.status !== 'removed') {
+      return res.status(400).json({ message: 'Crop listing is not removed' });
+    }
+
+    crop.status = 'available';
+    await crop.save();
+
+    res.status(200).json({ message: 'Listing restored successfully', crop });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = { 
   getDashboardStats, 
   getAllFarmers, 
@@ -271,5 +298,7 @@ module.exports = {
   getAuditLogs, 
   suspendUser, 
   resolveDispute,
-  getRevenueAnalytics
+  getRevenueAnalytics,
+  getDeletedListings,
+  restoreListing
 };

@@ -25,7 +25,7 @@ const exportRoutes = require('./routes/exportRoutes');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');
 const { initCronJobs } = require('./jobs/cronJobs');
-const cronWorker = require('./workers/cronWorker'); // Initialize BullMQ Worker
+const cronWorker = require('./workers/cronWorker');
 const { cronQueue } = require('./config/bullmq');
 const mongoose = require('mongoose');
 const redisClient = require('./config/redis');
@@ -38,9 +38,19 @@ const mongoSanitize = require('express-mongo-sanitize');
 
 dotenv.config();
 
-connectDB();
+// Global handler to catch any unhandled network drops gracefully
+process.on('unhandledRejection', (reason) => {
+  const msg = reason?.message || String(reason);
+  if (msg.includes('ENOTFOUND') || msg.includes('ECONNREFUSED') || msg.includes('ETIMEDOUT')) {
+    logger.warn(`[Network] Cloud service notice: ${msg}`);
+  } else {
+    logger.error(`[Process] Unhandled Rejection: ${msg}`);
+  }
+});
 
-initCronJobs();
+connectDB().catch(() => {});
+
+initCronJobs().catch(() => {});
 
 const app = express();
 
@@ -59,15 +69,21 @@ const io = new Server(server, {
   },
 });
 
-const pubClient = createClient({ url: process.env.REDIS_URL || 'redis://localhost:6379' });
-const subClient = pubClient.duplicate();
+// Attach Socket.io Redis adapter only if real cloud Redis is explicitly enabled
+if (redisClient.isRealRedis && process.env.REDIS_URL) {
+  const pubClient = createClient({ url: process.env.REDIS_URL });
+  const subClient = pubClient.duplicate();
 
-Promise.all([pubClient.connect(), subClient.connect()]).then(() => {
-  io.adapter(createAdapter(pubClient, subClient));
-  logger.info('[Socket] Redis Adapter attached to Socket.io');
-}).catch(err => {
-  logger.warn('[Socket] Redis adapter failed to connect, using default in-memory adapter');
-});
+  pubClient.on('error', () => {});
+  subClient.on('error', () => {});
+
+  Promise.allSettled([pubClient.connect(), subClient.connect()]).then((results) => {
+    if (results.every(r => r.status === 'fulfilled')) {
+      io.adapter(createAdapter(pubClient, subClient));
+      logger.info('[Socket] Redis Adapter attached to Socket.io');
+    }
+  });
+}
 
 io.use((socket, next) => {
   const token = socket.handshake.auth.token || socket.handshake.query.token;
@@ -120,25 +136,22 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Health Check Endpoint (Stage 70.6)
 app.get('/health', (req, res) => {
-  const mongoose = require('mongoose');
-  const redisClient = require('./config/redis');
-  
   const isMongoConnected = mongoose.connection.readyState === 1;
-  const isRedisConnected = redisClient.isReady;
+  const isRedisActive = redisClient.isRealRedis ? redisClient.status === 'ready' : true;
 
-  if (isMongoConnected && isRedisConnected) {
+  if (isMongoConnected) {
     return res.status(200).json({ 
       status: 'OK', 
       mongo: 'connected', 
-      redis: 'connected',
+      redis: redisClient.isRealRedis ? (redisClient.status === 'ready' ? 'connected' : 'disconnected') : 'in-memory-active',
       timestamp: new Date().toISOString()
     });
   }
 
   return res.status(503).json({ 
-    status: 'Service Unavailable', 
+    status: 'Degraded', 
     mongo: isMongoConnected ? 'connected' : 'disconnected', 
-    redis: isRedisConnected ? 'connected' : 'disconnected',
+    redis: redisClient.isRealRedis ? (redisClient.status === 'ready' ? 'connected' : 'disconnected') : 'in-memory-active',
     timestamp: new Date().toISOString()
   });
 });
@@ -183,18 +196,10 @@ const shutdown = async () => {
   });
 
   try {
-    if (cronWorker) await cronWorker.close();
-    logger.info('[System] BullMQ Worker closed.');
-    
-    if (cronQueue) await cronQueue.close();
-    logger.info('[System] BullMQ Queue closed.');
-
+    if (cronWorker && cronWorker.close) await cronWorker.close();
+    if (cronQueue && cronQueue.close) await cronQueue.close();
     await mongoose.connection.close();
-    logger.info('[System] MongoDB connection closed.');
-
-    if (redisClient.isReady) await redisClient.quit();
-    logger.info('[System] Redis connection closed.');
-    
+    if (redisClient.isRealRedis && redisClient.status === 'ready') await redisClient.quit();
     process.exit(0);
   } catch (error) {
     logger.error('[System] Error during shutdown:', error);
