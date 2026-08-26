@@ -14,6 +14,8 @@ import Schemes from '@/pages/public/Schemes'
 import Login from '@/pages/auth/Login'
 import Register from '@/pages/auth/Register'
 import FarmerRegister from '@/pages/auth/FarmerRegister'
+import TraderRegister from '@/pages/auth/TraderRegister'
+import ForgotPassword from '@/pages/auth/ForgotPassword'
 import FarmerDashboard from '@/pages/farmer/FarmerDashboard'
 import TraderDashboard from '@/pages/trader/TraderDashboard'
 import AdminDashboard from '@/pages/admin/AdminDashboard'
@@ -28,9 +30,10 @@ export const AppRoutes = () => {
         <Route path="/mandi-prices" element={<MandiPrices />} />
         <Route path="/schemes" element={<Schemes />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/register" element={<Register />} />
         <Route path="/register/farmer" element={<FarmerRegister />} />
-        <Route path="/register/trader" element={<Register />} />
+        <Route path="/register/trader" element={<TraderRegister />} />
       </Route>
 
       {/* 2. Protected Farmer Routes */}
