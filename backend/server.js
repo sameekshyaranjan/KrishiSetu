@@ -65,6 +65,8 @@ const subClient = pubClient.duplicate();
 Promise.all([pubClient.connect(), subClient.connect()]).then(() => {
   io.adapter(createAdapter(pubClient, subClient));
   logger.info('[Socket] Redis Adapter attached to Socket.io');
+}).catch(err => {
+  logger.warn('[Socket] Redis adapter failed to connect, using default in-memory adapter');
 });
 
 io.use((socket, next) => {
