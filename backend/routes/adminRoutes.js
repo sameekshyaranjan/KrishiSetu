@@ -1,10 +1,21 @@
 const express = require('express');
-const { getDashboardStats, getAllFarmers, getAllTraders, getFarmerById, getTraderById, getAuditLogs, suspendUser, resolveDispute } = require('../controllers/adminController');
+const { 
+  getDashboardStats, 
+  getAllFarmers, 
+  getAllTraders, 
+  getFarmerById, 
+  getTraderById, 
+  getAuditLogs, 
+  suspendUser, 
+  resolveDispute,
+  getRevenueAnalytics
+} = require('../controllers/adminController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
 router.get('/dashboard', protect, authorize('admin'), getDashboardStats);
+router.get('/analytics/revenue', protect, authorize('admin'), getRevenueAnalytics);
 router.get('/audit-logs', protect, authorize('admin'), getAuditLogs);
 
 router.get('/farmers', protect, authorize('admin'), getAllFarmers);

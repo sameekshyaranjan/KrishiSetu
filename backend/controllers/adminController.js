@@ -215,4 +215,61 @@ const resolveDispute = async (req, res, next) => {
   }
 };
 
-module.exports = { getDashboardStats, getAllFarmers, getAllTraders, getFarmerById, getTraderById, getAuditLogs, suspendUser, resolveDispute };
+const getRevenueAnalytics = async (req, res, next) => {
+  try {
+    const analytics = await Transaction.aggregate([
+      {
+        $match: {
+          paymentStatus: { $in: ['held_in_escrow', 'completed', 'payout_released'] }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$transactionDate' },
+            month: { $month: '$transactionDate' }
+          },
+          totalRevenue: { $sum: '$amount' },
+          totalTransactions: { $sum: 1 },
+          averageTransactionValue: { $avg: '$amount' }
+        }
+      },
+      {
+        $sort: {
+          '_id.year': 1,
+          '_id.month': 1
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          year: '$_id.year',
+          month: '$_id.month',
+          totalRevenue: 1,
+          totalTransactions: 1,
+          averageTransactionValue: { $round: ['$averageTransactionValue', 2] }
+        }
+      }
+    ]);
+
+    res.status(200).json({
+      success: true,
+      count: analytics.length,
+      data: analytics
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { 
+  getDashboardStats, 
+  getAllFarmers, 
+  getAllTraders, 
+  getFarmerById, 
+  getTraderById, 
+  getAuditLogs, 
+  suspendUser, 
+  resolveDispute,
+  getRevenueAnalytics
+};
