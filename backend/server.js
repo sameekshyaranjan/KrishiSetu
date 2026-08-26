@@ -21,6 +21,7 @@ const smsRoutes = require('./routes/smsRoutes');
 const transactionRoutes = require('./routes/transactionRoutes');
 const storageRoutes = require('./routes/storageRoutes');
 const messageRoutes = require('./routes/messageRoutes');
+const exportRoutes = require('./routes/exportRoutes');
 const { initCronJobs } = require('./jobs/cronJobs');
 const cronWorker = require('./workers/cronWorker'); // Initialize BullMQ Worker
 const { cronQueue } = require('./config/bullmq');
@@ -149,6 +150,7 @@ app.use('/api/v1/sms', smsRoutes);
 app.use('/api/v1/transactions', transactionRoutes);
 app.use('/api/v1/storage', storageRoutes);
 app.use('/api/v1/messages', messageRoutes);
+app.use('/api/v1/export', exportRoutes);
 
 app.get('/', (req, res) => {
   res.json({ message: 'KrishiSetu API running' });
