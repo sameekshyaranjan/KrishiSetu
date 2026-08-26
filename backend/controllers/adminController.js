@@ -7,6 +7,7 @@ const GovernmentScheme = require('../models/GovernmentScheme');
 const AuditLog = require('../models/AuditLog');
 const redisClient = require('../config/redis');
 const { paginate } = require('../utils/paginate');
+const logger = require('../utils/logger');
 
 const getDashboardStats = async (req, res, next) => {
   try {
@@ -188,7 +189,7 @@ const resolveDispute = async (req, res, next) => {
 
     if (action === 'refund_trader') {
       tx.paymentStatus = 'refunded';
-      console.log(`\n[REFUND SIMULATION] Refunding ₹${tx.amount} to Trader: ${tx.trader.name}\n`);
+      logger.info(`\n[REFUND SIMULATION] Refunding ₹${tx.amount} to Trader: ${tx.trader.name}\n`);
       
       createNotification(tx.trader._id, 'Trader', 'Dispute Resolved', 'Admin resolved the dispute in your favor. A refund has been issued.');
       createNotification(tx.farmer._id, 'Farmer', 'Dispute Resolved', 'Admin resolved the dispute in favor of the trader. Escrow funds were refunded.');
@@ -199,7 +200,7 @@ const resolveDispute = async (req, res, next) => {
 
     } else if (action === 'payout_farmer') {
       tx.paymentStatus = 'payout_released';
-      console.log(`\n[PAYOUT SIMULATION] Forcing release of ₹${tx.amount} to Farmer: ${tx.farmer.name}\n`);
+      logger.info(`\n[PAYOUT SIMULATION] Forcing release of ₹${tx.amount} to Farmer: ${tx.farmer.name}\n`);
       
       createNotification(tx.farmer._id, 'Farmer', 'Dispute Resolved', 'Admin resolved the dispute in your favor. Funds released from escrow.');
       createNotification(tx.trader._id, 'Trader', 'Dispute Resolved', 'Admin resolved the dispute in favor of the farmer. Funds paid out.');

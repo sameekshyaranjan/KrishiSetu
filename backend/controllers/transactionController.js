@@ -5,6 +5,7 @@ const Bid = require('../models/Bid');
 const Crop = require('../models/Crop');
 const { paginate } = require('../utils/paginate');
 const { createNotification } = require('../utils/createNotification');
+const logger = require('../utils/logger');
 
 const createRazorpayOrder = async (req, res, next) => {
   try {
@@ -35,7 +36,7 @@ const createRazorpayOrder = async (req, res, next) => {
     let order;
     if (process.env.NODE_ENV === 'development' && (!process.env.RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID.includes('dummy'))) {
       // Dev Mock for Razorpay
-      console.log('[DEV MOCK] Generating fake Razorpay order...');
+      logger.info('[DEV MOCK] Generating fake Razorpay order...');
       order = { id: `order_dev_${Date.now()}`, amount: options.amount, currency: "INR" };
     } else {
       order = await razorpayInstance.orders.create(options);
@@ -204,7 +205,7 @@ const updateLogisticsStatus = async (req, res, next) => {
 
     if (status === 'delivered') {
       tx.paymentStatus = 'payout_released';
-      console.log(`\n[PAYOUT SIMULATION] Releasing ₹${tx.amount} from Escrow to Farmer: ${tx.farmer.name}\n`);
+      logger.info(`\n[PAYOUT SIMULATION] Releasing ₹${tx.amount} from Escrow to Farmer: ${tx.farmer.name}\n`);
 
       createNotification(
         tx.farmer._id,

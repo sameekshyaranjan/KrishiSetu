@@ -28,6 +28,7 @@ const mongoose = require('mongoose');
 const redisClient = require('./config/redis');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 const auditEmitter = require('./utils/auditEmitter');
+const logger = require('./utils/logger');
 const { globalLimiter } = require('./middleware/rateLimiter');
 const helmet = require('helmet');
 const mongoSanitize = require('express-mongo-sanitize');
@@ -60,7 +61,7 @@ const subClient = pubClient.duplicate();
 
 Promise.all([pubClient.connect(), subClient.connect()]).then(() => {
   io.adapter(createAdapter(pubClient, subClient));
-  console.log('[Socket] Redis Adapter attached to Socket.io');
+  logger.info('[Socket] Redis Adapter attached to Socket.io');
 });
 
 io.use((socket, next) => {
@@ -83,11 +84,11 @@ io.on('connection', (socket) => {
   
   if (userId) {
     socket.join(userId);
-    console.log(`[Socket] Secure user connected and joined room: ${userId}`);
+    logger.info(`[Socket] Secure user connected and joined room: ${userId}`);
   }
 
   socket.on('disconnect', () => {
-    console.log(`[Socket] Secure user disconnected: ${userId}`);
+    logger.info(`[Socket] Secure user disconnected: ${userId}`);
   });
 });
 
@@ -160,33 +161,33 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  logger.info(`Server running on port ${PORT}`);
 });
 
 // Graceful Shutdown (Stage 70.8)
 const shutdown = async () => {
-  console.log('\n[System] SIGTERM/SIGINT received. Shutting down gracefully...');
+  logger.info('[System] SIGTERM/SIGINT received. Shutting down gracefully...');
   
   server.close(() => {
-    console.log('[System] HTTP server closed.');
+    logger.info('[System] HTTP server closed.');
   });
 
   try {
     if (cronWorker) await cronWorker.close();
-    console.log('[System] BullMQ Worker closed.');
+    logger.info('[System] BullMQ Worker closed.');
     
     if (cronQueue) await cronQueue.close();
-    console.log('[System] BullMQ Queue closed.');
+    logger.info('[System] BullMQ Queue closed.');
 
     await mongoose.connection.close();
-    console.log('[System] MongoDB connection closed.');
+    logger.info('[System] MongoDB connection closed.');
 
     if (redisClient.isReady) await redisClient.quit();
-    console.log('[System] Redis connection closed.');
+    logger.info('[System] Redis connection closed.');
     
     process.exit(0);
   } catch (error) {
-    console.error('[System] Error during shutdown:', error);
+    logger.error('[System] Error during shutdown:', error);
     process.exit(1);
   }
 };
