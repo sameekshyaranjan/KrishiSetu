@@ -98,7 +98,11 @@ exports.verifyRegistrationOTP = async (req, res, next) => {
     const accessToken = generateAccessToken(payload);
     const refreshToken = generateRefreshToken(payload);
 
-    res.status(201).json({ user: newUser, accessToken, refreshToken });
+    const userObject = newUser.toObject();
+    delete userObject.password;
+    userObject.role = role;
+
+    res.status(201).json({ user: userObject, accessToken, refreshToken });
   } catch (error) {
     next(error);
   }
@@ -126,6 +130,7 @@ exports.loginWithPassword = async (req, res, next) => {
     // Don't send password hash back
     const userObject = user.toObject();
     delete userObject.password;
+    userObject.role = role;
 
     res.status(200).json({ user: userObject, accessToken, refreshToken });
   } catch (error) {
@@ -175,7 +180,11 @@ exports.verifyLoginOTP = async (req, res, next) => {
     const accessToken = generateAccessToken(payload);
     const refreshToken = generateRefreshToken(payload);
 
-    res.status(200).json({ user, accessToken, refreshToken });
+    const userObject = user.toObject();
+    delete userObject.password;
+    userObject.role = role;
+
+    res.status(200).json({ user: userObject, accessToken, refreshToken });
   } catch (error) {
     next(error);
   }
@@ -255,7 +264,7 @@ exports.adminLogin = async (req, res, next) => {
     res.status(200).json({
       accessToken,
       refreshToken,
-      admin: { _id: admin._id, name: admin.name, email: admin.email, role: admin.role },
+      user: { _id: admin._id, name: admin.name, email: admin.email, role: 'admin' },
     });
   } catch (error) {
     next(error);

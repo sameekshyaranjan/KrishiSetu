@@ -10,9 +10,10 @@ import {
   BookOpen, 
   UserCheck, 
   LogOut, 
-  LayoutDashboard,
-  ShieldCheck,
-  Briefcase
+  LayoutDashboard, 
+  ShieldCheck, 
+  Briefcase,
+  CloudSun
 } from 'lucide-react'
 
 export const Navbar = () => {
@@ -27,10 +28,10 @@ export const Navbar = () => {
   }
 
   const getDashboardPath = () => {
-    if (role === 'farmer') return '/farmer/dashboard'
-    if (role === 'trader') return '/trader/dashboard'
-    if (role === 'admin') return '/admin/dashboard'
-    return '/'
+    const currentRole = role || user?.role
+    if (currentRole === 'trader') return '/trader/dashboard'
+    if (currentRole === 'admin') return '/admin/dashboard'
+    return '/farmer/dashboard'
   }
 
   const navLinkClasses = ({ isActive }) =>
@@ -70,6 +71,12 @@ export const Navbar = () => {
             <span className="flex items-center gap-1.5">
               <BookOpen className="w-4 h-4 text-amber-500" />
               Govt Schemes
+            </span>
+          </NavLink>
+          <NavLink to="/farmer/weather" className={navLinkClasses}>
+            <span className="flex items-center gap-1.5">
+              <CloudSun className="w-4 h-4 text-sky-500" />
+              Weather Radar
             </span>
           </NavLink>
         </nav>
@@ -147,42 +154,57 @@ export const Navbar = () => {
             <Link
               to="/mandi-prices"
               onClick={() => setIsOpen(false)}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-foreground hover:bg-muted"
+              className="px-3 py-2 rounded-lg text-sm font-medium text-foreground hover:bg-muted"
             >
-              <TrendingUp className="w-4 h-4 text-emerald-500" /> Mandi Prices
+              Live Mandi Rates
             </Link>
             <Link
               to="/schemes"
               onClick={() => setIsOpen(false)}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-foreground hover:bg-muted"
+              className="px-3 py-2 rounded-lg text-sm font-medium text-foreground hover:bg-muted"
             >
-              <BookOpen className="w-4 h-4 text-amber-500" /> Govt Schemes
+              Government Schemes
+            </Link>
+            <Link
+              to="/farmer/weather"
+              onClick={() => setIsOpen(false)}
+              className="px-3 py-2 rounded-lg text-sm font-medium text-foreground hover:bg-muted flex items-center gap-2"
+            >
+              <CloudSun className="w-4 h-4 text-sky-500" />
+              <span>Weather Radar & Advisory</span>
             </Link>
           </nav>
 
-          <div className="pt-3 border-t border-border flex flex-col gap-2">
+          <div className="pt-3 border-t border-border flex flex-col space-y-2">
             {isAuthenticated ? (
               <>
-                <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground bg-muted/40 rounded-lg">
-                  <UserCheck className="w-4 h-4 text-primary" />
-                  <span>Logged in as <strong>{user?.name}</strong> ({role})</span>
-                </div>
-                <Button asChild size="sm" className="w-full justify-center">
-                  <Link to={getDashboardPath()} onClick={() => setIsOpen(false)}>
-                    <LayoutDashboard className="w-4 h-4 mr-2" /> Open {role.toUpperCase()} Portal
-                  </Link>
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleLogout} className="w-full text-rose-500">
-                  <LogOut className="w-4 h-4 mr-2" /> Logout
-                </Button>
+                <Link
+                  to={getDashboardPath()}
+                  onClick={() => setIsOpen(false)}
+                  className="px-3 py-2 rounded-lg text-sm font-medium bg-primary/10 text-primary flex items-center gap-2"
+                >
+                  <LayoutDashboard className="w-4 h-4" />
+                  <span>Go to Dashboard</span>
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="px-3 py-2 rounded-lg text-sm font-medium text-rose-500 hover:bg-rose-500/10 flex items-center gap-2 text-left"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Sign Out</span>
+                </button>
               </>
             ) : (
               <div className="grid grid-cols-2 gap-2">
-                <Button asChild variant="outline" size="sm" className="w-full">
-                  <Link to="/login" onClick={() => setIsOpen(false)}>Sign In</Link>
+                <Button asChild variant="outline" size="sm" className="w-full rounded-xl">
+                  <Link to="/login" onClick={() => setIsOpen(false)}>
+                    Sign In
+                  </Link>
                 </Button>
-                <Button asChild size="sm" className="w-full">
-                  <Link to="/register" onClick={() => setIsOpen(false)}>Register</Link>
+                <Button asChild size="sm" className="w-full rounded-xl">
+                  <Link to="/register" onClick={() => setIsOpen(false)}>
+                    Register
+                  </Link>
                 </Button>
               </div>
             )}

@@ -17,6 +17,11 @@ import FarmerRegister from '@/pages/auth/FarmerRegister'
 import TraderRegister from '@/pages/auth/TraderRegister'
 import ForgotPassword from '@/pages/auth/ForgotPassword'
 import FarmerDashboard from '@/pages/farmer/FarmerDashboard'
+import FarmerListings from '@/pages/farmer/FarmerListings'
+import FarmerBids from '@/pages/farmer/FarmerBids'
+import FarmerOrders from '@/pages/farmer/FarmerOrders'
+import FarmerWeather from '@/pages/farmer/FarmerWeather'
+import FarmerProfile from '@/pages/farmer/FarmerProfile'
 import TraderDashboard from '@/pages/trader/TraderDashboard'
 import AdminDashboard from '@/pages/admin/AdminDashboard'
 import NotFound from '@/pages/public/NotFound'
@@ -41,8 +46,13 @@ export const AppRoutes = () => {
         <Route path="/farmer" element={<FarmerLayout />}>
           <Route index element={<Navigate to="/farmer/dashboard" replace />} />
           <Route path="dashboard" element={<FarmerDashboard />} />
-          <Route path="add-crop" element={<FarmerDashboard />} />
-          <Route path="my-crops" element={<FarmerDashboard />} />
+          <Route path="listings" element={<FarmerListings />} />
+          <Route path="my-crops" element={<FarmerListings />} />
+          <Route path="add-crop" element={<FarmerListings />} />
+          <Route path="bids" element={<FarmerBids />} />
+          <Route path="orders" element={<FarmerOrders />} />
+          <Route path="weather" element={<FarmerWeather />} />
+          <Route path="profile" element={<FarmerProfile />} />
         </Route>
       </Route>
 

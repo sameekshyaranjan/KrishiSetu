@@ -16,6 +16,9 @@ export const AuthProvider = ({ children }) => {
         const storedUser = authService.getStoredUser()
 
         if (storedToken && storedUser) {
+          if (!storedUser.role) {
+            storedUser.role = storedUser.gstNumber ? 'trader' : 'farmer'
+          }
           setToken(storedToken)
           setUser(storedUser)
         } else {
@@ -67,9 +70,10 @@ export const AuthProvider = ({ children }) => {
         data = await authService.login({ email, password, role })
       }
 
-      setToken(data.token)
+      const token = data.accessToken || data.token
+      setToken(token)
       setUser(data.user)
-      return { success: true, data }
+      return { success: true, user: data.user, data }
     } catch (error) {
       const message = error.response?.data?.message || error.message || 'Login failed'
       return { success: false, error: message }
@@ -77,6 +81,15 @@ export const AuthProvider = ({ children }) => {
       setLoading(false)
     }
   }, [])
+
+  // Convenient helper functions
+  const loginWithPassword = useCallback(async (email, password, role) => {
+    return login({ email, password, role })
+  }, [login])
+
+  const loginWithAdmin = useCallback(async (email, password) => {
+    return login({ email, password, role: 'admin' })
+  }, [login])
 
   // Verify OTP Login/Registration and set active session
   const verifyAndSetSession = useCallback(async ({ email, otp, isRegistration = false }) => {
@@ -89,9 +102,10 @@ export const AuthProvider = ({ children }) => {
         data = await authService.verifyLoginOTP({ email, otp })
       }
 
-      setToken(data.token)
+      const token = data.accessToken || data.token
+      setToken(token)
       setUser(data.user)
-      return { success: true, data }
+      return { success: true, user: data.user, data }
     } catch (error) {
       const message = error.response?.data?.message || error.message || 'Verification failed'
       return { success: false, error: message }
@@ -129,6 +143,8 @@ export const AuthProvider = ({ children }) => {
     isAdmin: user?.role === 'admin',
     loading,
     login,
+    loginWithPassword,
+    loginWithAdmin,
     verifyAndSetSession,
     setSession,
     logout,

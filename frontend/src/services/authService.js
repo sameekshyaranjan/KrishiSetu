@@ -7,7 +7,6 @@ import api from './api'
 export const authService = {
   /**
    * Send OTP for Farmer registration
-   * @param {Object} data - { name, email, phone, password, state, district, taluk, village, preferredLanguage, cropsGrown, landSizeAcres }
    */
   registerFarmer: async (data) => {
     const response = await api.post('/auth/register/farmer', data)
@@ -16,7 +15,6 @@ export const authService = {
 
   /**
    * Send OTP for Trader registration
-   * @param {Object} data - { name, email, phone, password, companyName, gstNumber, licenseNumber, operatingStates, operatingDistricts, businessAddress }
    */
   registerTrader: async (data) => {
     const response = await api.post('/auth/register/trader', data)
@@ -25,31 +23,30 @@ export const authService = {
 
   /**
    * Verify Registration OTP and create user account
-   * @param {Object} data - { email, otp }
    */
   verifyRegistrationOTP: async ({ email, otp }) => {
     const response = await api.post('/auth/register/verify', { email, otp })
-    if (response.data.token && response.data.user) {
-      authService.setAuthSession(response.data.token, response.data.refreshToken, response.data.user)
+    const token = response.data.accessToken || response.data.token
+    if (token && response.data.user) {
+      authService.setAuthSession(token, response.data.refreshToken, response.data.user)
     }
-    return response.data
+    return { ...response.data, token }
   },
 
   /**
    * Login with Email & Password (Farmer or Trader)
-   * @param {Object} credentials - { email, password, role }
    */
   login: async ({ email, password, role }) => {
     const response = await api.post('/auth/login', { email, password, role })
-    if (response.data.token && response.data.user) {
-      authService.setAuthSession(response.data.token, response.data.refreshToken, response.data.user)
+    const token = response.data.accessToken || response.data.token
+    if (token && response.data.user) {
+      authService.setAuthSession(token, response.data.refreshToken, response.data.user)
     }
-    return response.data
+    return { ...response.data, token }
   },
 
   /**
    * Request OTP for passwordless login
-   * @param {string} email
    */
   sendLoginOTP: async (email) => {
     const response = await api.post('/auth/login/otp', { email })
@@ -58,31 +55,30 @@ export const authService = {
 
   /**
    * Verify Passwordless Login OTP
-   * @param {Object} data - { email, otp }
    */
   verifyLoginOTP: async ({ email, otp }) => {
     const response = await api.post('/auth/login/otp/verify', { email, otp })
-    if (response.data.token && response.data.user) {
-      authService.setAuthSession(response.data.token, response.data.refreshToken, response.data.user)
+    const token = response.data.accessToken || response.data.token
+    if (token && response.data.user) {
+      authService.setAuthSession(token, response.data.refreshToken, response.data.user)
     }
-    return response.data
+    return { ...response.data, token }
   },
 
   /**
    * Admin Portal Direct Login
-   * @param {Object} credentials - { email, password }
    */
   adminLogin: async ({ email, password }) => {
     const response = await api.post('/auth/admin/login', { email, password })
-    if (response.data.token && response.data.user) {
-      authService.setAuthSession(response.data.token, response.data.refreshToken, response.data.user)
+    const token = response.data.accessToken || response.data.token
+    if (token && response.data.user) {
+      authService.setAuthSession(token, response.data.refreshToken, response.data.user)
     }
-    return response.data
+    return { ...response.data, token }
   },
 
   /**
    * Send Password Reset Email
-   * @param {string} email
    */
   forgotPassword: async (email) => {
     const response = await api.post('/auth/password/forgot', { email })
@@ -91,7 +87,6 @@ export const authService = {
 
   /**
    * Reset Password with Token
-   * @param {Object} data - { token, newPassword }
    */
   resetPassword: async ({ token, newPassword }) => {
     const response = await api.post('/auth/password/reset', { token, newPassword })
@@ -100,14 +95,14 @@ export const authService = {
 
   /**
    * Refresh Expired Access Token
-   * @param {string} refreshToken
    */
   refreshToken: async (refreshToken) => {
     const response = await api.post('/auth/refresh-token', { refreshToken })
-    if (response.data.token) {
-      localStorage.setItem('krishisetu_token', response.data.token)
+    const token = response.data.accessToken || response.data.token
+    if (token) {
+      localStorage.setItem('krishisetu_token', token)
     }
-    return response.data
+    return { ...response.data, token }
   },
 
   /**

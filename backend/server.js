@@ -156,21 +156,27 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Routes
-app.use('/api/v1/auth', authRoutes);
-app.use('/api/v1/farmers', farmerRoutes);
-app.use('/api/v1/traders', traderRoutes);
-app.use('/api/v1/listings', cropListingRoutes);
-app.use('/api/v1/bids', bidRoutes);
-app.use('/api/v1/prices', priceRoutes);
-app.use('/api/v1/schemes', schemeRoutes);
-app.use('/api/v1/notifications', notificationRoutes);
-app.use('/api/v1/admin', adminRoutes);
-app.use('/api/v1/sms', smsRoutes);
-app.use('/api/v1/transactions', transactionRoutes);
-app.use('/api/v1/storage', storageRoutes);
-app.use('/api/v1/messages', messageRoutes);
-app.use('/api/v1/export', exportRoutes);
+// Routes (Dual support for both /api and /api/v1 prefixes)
+const registerRoutes = (prefix) => {
+  app.use(`${prefix}/auth`, authRoutes);
+  app.use(`${prefix}/farmers`, farmerRoutes);
+  app.use(`${prefix}/traders`, traderRoutes);
+  app.use(`${prefix}/listings`, cropListingRoutes);
+  app.use(`${prefix}/bids`, bidRoutes);
+  app.use(`${prefix}/prices`, priceRoutes);
+  app.use(`${prefix}/mandi`, priceRoutes);
+  app.use(`${prefix}/schemes`, schemeRoutes);
+  app.use(`${prefix}/notifications`, notificationRoutes);
+  app.use(`${prefix}/admin`, adminRoutes);
+  app.use(`${prefix}/sms`, smsRoutes);
+  app.use(`${prefix}/transactions`, transactionRoutes);
+  app.use(`${prefix}/storage`, storageRoutes);
+  app.use(`${prefix}/messages`, messageRoutes);
+  app.use(`${prefix}/export`, exportRoutes);
+};
+
+registerRoutes('/api/v1');
+registerRoutes('/api');
 
 app.get('/', (req, res) => {
   res.json({ message: 'KrishiSetu API running. View docs at /api-docs' });
@@ -210,4 +216,4 @@ const shutdown = async () => {
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
 
-module.exports = { io };
+module.exports = { app, server };
