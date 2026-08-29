@@ -161,11 +161,11 @@ export const FarmerListings = () => {
       const payload = {
         name: formData.title || `${formData.cropType} Lot`,
         cropType: formData.cropType,
-        category: formData.category,
-        quantity: Number(formData.quantity),
-        unit: formData.unit,
-        basePrice: Number(formData.basePrice),
-        district: formData.district,
+        category: formData.category || 'vegetables',
+        quantity: Number(formData.quantity) || 50,
+        unit: formData.unit || 'quintal',
+        basePrice: Number(formData.basePrice) || 2000,
+        district: formData.district || user?.district || 'Hassan',
         description: formData.description || `Freshly harvested ${formData.cropType} lot from farm gate.`,
         images: imagesList
       }
@@ -182,7 +182,7 @@ export const FarmerListings = () => {
       }
 
       setListings((prev) => [newListing, ...prev])
-      toast.success(`"${payload.name}" published with ${imagesList.length} photo(s)! 🌾`)
+      toast.success(`"${payload.name}" published to Karnataka APMC marketplace! 🌾`)
       
       // Reset form modal
       setIsCreateModalOpen(false)
@@ -198,7 +198,8 @@ export const FarmerListings = () => {
         description: ''
       })
     } catch (err) {
-      toast.error('Failed to publish crop listing. Please try again.')
+      const msg = err.response?.data?.message || err.message || 'Failed to publish crop listing. Please try again.'
+      toast.error(msg)
     } finally {
       setSubmitting(false)
     }

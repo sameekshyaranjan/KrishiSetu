@@ -7,33 +7,40 @@ const redisClient = require('../config/redis');
 const createCropListing = async (req, res, next) => {
   try {
     const farmer = await Farmer.findById(req.user.id);
-    if (!farmer || !farmer.district || !farmer.state || !farmer.mobile) {
-      return res.status(403).json({ message: 'Please complete your profile (district, state, and mobile number) before creating a crop listing.' });
+    if (!farmer) {
+      return res.status(404).json({ message: 'Farmer account not found' });
     }
 
-    const { name, category, quantity, unit, basePrice, description } = req.body;
+    const { name, title, cropType, category, quantity, unit, basePrice, description, district, harvestStatus } = req.body;
     
     let images = [];
-    // 1. If images were sent as string URLs (backwards compatibility)
     if (req.body.images) {
       images = Array.isArray(req.body.images) ? req.body.images : [req.body.images];
     }
     
-    // 2. If physical files were uploaded via multipart/form-data
     if (req.files && req.files.length > 0) {
       const uploadedImages = req.files.map(file => file.path);
       images = [...images, ...uploadedImages];
     }
 
+    const finalName = name || title || (cropType ? `${cropType} Lot` : 'Produce Lot');
+    const finalCategory = category || 'vegetables';
+    const finalQuantity = Number(quantity) || 50;
+    const finalUnit = unit || 'quintal';
+    const finalBasePrice = Number(basePrice) || 2000;
+    const finalDistrict = district || farmer.district || 'Hassan';
+
     const crop = await Crop.create({
       farmer: req.user.id,
-      name,
-      category,
-      quantity,
-      unit,
-      basePrice,
-      description,
-      images
+      name: finalName,
+      category: finalCategory,
+      quantity: finalQuantity,
+      unit: finalUnit,
+      basePrice: finalBasePrice,
+      district: finalDistrict,
+      description: description || `Freshly harvested ${finalName} lot from farm gate.`,
+      images: images.length > 0 ? images : ['https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=600&auto=format&fit=crop'],
+      harvestStatus: harvestStatus || 'post-harvest'
     });
 
     await redisClient.incr('crops_feed_version');
