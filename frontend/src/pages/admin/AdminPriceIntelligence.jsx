@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '@/hooks/useAuth'
+import adminMandiService from '@/services/adminMandiService'
 import { Button } from '@/components/ui/button'
 import toast from 'react-hot-toast'
 import { 
@@ -27,225 +28,81 @@ import {
   Sprout
 } from 'lucide-react'
 
-const DEMO_PRICE_INTELLIGENCE = [
-  {
-    _id: 'PRC-TOM-KA-01',
-    cropName: 'Hybrid Tomato',
-    category: 'vegetables',
-    primaryMandi: 'Hassan & Kolar APMC',
-    district: 'Hassan',
-    currentModalRate: 2200,
-    mspFloorPrice: 1800,
-    shift7dPercent: 14.2,
-    shift30dPercent: 32.5,
-    volatilityStatus: 'SURGE_RISK', // 'SURGE_RISK' | 'DEFICIT_RISK' | 'STABLE'
-    stateBufferRequirementQtl: 5000,
-    allocatedStorage: 'Hassan Central Cold Storage #2',
-    bufferStatus: 'requisition_open',
-    recommendedAction: 'Trigger State Market Intervention to procure 5,000 Qtl for urban retail price stabilization.'
-  },
-  {
-    _id: 'PRC-ONI-KA-02',
-    cropName: 'Bellary Red Onion',
-    category: 'vegetables',
-    primaryMandi: 'Mandya & Hubballi APMC',
-    district: 'Mandya',
-    currentModalRate: 2650,
-    mspFloorPrice: 2100,
-    shift7dPercent: 18.5,
-    shift30dPercent: 41.0,
-    volatilityStatus: 'SURGE_RISK',
-    stateBufferRequirementQtl: 8000,
-    allocatedStorage: 'Mandya Ventilated Storage Shed #4',
-    bufferStatus: 'requisition_open',
-    recommendedAction: 'Acquire 8,000 Qtl buffer stock to counteract anticipated monsoon transport disruption.'
-  },
-  {
-    _id: 'PRC-MAI-KA-03',
-    cropName: 'Yellow Dent Maize',
-    category: 'grains',
-    primaryMandi: 'Bengaluru Rural (Doddaballapura)',
-    district: 'Bengaluru Rural',
-    currentModalRate: 2050,
-    mspFloorPrice: 2090, // Below MSP -> DEFICIT_RISK
-    shift7dPercent: -3.8,
-    shift30dPercent: -6.2,
-    volatilityStatus: 'DEFICIT_RISK',
-    stateBufferRequirementQtl: 12000,
-    allocatedStorage: 'Karnataka State Warehousing Corp (KSWC Silo #1)',
-    bufferStatus: 'requisition_open',
-    recommendedAction: 'Modal price is ₹40 below MSP. Immediate MSP floor procurement mandated to protect farmer incomes.'
-  },
-  {
-    _id: 'PRC-RAG-KA-04',
-    cropName: 'Organic Finger Millet (Ragi)',
-    category: 'grains',
-    primaryMandi: 'Kolar & Tumakuru APMC',
-    district: 'Kolar',
-    currentModalRate: 3450,
-    mspFloorPrice: 3578,
-    shift7dPercent: 2.1,
-    shift30dPercent: 4.8,
-    volatilityStatus: 'STABLE',
-    stateBufferRequirementQtl: 15000,
-    allocatedStorage: 'Civil Supplies PDS Distribution Hub',
-    bufferStatus: 'procured',
-    recommendedAction: 'Regular PDS procurement quota 92% fulfilled across Southern Karnataka mandis.'
-  },
-  {
-    _id: 'PRC-CHI-KA-05',
-    cropName: 'Byadagi Stemless Chilli',
-    category: 'spices',
-    primaryMandi: 'Hubballi-Dharwad APMC',
-    district: 'Hubballi',
-    currentModalRate: 14200,
-    mspFloorPrice: 11000,
-    shift7dPercent: 6.4,
-    shift30dPercent: 12.0,
-    volatilityStatus: 'STABLE',
-    stateBufferRequirementQtl: 2000,
-    allocatedStorage: 'Hubballi Spices Board Dehumidified Vault',
-    bufferStatus: 'procured',
-    recommendedAction: 'Export demand strong; domestic market prices remain stable with high trader liquidity.'
-  },
-  {
-    _id: 'PRC-POT-KA-06',
-    cropName: 'Kufri Jyoti Potato',
-    category: 'vegetables',
-    primaryMandi: 'Belagavi APMC Yard',
-    district: 'Belagavi',
-    currentModalRate: 1850,
-    mspFloorPrice: 1650,
-    shift7dPercent: -5.2,
-    shift30dPercent: -8.0,
-    volatilityStatus: 'STABLE',
-    stateBufferRequirementQtl: 4000,
-    allocatedStorage: 'Belagavi Cold Chain Complex',
-    bufferStatus: 'requisition_open',
-    recommendedAction: 'Harvest arrival peak in Belagavi; monitor for distress sales if modal drops under ₹1,700/Qtl.'
-  }
-]
-
-const CATEGORY_TABS = [
+const CATEGORY_FILTERS = [
   { id: 'all', label: 'All Commodities' },
-  { id: 'vegetables', label: 'Perishables & Veg 🍅' },
+  { id: 'vegetables', label: 'Vegetables 🍅' },
   { id: 'grains', label: 'Grains & Millets 🌾' },
-  { id: 'spices', label: 'Spices & Cash 🌶️' },
-  { id: 'requisitions', label: 'Buffer Requisitions 🏛️' }
-]
-
-const KARNATAKA_DISTRICTS = [
-  'All Districts',
-  'Hassan',
-  'Mandya',
-  'Bengaluru Rural',
-  'Kolar',
-  'Hubballi',
-  'Belagavi'
+  { id: 'spices', label: 'Spices & Cash Crops 🌶️' }
 ]
 
 export const AdminPriceIntelligence = () => {
   const { user } = useAuth()
-  const [prices, setPrices] = useState(DEMO_PRICE_INTELLIGENCE)
+  const [priceIntel, setPriceIntel] = useState([])
   const [selectedCategory, setSelectedCategory] = useState('all')
-  const [selectedDistrict, setSelectedDistrict] = useState('All Districts')
   const [searchQuery, setSearchQuery] = useState('')
   const [isRefreshing, setIsRefreshing] = useState(false)
-  const [selectedCropForBuffer, setSelectedCropForBuffer] = useState(null)
-  const [showBufferOrderModal, setShowBufferOrderModal] = useState(false)
 
-  // Buffer Order Form State
-  const [bufferForm, setBufferForm] = useState({
-    cropName: '',
-    targetQuantityQtl: '',
-    procurementRate: '',
-    storageFacility: '',
-    targetMandi: '',
-    budgetOutlayLakhs: ''
-  })
-
-  const handleRefresh = () => {
-    setIsRefreshing(true)
-    setTimeout(() => {
-      setIsRefreshing(false)
-      toast.success('Agmarknet Karnataka modal price intelligence feeds synchronized!')
-    }, 600)
-  }
-
-  const handleOpenBufferModal = (crop) => {
-    setSelectedCropForBuffer(crop)
-    setBufferForm({
-      cropName: crop.cropName,
-      targetQuantityQtl: crop.stateBufferRequirementQtl.toString(),
-      procurementRate: (crop.currentModalRate || crop.mspFloorPrice).toString(),
-      storageFacility: crop.allocatedStorage,
-      targetMandi: crop.primaryMandi,
-      budgetOutlayLakhs: ((crop.stateBufferRequirementQtl * crop.currentModalRate) / 100000).toFixed(2)
-    })
-    setShowBufferOrderModal(true)
-  }
-
-  const handleExecuteBufferOrder = (e) => {
-    e.preventDefault()
-    if (!bufferForm.targetQuantityQtl || !bufferForm.procurementRate) {
-      toast.error('Please enter valid quantity and price')
-      return
+  const loadData = async () => {
+    try {
+      const data = await adminMandiService.getPriceIntelligence()
+      setPriceIntel(data || [])
+    } catch {
+      // Fallback
     }
-
-    setPrices((prev) =>
-      prev.map((p) =>
-        p._id === selectedCropForBuffer._id ? { ...p, bufferStatus: 'procured' } : p
-      )
-    )
-    setShowBufferOrderModal(false)
-    toast.success(
-      `State Buffer Order Dispatched: ${bufferForm.targetQuantityQtl} Qtl ${bufferForm.cropName} at ₹${bufferForm.procurementRate}/Qtl 🚀`
-    )
   }
 
-  // Filtered List
-  const filteredPrices = useMemo(() => {
-    return prices.filter((p) => {
-      const matchesCategory =
-        selectedCategory === 'all'
-          ? true
-          : selectedCategory === 'requisitions'
-          ? p.bufferStatus === 'requisition_open'
-          : p.category === selectedCategory
+  useEffect(() => {
+    loadData()
+  }, [])
 
-      const matchesDistrict =
-        selectedDistrict === 'All Districts' ? true : p.district === selectedDistrict
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    await loadData()
+    setIsRefreshing(false)
+    toast.success('Statewide APMC price intelligence & buffer telemetry refreshed! ⚡')
+  }
 
-      const q = searchQuery.toLowerCase()
-      const matchesSearch =
-        p.cropName.toLowerCase().includes(q) ||
-        p.primaryMandi.toLowerCase().includes(q) ||
-        p.district.toLowerCase().includes(q) ||
-        p.allocatedStorage.toLowerCase().includes(q)
-
-      return matchesCategory && matchesDistrict && matchesSearch
-    })
-  }, [prices, selectedCategory, selectedDistrict, searchQuery])
+  const handleToggleBuffer = async (cropId, currentStatus) => {
+    const nextStatus = currentStatus === 'procured' ? 'requisition_open' : 'procured'
+    const updated = await adminMandiService.updateBufferStatus(cropId, nextStatus)
+    setPriceIntel(updated)
+    toast.success(`Buffer requisition status updated to ${nextStatus === 'procured' ? 'Procured 🟢' : 'Open Requisition 🚨'}`)
+  }
 
   // Aggregate Metrics
-  const surgeCount = prices.filter((p) => p.volatilityStatus === 'SURGE_RISK').length
-  const totalBufferRequired = prices.reduce((acc, p) => acc + p.stateBufferRequirementQtl, 0)
+  const surgeRiskCount = priceIntel.filter((p) => p.volatilityStatus === 'SURGE_RISK').length
+  const deficitRiskCount = priceIntel.filter((p) => p.volatilityStatus === 'DEFICIT_RISK').length
+  const totalBufferRequirementQtl = priceIntel.reduce((acc, p) => acc + (p.stateBufferRequirementQtl || 0), 0)
+
+  // Filtered List
+  const filteredList = useMemo(() => {
+    return priceIntel.filter((p) => {
+      const matchesCategory = selectedCategory === 'all' || p.category === selectedCategory
+      const q = searchQuery.toLowerCase()
+      const matchesSearch =
+        (p.cropName || '').toLowerCase().includes(q) ||
+        (p.primaryMandi || '').toLowerCase().includes(q) ||
+        (p.district || '').toLowerCase().includes(q)
+
+      return matchesCategory && matchesSearch
+    })
+  }, [priceIntel, selectedCategory, searchQuery])
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto">
       
-      {/* 1. Header & Actions */}
+      {/* 1. Header & Quick Actions */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 text-purple-600 text-xs font-semibold border border-purple-500/20 mb-2">
-            <TrendingUp className="w-3.5 h-3.5" />
-            <span>State Food Security & Market Intervention Intelligence</span>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold border border-primary/20 mb-2">
+            <Activity className="w-3.5 h-3.5 animate-pulse" />
+            <span>Statewide APMC Price Surveillance & Buffer Stock Requisition</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
-            Price Intelligence & State Buffer Stock Planner 📈
+            Price Intelligence & Market Intervention 📊
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-            Monitor macroeconomic price shifts, identify inflationary surges, and execute state food security buffer stock procurements.
+            Detect wholesale price surges, enforce MSP floor protections, and manage Karnataka State buffer stock quotas.
           </p>
         </div>
 
@@ -258,316 +115,186 @@ export const AdminPriceIntelligence = () => {
             className="rounded-xl text-xs h-10 shadow-sm"
           >
             <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Sync Agmarknet Feeds
+            Refresh Intelligence
           </Button>
 
           <Button 
-            onClick={() => toast.success('Statewide Agricultural Price Intelligence Brief exported!')}
-            className="rounded-xl text-xs h-10 px-4 font-bold bg-purple-600 hover:bg-purple-700 text-white shadow-md"
+            onClick={() => toast.success('Statewide Price Stabilization Strategy PDF exported!')}
+            size="sm" 
+            className="rounded-xl text-xs font-bold shadow-md h-10 px-4 bg-primary text-primary-foreground"
           >
-            <Download className="w-4 h-4 mr-1.5" /> Export Brief (PDF)
+            <Download className="w-3.5 h-3.5 mr-1.5" /> Export Report
           </Button>
         </div>
       </div>
 
-      {/* 2. 4 Macro Price & Buffer KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 rounded-3xl bg-card border border-border shadow-sm space-y-1">
-          <span className="text-xs font-bold text-muted-foreground">Tracked APMC Crops</span>
-          <p className="text-2xl font-black text-foreground">48 Crops</p>
-          <span className="text-[11px] text-muted-foreground">30 Karnataka Districts</span>
+      {/* 2. Top Summary KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <div className="p-6 rounded-3xl bg-card border border-border shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-600 flex items-center justify-center font-bold shrink-0">
+            <TrendingUp className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground">Price Surge Alerts (&gt;15% 7d)</p>
+            <h3 className="text-2xl font-black text-rose-600">{surgeRiskCount} Commodities</h3>
+            <span className="text-[11px] text-muted-foreground">Tomato & Red Onion Surging</span>
+          </div>
         </div>
 
-        <div className="p-5 rounded-3xl bg-card border border-border shadow-sm space-y-1">
-          <span className="text-xs font-bold text-muted-foreground">High Volatility Surges</span>
-          <p className="text-2xl font-black text-rose-600">{surgeCount} Commodities</p>
-          <span className="text-[11px] text-rose-600 font-bold">Tomato (+14.2%) • Onion (+18.5%)</span>
+        <div className="p-6 rounded-3xl bg-card border border-border shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold shrink-0">
+            <TrendingDown className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground">MSP Deficit Protection</p>
+            <h3 className="text-2xl font-black text-amber-600">{deficitRiskCount} Crop Triggered</h3>
+            <span className="text-[11px] text-amber-600 font-medium">Maize trading below MSP floor</span>
+          </div>
         </div>
 
-        <div className="p-5 rounded-3xl bg-card border border-border shadow-sm space-y-1">
-          <span className="text-xs font-bold text-muted-foreground">State Buffer Requisition</span>
-          <p className="text-2xl font-black text-purple-600">{totalBufferRequired.toLocaleString('en-IN')} Qtl</p>
-          <span className="text-[11px] text-muted-foreground">Sanctioned Outlay: ₹18.50 Cr</span>
-        </div>
-
-        <div className="p-5 rounded-3xl bg-card border border-border shadow-sm space-y-1">
-          <span className="text-xs font-bold text-muted-foreground">MSP Floor Compliance</span>
-          <p className="text-2xl font-black text-emerald-600">98.6%</p>
-          <span className="text-[11px] text-emerald-600 font-bold">Above Statutory MSP 🟢</span>
+        <div className="p-6 rounded-3xl bg-card border border-border shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-bold shrink-0">
+            <ShoppingBag className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground">State Buffer Quota</p>
+            <h3 className="text-2xl font-black text-emerald-600 font-mono">{totalBufferRequirementQtl.toLocaleString('en-IN')} Qtl</h3>
+            <span className="text-[11px] text-muted-foreground">Across 4 KSWC State Silos</span>
+          </div>
         </div>
       </div>
 
-      {/* 3. Category Filter Tabs & District Dropdown */}
-      <div className="space-y-4">
+      {/* 3. Category Filter & Search Bar */}
+      <div className="p-6 rounded-3xl bg-card border border-border shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar w-full sm:w-auto py-1">
-            {CATEGORY_TABS.map((tab) => {
-              const count =
-                tab.id === 'all'
-                  ? prices.length
-                  : tab.id === 'requisitions'
-                  ? prices.filter((p) => p.bufferStatus === 'requisition_open').length
-                  : prices.filter((p) => p.category === tab.id).length
+          
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar w-full sm:w-auto">
+            {CATEGORY_FILTERS.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setSelectedCategory(tab.id)}
+                className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                  selectedCategory === tab.id
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'bg-muted/60 text-muted-foreground hover:text-foreground border border-border'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
 
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setSelectedCategory(tab.id)}
-                  className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
-                    selectedCategory === tab.id
-                      ? 'bg-purple-600 text-white shadow-sm'
-                      : 'bg-card border border-border text-muted-foreground hover:text-foreground'
+          <div className="relative w-full sm:w-80">
+            <Search className="w-4 h-4 text-muted-foreground absolute left-3.5 top-3" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search commodity, primary mandi yard, or district..."
+              className="w-full h-10 pl-10 pr-4 rounded-xl bg-background border border-border text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 font-medium"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* 4. Commodity Surveillance Cards */}
+      <div className="space-y-4">
+        {filteredList.map((item) => {
+          const isSurge = item.volatilityStatus === 'SURGE_RISK'
+          const isDeficit = item.volatilityStatus === 'DEFICIT_RISK'
+          const isProcured = item.bufferStatus === 'procured'
+
+          return (
+            <div
+              key={item._id}
+              className="p-6 sm:p-7 rounded-3xl bg-card border border-border hover:border-primary/50 shadow-sm transition-all space-y-5"
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-extrabold text-lg text-foreground">{item.cropName}</h3>
+                    <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${
+                      isSurge
+                        ? 'bg-rose-500/10 text-rose-600 border border-rose-500/20'
+                        : isDeficit
+                        ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
+                        : 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
+                    }`}>
+                      {item.volatilityStatus.replace('_', ' ')}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-1 font-medium">
+                    <Building2 className="w-3.5 h-3.5 text-primary" /> {item.primaryMandi} ({item.district} District)
+                  </p>
+                </div>
+
+                {/* Rates HUD */}
+                <div className="flex items-center gap-6">
+                  <div>
+                    <span className="text-[11px] text-muted-foreground block font-medium">Current Modal Rate:</span>
+                    <span className="text-xl font-black text-primary font-mono">
+                      ₹{item.currentModalRate}/Qtl
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-[11px] text-muted-foreground block font-medium">Govt MSP Floor:</span>
+                    <span className="text-xl font-black text-foreground font-mono">
+                      ₹{item.mspFloorPrice}/Qtl
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-[11px] text-muted-foreground block font-medium">7-Day Shift:</span>
+                    <span className={`text-base font-bold font-mono ${item.shift7dPercent >= 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                      {item.shift7dPercent >= 0 ? `+${item.shift7dPercent}%` : `${item.shift7dPercent}%`}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Recommended Action & Buffer Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div className="p-4 rounded-2xl bg-muted/40 border border-border/80 space-y-1">
+                  <span className="font-bold text-foreground flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-primary" /> Market Intervention Directive:
+                  </span>
+                  <p className="text-muted-foreground leading-relaxed">{item.recommendedAction}</p>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-muted/40 border border-border/80 space-y-1">
+                  <div className="flex justify-between">
+                    <span className="font-bold text-foreground">State Buffer Quota:</span>
+                    <span className="font-mono font-bold text-primary">{item.stateBufferRequirementQtl.toLocaleString('en-IN')} Quintals</span>
+                  </div>
+                  <p className="text-muted-foreground">Storage: {item.allocatedStorage}</p>
+                  <div className="pt-1 flex items-center justify-between text-[11px]">
+                    <span className="text-muted-foreground">Requisition Status:</span>
+                    <span className={`font-bold ${isProcured ? 'text-emerald-600' : 'text-amber-600'}`}>
+                      {isProcured ? 'Procured & Stocked 🟢' : 'Open Requisition 🚨'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Button */}
+              <div className="flex items-center justify-end gap-3 pt-2 border-t border-border">
+                <Button
+                  size="sm"
+                  onClick={() => handleToggleBuffer(item._id, item.bufferStatus)}
+                  className={`rounded-xl text-xs font-bold h-9 px-5 shadow-sm ${
+                    isProcured
+                      ? 'bg-muted text-foreground border border-border hover:bg-muted/80'
+                      : 'bg-primary text-primary-foreground'
                   }`}
                 >
-                  <span>{tab.label}</span>
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-md ${
-                    selectedCategory === tab.id ? 'bg-black/20 text-white' : 'bg-muted text-muted-foreground'
-                  }`}>
-                    {count}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <select
-              value={selectedDistrict}
-              onChange={(e) => setSelectedDistrict(e.target.value)}
-              className="h-10 px-3.5 rounded-xl bg-card border border-border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500/40"
-            >
-              {KARNATAKA_DISTRICTS.map((d) => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Search Input */}
-        <div className="relative">
-          <Search className="w-4 h-4 text-muted-foreground absolute left-3.5 top-3" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search commodity name, APMC mandi yard, or warehouse facility..."
-            className="w-full h-10 pl-10 pr-4 rounded-xl bg-card border border-border text-xs focus:outline-none focus:ring-2 focus:ring-purple-500/40"
-          />
-        </div>
-      </div>
-
-      {/* 4. Price Intelligence Table */}
-      <div className="rounded-3xl bg-card border border-border overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-muted/60 text-muted-foreground font-bold uppercase tracking-wider text-[10px] border-b border-border">
-              <tr>
-                <th className="p-4">Commodity & Mandi</th>
-                <th className="p-4">Modal Price (₹/Qtl)</th>
-                <th className="p-4">MSP Floor (₹/Qtl)</th>
-                <th className="p-4">7-Day / 30-Day Trend</th>
-                <th className="p-4">Volatility Risk</th>
-                <th className="p-4">Buffer Target</th>
-                <th className="p-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {filteredPrices.map((item) => (
-                <tr key={item._id} className="hover:bg-muted/30 transition-colors">
-                  <td className="p-4">
-                    <p className="font-extrabold text-foreground">{item.cropName}</p>
-                    <span className="text-[10px] text-muted-foreground">{item.primaryMandi}</span>
-                  </td>
-
-                  <td className="p-4 font-mono font-black text-sm text-foreground">
-                    ₹{item.currentModalRate.toLocaleString('en-IN')}
-                  </td>
-
-                  <td className="p-4 font-mono font-bold text-muted-foreground">
-                    ₹{item.mspFloorPrice.toLocaleString('en-IN')}
-                  </td>
-
-                  <td className="p-4 font-mono">
-                    <div className="flex items-center gap-1.5 font-bold">
-                      {item.shift7dPercent >= 0 ? (
-                        <span className="text-emerald-600 flex items-center gap-0.5">
-                          <TrendingUp className="w-3.5 h-3.5" /> +{item.shift7dPercent}%
-                        </span>
-                      ) : (
-                        <span className="text-rose-600 flex items-center gap-0.5">
-                          <TrendingDown className="w-3.5 h-3.5" /> {item.shift7dPercent}%
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-[10px] text-muted-foreground block">
-                      30D: {item.shift30dPercent >= 0 ? `+${item.shift30dPercent}%` : `${item.shift30dPercent}%`}
-                    </span>
-                  </td>
-
-                  <td className="p-4">
-                    {item.volatilityStatus === 'SURGE_RISK' && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-rose-500/10 text-rose-600 text-[10px] font-bold border border-rose-500/20">
-                        <AlertTriangle className="w-3 h-3" /> Surge Risk 🔴
-                      </span>
-                    )}
-                    {item.volatilityStatus === 'DEFICIT_RISK' && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-amber-500/10 text-amber-600 text-[10px] font-bold border border-amber-500/20">
-                        <AlertTriangle className="w-3 h-3" /> Below MSP 🟡
-                      </span>
-                    )}
-                    {item.volatilityStatus === 'STABLE' && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 text-[10px] font-bold border border-emerald-500/20">
-                        <CheckCircle2 className="w-3 h-3" /> Stable 🟢
-                      </span>
-                    )}
-                  </td>
-
-                  <td className="p-4">
-                    <p className="font-mono font-bold text-foreground">
-                      {item.stateBufferRequirementQtl.toLocaleString('en-IN')} Qtl
-                    </p>
-                    <span className="text-[10px] text-muted-foreground block truncate max-w-[140px]">
-                      {item.allocatedStorage}
-                    </span>
-                  </td>
-
-                  <td className="p-4 text-right">
-                    <Button 
-                      size="sm"
-                      onClick={() => handleOpenBufferModal(item)}
-                      className={`rounded-xl text-xs h-8 px-3 font-bold shadow-sm ${
-                        item.bufferStatus === 'procured'
-                          ? 'bg-muted text-muted-foreground hover:bg-muted/80'
-                          : 'bg-purple-600 hover:bg-purple-700 text-white'
-                      }`}
-                    >
-                      <ShoppingBag className="w-3.5 h-3.5 mr-1" />
-                      {item.bufferStatus === 'procured' ? 'Order Fulfilled' : 'Order Buffer'}
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* 5. State Buffer Stock Procurement Order Modal */}
-      {showBufferOrderModal && selectedCropForBuffer && (
-        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-card border border-border rounded-3xl p-6 sm:p-8 max-w-xl w-full shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
-            
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-border pb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-600">
-                  <ShoppingBag className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-extrabold text-foreground">
-                    State Buffer Stock Procurement Order
-                  </h3>
-                  <span className="text-[10px] text-muted-foreground">
-                    Karnataka Food & Civil Supplies Market Intervention Initiative
-                  </span>
-                </div>
+                  {isProcured ? 'Reopen Buffer Requisition' : 'Mark Buffer Procured 🟢'}
+                </Button>
               </div>
-
-              <button 
-                onClick={() => setShowBufferOrderModal(false)}
-                className="p-1 rounded-xl text-muted-foreground hover:text-foreground"
-              >
-                <X className="w-5 h-5" />
-              </button>
             </div>
-
-            {/* Form */}
-            <form onSubmit={handleExecuteBufferOrder} className="space-y-4 text-xs">
-              <div className="p-3.5 rounded-2xl bg-purple-500/10 border border-purple-500/20 space-y-1">
-                <span className="text-[10px] font-bold text-purple-700 uppercase">Selected Commodity</span>
-                <p className="font-extrabold text-sm text-foreground">{bufferForm.cropName} ({selectedCropForBuffer.district} District)</p>
-                <p className="text-[11px] text-purple-900 font-mono">
-                  Current Market Modal Rate: ₹{selectedCropForBuffer.currentModalRate}/Qtl • MSP Floor: ₹{selectedCropForBuffer.mspFloorPrice}/Qtl
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="font-bold text-foreground">Target Procurement (Quintals) *</label>
-                  <input
-                    type="number"
-                    required
-                    value={bufferForm.targetQuantityQtl}
-                    onChange={(e) => {
-                      const qty = parseFloat(e.target.value) || 0
-                      const rate = parseFloat(bufferForm.procurementRate) || 0
-                      setBufferForm({
-                        ...bufferForm,
-                        targetQuantityQtl: e.target.value,
-                        budgetOutlayLakhs: ((qty * rate) / 100000).toFixed(2)
-                      })
-                    }}
-                    className="w-full h-10 px-3.5 rounded-xl bg-background border border-border focus:outline-none focus:ring-2 focus:ring-purple-500/40 font-mono"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="font-bold text-foreground">Procurement Rate (₹/Qtl) *</label>
-                  <input
-                    type="number"
-                    required
-                    value={bufferForm.procurementRate}
-                    onChange={(e) => {
-                      const rate = parseFloat(e.target.value) || 0
-                      const qty = parseFloat(bufferForm.targetQuantityQtl) || 0
-                      setBufferForm({
-                        ...bufferForm,
-                        procurementRate: e.target.value,
-                        budgetOutlayLakhs: ((qty * rate) / 100000).toFixed(2)
-                      })
-                    }}
-                    className="w-full h-10 px-3.5 rounded-xl bg-background border border-border focus:outline-none focus:ring-2 focus:ring-purple-500/40 font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="font-bold text-foreground">Allocated State Storage / Cold Chain Warehouse</label>
-                <input
-                  type="text"
-                  required
-                  value={bufferForm.storageFacility}
-                  onChange={(e) => setBufferForm({ ...bufferForm, storageFacility: e.target.value })}
-                  className="w-full h-10 px-3.5 rounded-xl bg-background border border-border focus:outline-none focus:ring-2 focus:ring-purple-500/40"
-                />
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-muted/40 border border-border flex justify-between items-center font-mono">
-                <span className="text-muted-foreground font-bold">Total State Treasury Outlay:</span>
-                <span className="text-base font-black text-purple-600">₹{bufferForm.budgetOutlayLakhs} Lakhs</span>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
-                <Button 
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowBufferOrderModal(false)}
-                  className="rounded-xl text-xs h-10"
-                >
-                  Cancel
-                </Button>
-
-                <Button 
-                  type="submit"
-                  className="rounded-xl text-xs font-bold h-10 px-6 bg-purple-600 hover:bg-purple-700 text-white shadow-md"
-                >
-                  Dispatch Market Intervention Order 🚀
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+          )
+        })}
+      </div>
     </div>
   )
 }
