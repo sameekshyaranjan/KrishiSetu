@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import cropService from '@/services/cropService'
+import orderService from '@/services/orderService'
 import { Button } from '@/components/ui/button'
 import toast from 'react-hot-toast'
 import { 
@@ -27,18 +28,21 @@ export const FarmerDashboard = () => {
   const { user } = useAuth()
   const [listings, setListings] = useState([])
   const [bids, setBids] = useState([])
+  const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [actionLoadingId, setActionLoadingId] = useState(null)
 
   const loadDashboardData = async () => {
     setLoading(true)
     try {
-      const [listingsData, bidsData] = await Promise.all([
+      const [listingsData, bidsData, ordersData] = await Promise.all([
         cropService.getMyListings(),
-        cropService.getInboundBids()
+        cropService.getInboundBids(),
+        orderService.getFarmerOrders()
       ])
       setListings(listingsData || [])
       setBids(bidsData || [])
+      setOrders(ordersData || [])
     } catch (err) {
       console.error('[FarmerDashboard] Load error:', err)
     } finally {
@@ -69,6 +73,12 @@ export const FarmerDashboard = () => {
   const activeListings = listings.filter(l => l.status === 'available')
   const totalQuintals = activeListings.reduce((sum, l) => sum + (Number(l.quantity) || 0), 0)
   const pendingBids = bids.filter(b => b.status === 'pending')
+
+  const completedOrders = orders.filter(o => o.paymentStatus === 'disbursed' || o.paymentStatus === 'completed')
+  const realizedRevenue = completedOrders.reduce((sum, o) => sum + (Number(o.netFarmerPayout) || Number(o.escrowAmount) || 0), 0)
+
+  const activeEscrowOrders = orders.filter(o => o.paymentStatus === 'escrow_locked' || o.paymentStatus === 'dispatched')
+  const escrowProtected = activeEscrowOrders.reduce((sum, o) => sum + (Number(o.escrowAmount) || 0), 0)
 
   return (
     <div className="space-y-8">
@@ -143,7 +153,7 @@ export const FarmerDashboard = () => {
             <DollarSign className="w-4 h-4 text-emerald-600" />
           </div>
           <p className="text-2xl sm:text-3xl font-black text-emerald-600">
-            ₹1,77,500
+            ₹{realizedRevenue.toLocaleString('en-IN')}
           </p>
           <span className="text-[11px] text-emerald-500 font-medium">
             100% Direct DBT payouts
@@ -156,7 +166,7 @@ export const FarmerDashboard = () => {
             <Lock className="w-4 h-4 text-blue-500" />
           </div>
           <p className="text-2xl sm:text-3xl font-black text-blue-600 dark:text-blue-400">
-            ₹1,88,000
+            ₹{escrowProtected.toLocaleString('en-IN')}
           </p>
           <span className="text-[11px] text-muted-foreground">
             Guaranteed before pickup
