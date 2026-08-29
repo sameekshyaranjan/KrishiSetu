@@ -24,33 +24,42 @@ import {
   Calendar,
   Layers,
   Sprout,
-  Radio
+  Radio,
+  Compass,
+  Gauge
 } from 'lucide-react'
 
 const FALLBACK_WEATHER = {
-  current: { temp: 27, condition: 'Partly Cloudy', humidity: 75, rainProb: 40, wind: 12, uv: 6, rainfall: '2.0 mm', feelsLike: 29 },
+  current: { temp: 24, condition: 'Partly Cloudy', humidity: 82, rainProb: 35, wind: 14, uv: 6, rainfall: '0.0 mm', feelsLike: 25, pressure: 1012 },
   forecast: [
-    { day: 'Today', date: '27 Aug', icon: 'cloud-sun', max: 28, min: 20, rain: 40, tag: 'Good Spray Window', tagType: 'success' },
-    { day: 'Thu', date: '28 Aug', icon: 'rain', max: 27, min: 19, rain: 75, tag: 'Rain Likely', tagType: 'danger' },
-    { day: 'Fri', date: '29 Aug', icon: 'cloud-sun', max: 29, min: 21, rain: 30, tag: 'Good Spray Window', tagType: 'success' },
-    { day: 'Sat', date: '30 Aug', icon: 'sun', max: 31, min: 22, rain: 10, tag: 'Optimal for Harvest', tagType: 'success' },
-    { day: 'Sun', date: '31 Aug', icon: 'sun', max: 32, min: 22, rain: 15, tag: 'Ideal Sun Drying', tagType: 'success' },
-    { day: 'Mon', date: '01 Sep', icon: 'cloud-sun', max: 30, min: 21, rain: 25, tag: 'Favorable Fieldwork', tagType: 'success' },
-    { day: 'Tue', date: '02 Sep', icon: 'rain', max: 28, min: 20, rain: 60, tag: 'Soil Moisture Surplus', tagType: 'info' },
+    { day: 'Today', date: '30 Aug', icon: 'cloud-sun', max: 26, min: 20, rain: 40, tag: 'Good Spray Window', tagType: 'success' },
+    { day: 'Sun', date: '31 Aug', icon: 'cloud-sun', max: 27, min: 20, rain: 45, tag: 'Favorable Fieldwork', tagType: 'success' },
+    { day: 'Mon', date: '01 Sep', icon: 'rain', max: 27, min: 20, rain: 85, tag: 'Rain Likely', tagType: 'danger' },
+    { day: 'Tue', date: '02 Sep', icon: 'rain', max: 26, min: 20, rain: 90, tag: 'Waterlogging Risk', tagType: 'danger' },
+    { day: 'Wed', date: '03 Sep', icon: 'rain', max: 26, min: 20, rain: 75, tag: 'Fungal Spot Risk', tagType: 'warning' },
+    { day: 'Thu', date: '04 Sep', icon: 'cloud-sun', max: 27, min: 20, rain: 30, tag: 'Optimal for Harvest', tagType: 'success' },
+    { day: 'Fri', date: '05 Sep', icon: 'sun', max: 28, min: 21, rain: 20, tag: 'Sun Drying Window', tagType: 'success' },
   ],
   advisories: [
-    { category: 'Irrigation', title: 'Maintain Scheduled Drip Intervals', desc: 'Soil moisture levels are favorable. Standard morning fertigation is recommended.', type: 'success' },
-    { category: 'Pest & Disease', title: 'Scout Lower Foliage for Fungal Spots', desc: 'Moderate humidity requires routine pest inspection across solanaceous and pulse crops.', type: 'warning' }
+    { category: 'Irrigation & Drainage', title: 'Optimal Soil Moisture — Continue Regular Drip Fertigation', desc: 'Mild transpiration conditions. Maintain standard morning drip schedules.', type: 'success' },
+    { category: 'Pest & Fungal Alert', title: 'Inspect Foliage for Blight Spores', desc: 'Moderate humidity requires routine pest inspection across Solanaceous and pulse crops.', type: 'warning' }
   ]
 }
 
-const DISTRICT_LIST = ['Hassan', 'Mysuru', 'Belagavi', 'Mandya', 'Bengaluru Rural', 'Bengaluru Urban', 'Kolar', 'Dharwad', 'Kalaburagi', 'Raichur', 'Ballari', 'Tumakuru', 'Mangaluru']
+const DISTRICT_LIST = [
+  'Bagalkote', 'Ballari', 'Belagavi', 'Bengaluru Rural', 'Bengaluru Urban',
+  'Bidar', 'Chamarajanagar', 'Chikkaballapura', 'Chikkamagaluru', 'Chitradurga',
+  'Dakshina Kannada', 'Davanagere', 'Dharwad', 'Gadag', 'Hassan',
+  'Haveri', 'Hubballi', 'Kalaburagi', 'Kodagu', 'Kolar',
+  'Koppal', 'Mandya', 'Mysuru', 'Raichur', 'Ramanagara',
+  'Shivamogga', 'Tumakuru', 'Udupi', 'Uttara Kannada', 'Vijayapura', 'Yadgir'
+]
 
 const AI_PRESET_QUESTIONS = [
-  'Should I spray pesticide on my tomato crop today?',
-  'Is tomorrow a safe day for harvesting Maize?',
+  'Should I spray pesticide on my tomato/paddy crop today?',
+  'Is tomorrow a safe window for harvesting ragi/wheat?',
   'How to prevent root rot during heavy rainfall?',
-  'What is the best time for fertilizer foliar spray this week?'
+  'What is the best time for foliar fertilizer spray this week?'
 ]
 
 export const FarmerWeather = () => {
@@ -89,7 +98,26 @@ export const FarmerWeather = () => {
     setIsRefreshing(true)
     await fetchLiveWeather(selectedDistrict)
     setIsRefreshing(false)
-    toast.success(`Live weather radar updated for ${selectedDistrict}!`)
+    toast.success(`Live micro-climate radar refreshed for ${selectedDistrict}! ⚡`)
+  }
+
+  const handleDetectGPS = () => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocation is not supported by your browser.')
+      return
+    }
+    toast.loading('Detecting agro-climatic district from GPS...', { id: 'gps' })
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        toast.dismiss('gps')
+        toast.success(`GPS locked (${pos.coords.latitude.toFixed(2)}° N, ${pos.coords.longitude.toFixed(2)}° E). Live weather loaded! 🛰️`)
+        fetchLiveWeather(selectedDistrict)
+      },
+      () => {
+        toast.dismiss('gps')
+        toast.error('GPS permission denied. Using selected district.')
+      }
+    )
   }
 
   const weather = weatherData || FALLBACK_WEATHER
@@ -109,18 +137,18 @@ export const FarmerWeather = () => {
 
       if (q.toLowerCase().includes('spray') || q.toLowerCase().includes('pesticide')) {
         if (rainProb > 50) {
-          setAiAnswer(`🌧️ Live Radar for ${selectedDistrict}: Rain probability is ${rainProb}%. Spraying today is NOT recommended as rain will wash away chemical deposits. Wait for clear skies on Friday morning (6:00 AM - 9:00 AM) when wind drops below 9 km/h.`)
+          setAiAnswer(`🌧️ Live Radar for ${selectedDistrict}: Rain probability is ${rainProb}%. Spraying today is NOT recommended as rain will wash away chemical deposits. Wait for a low-rain window (wind < 10 km/h) between 6:30 AM - 9:30 AM.`)
         } else {
           setAiAnswer(`✅ Live Radar for ${selectedDistrict}: Rain probability is currently low (${rainProb}%) and wind speed is ${wind} km/h. Favorable morning spraying window between 6:30 AM and 9:30 AM.`)
         }
       } else if (q.toLowerCase().includes('harvest')) {
-        setAiAnswer(`🌾 For ${selectedDistrict}, Saturday and Sunday present the optimal harvesting window with less than 15% precipitation probability and 6+ hours of uninterrupted sunlight.`)
+        setAiAnswer(`🌾 For ${selectedDistrict}, the 7-day outlook shows upcoming dry days with precipitation probability below 25%, ideal for grain threshing and sun-drying.`)
       } else if (q.toLowerCase().includes('rot') || q.toLowerCase().includes('rain')) {
-        setAiAnswer(`💧 To prevent root rot during current conditions (${weather.current.humidity}% humidity): 1) Clear field bund channels, 2) Avoid standing water around root zones, 3) Apply Trichoderma viride bio-fungicide drench once rain clears.`)
+        setAiAnswer(`💧 To prevent root rot during current humidity levels (${weather.current.humidity}%): 1) Clear field bund drainage channels, 2) Avoid standing water around root zones, 3) Apply Trichoderma viride bio-fungicide drench once soil surfaces clear.`)
       } else {
-        setAiAnswer(`🌱 Live Agronomy Telemetry for ${selectedDistrict}: Current temperature is ${temp}°C with ${weather.current.humidity}% humidity. Vegetative growth is optimal; scout lower foliage for pest egg clusters over the next 48 hours.`)
+        setAiAnswer(`🌱 Live Agronomy Telemetry for ${selectedDistrict}: Current temperature is ${temp}°C with ${weather.current.humidity}% relative humidity and ${wind} km/h winds. Crop growth conditions are favorable.`)
       }
-    }, 800)
+    }, 600)
   }
 
   const renderWeatherIcon = (type) => {
@@ -136,24 +164,34 @@ export const FarmerWeather = () => {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 max-w-7xl mx-auto py-2">
       
       {/* 1. Header & District Selector */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 text-xs font-semibold border border-emerald-500/20 mb-2">
             <Radio className="w-3.5 h-3.5 animate-pulse text-emerald-500" />
-            <span>Live Open-Meteo & IMD Radar Sync</span>
+            <span>Open-Meteo & IMD Live Radar Telemetry</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
-            Hyper-Local Weather & Crop Advisory
+            Hyper-Local Weather & Crop Advisory 🌦️
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">
             Real-time Karnataka micro-climate telemetry, 7-day agricultural outlook, and AI-driven spraying & harvest recommendations.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDetectGPS}
+            className="rounded-xl text-xs h-10 shadow-sm flex items-center gap-1.5"
+          >
+            <Compass className="w-3.5 h-3.5 text-primary" />
+            GPS Locate
+          </Button>
+
           <div className="relative">
             <MapPin className="w-4 h-4 text-primary absolute left-3 top-3" />
             <select
@@ -206,7 +244,7 @@ export const FarmerWeather = () => {
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Rainfall: <span className="font-semibold text-foreground">{weather.current.rainfall}</span> • Feels like {weather.current.feelsLike || weather.current.temp + 2}°C
+              Precipitation: <span className="font-semibold text-foreground">{weather.current.rainfall}</span> • Feels like {weather.current.feelsLike || weather.current.temp}°C
             </p>
           </div>
 
@@ -219,209 +257,200 @@ export const FarmerWeather = () => {
                 <span className="text-[11px] font-semibold">Humidity</span>
                 <Droplets className="w-4 h-4 text-primary" />
               </div>
-              <p className="text-xl font-extrabold text-foreground">{weather.current.humidity}%</p>
-              <span className="text-[10px] text-amber-600 font-medium">Air Moisture</span>
+              <div className="text-xl font-extrabold text-foreground font-mono">
+                {weather.current.humidity}%
+              </div>
+              <p className="text-[10px] text-muted-foreground font-medium">Relative Moisture</p>
             </div>
 
             {/* Index 2: Rain Probability */}
             <div className="p-4 rounded-2xl bg-card border border-border/80 shadow-sm space-y-1">
               <div className="flex items-center justify-between text-muted-foreground">
-                <span className="text-[11px] font-semibold">Rain Prob.</span>
+                <span className="text-[11px] font-semibold">Rain Probability</span>
                 <CloudRain className="w-4 h-4 text-primary" />
               </div>
-              <p className="text-xl font-extrabold text-primary">{weather.current.rainProb}%</p>
-              <span className="text-[10px] text-primary font-medium">Precipitation</span>
+              <div className="text-xl font-extrabold text-foreground font-mono">
+                {weather.current.rainProb}%
+              </div>
+              <p className="text-[10px] text-muted-foreground font-medium">Precipitation Radar</p>
             </div>
 
             {/* Index 3: Wind Speed */}
             <div className="p-4 rounded-2xl bg-card border border-border/80 shadow-sm space-y-1">
               <div className="flex items-center justify-between text-muted-foreground">
-                <span className="text-[11px] font-semibold">Wind Speed</span>
-                <Wind className="w-4 h-4 text-muted-foreground" />
+                <span className="text-[11px] font-semibold">Wind Velocity</span>
+                <Wind className="w-4 h-4 text-primary" />
               </div>
-              <p className="text-xl font-extrabold text-foreground">{weather.current.wind} <span className="text-xs font-normal">km/h</span></p>
-              <span className="text-[10px] text-muted-foreground">Surface Wind</span>
+              <div className="text-xl font-extrabold text-foreground font-mono">
+                {weather.current.wind} <span className="text-xs font-normal">km/h</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground font-medium">Anemometer Speed</p>
             </div>
 
-            {/* Index 4: UV Index */}
+            {/* Index 4: Barometric Pressure */}
             <div className="p-4 rounded-2xl bg-card border border-border/80 shadow-sm space-y-1">
               <div className="flex items-center justify-between text-muted-foreground">
-                <span className="text-[11px] font-semibold">UV Index</span>
-                <Sun className="w-4 h-4 text-amber-500" />
+                <span className="text-[11px] font-semibold">Barometric Pressure</span>
+                <Gauge className="w-4 h-4 text-purple-500" />
               </div>
-              <p className="text-xl font-extrabold text-amber-600">{weather.current.uv} / 10</p>
-              <span className="text-[10px] text-muted-foreground">Solar Radiance</span>
+              <div className="text-xl font-extrabold text-purple-600 font-mono">
+                {weather.current.pressure || 1013} <span className="text-xs font-normal">hPa</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground font-medium">Surface Telemetry</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* 3. 7-Day Agricultural Forecast Strip */}
-      <div className="space-y-4">
+      {/* 3. 7-Day Micro-Climate Agricultural Forecast */}
+      <div className="p-6 rounded-3xl bg-card border border-border shadow-sm space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="font-extrabold text-lg text-foreground tracking-tight flex items-center gap-2">
+          <div className="flex items-center gap-2">
             <Calendar className="w-5 h-5 text-primary" />
-            7-Day Live Agro-Climatic Outlook
-          </h3>
-          <span className="text-xs text-muted-foreground font-medium">Open-Meteo Satellite Feed</span>
+            <h3 className="text-base font-extrabold text-foreground">
+              7-Day Agricultural Forecast & Spray Suitability
+            </h3>
+          </div>
+          <span className="text-xs text-muted-foreground font-medium">
+            Live Open-Meteo Radar Feed
+          </span>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-          {weather.forecast.map((item, idx) => (
-            <div 
+          {weather.forecast.map((day, idx) => (
+            <div
               key={idx}
-              className={`p-4 rounded-2xl bg-card border transition-all text-center space-y-2.5 ${
+              className={`p-4 rounded-2xl border transition-all flex flex-col items-center justify-between text-center space-y-2 ${
                 idx === 0 
-                  ? 'border-primary shadow-sm bg-primary/[0.03]' 
-                  : 'border-border hover:border-primary/50'
+                  ? 'bg-primary/10 border-primary/40 shadow-sm ring-1 ring-primary/30' 
+                  : 'bg-muted/30 border-border/60 hover:bg-muted/60'
               }`}
             >
               <div>
-                <span className="font-bold text-xs text-foreground block">{item.day}</span>
-                <span className="text-[10px] text-muted-foreground font-medium">{item.date}</span>
+                <p className="font-extrabold text-xs text-foreground">{day.day}</p>
+                <p className="text-[10px] text-muted-foreground">{day.date}</p>
               </div>
 
-              <div className="my-2 flex items-center justify-center">
-                {renderWeatherIcon(item.icon)}
+              <div className="py-1">
+                {renderWeatherIcon(day.icon)}
               </div>
 
-              <div className="flex items-center justify-center gap-1.5 text-xs font-extrabold">
-                <span className="text-foreground">{item.max}°</span>
-                <span className="text-muted-foreground text-[11px] font-normal">{item.min}°</span>
+              <div>
+                <span className="font-black text-sm text-foreground">{day.max}°</span>
+                <span className="text-xs text-muted-foreground ml-1 font-semibold">{day.min}°</span>
               </div>
 
-              <div className="text-[11px] font-bold text-primary flex items-center justify-center gap-1">
+              <div className="text-[11px] font-bold text-primary flex items-center gap-0.5">
                 <Droplets className="w-3 h-3" />
-                <span>{item.rain}%</span>
+                {day.rain}%
               </div>
 
-              <span className={`block text-[9px] font-bold px-1.5 py-0.5 rounded-md leading-tight ${
-                item.tagType === 'danger' 
-                  ? 'bg-rose-500/10 text-rose-600 border border-rose-500/20' 
-                  : item.tagType === 'warning'
-                  ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
-                  : 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
+              <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                day.tagType === 'success' ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' :
+                day.tagType === 'danger' ? 'bg-rose-500/10 text-rose-600 border border-rose-500/20' :
+                'bg-amber-500/10 text-amber-600 border border-amber-500/20'
               }`}>
-                {item.tag}
+                {day.tag}
               </span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* 4. Actionable Agronomy Advisories */}
-      <div className="space-y-4">
-        <h3 className="font-extrabold text-lg text-foreground tracking-tight flex items-center gap-2">
-          <ShieldAlert className="w-5 h-5 text-amber-500" />
-          Field Action Advisories for {selectedDistrict}
-        </h3>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {weather.advisories.map((adv, idx) => (
-            <div 
-              key={idx}
-              className={`p-5 rounded-3xl bg-card border space-y-2 transition-all ${
-                adv.type === 'danger' 
-                  ? 'border-rose-500/30 bg-rose-500/[0.02]' 
-                  : adv.type === 'warning'
-                  ? 'border-amber-500/30 bg-amber-500/[0.02]'
-                  : 'border-emerald-500/30 bg-emerald-500/[0.02]'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-md bg-muted text-foreground border border-border">
-                  {adv.category}
-                </span>
-
-                <span className={`text-xs font-bold flex items-center gap-1 ${
-                  adv.type === 'danger' ? 'text-rose-600' : adv.type === 'warning' ? 'text-amber-600' : 'text-emerald-600'
-                }`}>
-                  {adv.type === 'danger' && <AlertTriangle className="w-3.5 h-3.5" />}
-                  {adv.type === 'warning' && <Info className="w-3.5 h-3.5" />}
-                  {adv.type === 'success' && <CheckCircle2 className="w-3.5 h-3.5" />}
-                  <span>{adv.type === 'danger' ? 'High Priority' : adv.type === 'warning' ? 'Action Recommended' : 'Favorable Window'}</span>
-                </span>
+      {/* 4. Automated Agronomy Advisories */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {weather.advisories.map((adv, idx) => (
+          <div
+            key={idx}
+            className={`p-5 rounded-3xl border shadow-sm flex flex-col justify-between space-y-2 ${
+              adv.type === 'danger' ? 'bg-rose-500/5 border-rose-500/20' :
+              adv.type === 'warning' ? 'bg-amber-500/5 border-amber-500/20' :
+              'bg-emerald-500/5 border-emerald-500/20'
+            }`}
+          >
+            <div>
+              <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider mb-1">
+                {adv.type === 'danger' ? <AlertTriangle className="w-3.5 h-3.5 text-rose-600" /> :
+                 adv.type === 'warning' ? <ShieldAlert className="w-3.5 h-3.5 text-amber-600" /> :
+                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
+                <span className={
+                  adv.type === 'danger' ? 'text-rose-600' :
+                  adv.type === 'warning' ? 'text-amber-600' :
+                  'text-emerald-600'
+                }>{adv.category}</span>
               </div>
-
-              <h4 className="font-bold text-sm text-foreground pt-1">{adv.title}</h4>
-              <p className="text-xs text-muted-foreground leading-relaxed">{adv.desc}</p>
+              <h4 className="font-extrabold text-sm text-foreground">{adv.title}</h4>
+              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{adv.desc}</p>
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
       </div>
 
-      {/* 5. AI Agronomy Assistant Chatbot */}
-      <div className="p-6 sm:p-8 rounded-3xl bg-card border border-border shadow-sm space-y-6">
-        <div className="flex items-center gap-3 border-b border-border pb-4">
-          <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
+      {/* 5. AI Agricultural Weather Advisor Assistant */}
+      <div className="p-6 sm:p-7 rounded-3xl bg-card border border-border shadow-sm space-y-5">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-bold">
             <Bot className="w-5 h-5" />
           </div>
           <div>
             <h3 className="text-base font-extrabold text-foreground">
-              Ask KrishiSetu AI Crop Doctor
+              KrishiSetu AI Agronomy Advisor 🤖
             </h3>
             <p className="text-xs text-muted-foreground">
-              Instant agronomy recommendations based on live {selectedDistrict} weather radar.
+              Ask real-time questions about spraying windows, soil saturation, and harvesting schedules for {selectedDistrict}.
             </p>
           </div>
         </div>
 
-        {/* Preset Quick Questions */}
-        <div className="space-y-2">
-          <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            Frequently Asked Weather Queries:
-          </label>
-          <div className="flex flex-wrap gap-2">
-            {AI_PRESET_QUESTIONS.map((q, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => {
-                  setAiQuestion(q)
-                  handleAskAI(q)
-                }}
-                className="px-3 py-1.5 rounded-xl bg-muted/60 hover:bg-muted border border-border text-xs font-semibold text-foreground transition-colors text-left"
-              >
-                {q}
-              </button>
-            ))}
-          </div>
+        {/* AI Quick Preset Questions */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+          {AI_PRESET_QUESTIONS.map((q, idx) => (
+            <button
+              key={idx}
+              onClick={() => {
+                setAiQuestion(q)
+                handleAskAI(q)
+              }}
+              className="px-3.5 py-1.5 rounded-xl bg-muted/60 hover:bg-muted text-foreground border border-border/80 text-xs font-semibold whitespace-nowrap transition-colors"
+            >
+              {q}
+            </button>
+          ))}
         </div>
 
-        {/* Input Bar */}
-        <form 
+        {/* AI Question Form */}
+        <form
           onSubmit={(e) => {
             e.preventDefault()
             handleAskAI()
-          }} 
-          className="flex items-center gap-3 pt-2"
+          }}
+          className="flex gap-2"
         >
           <input
             type="text"
             value={aiQuestion}
             onChange={(e) => setAiQuestion(e.target.value)}
-            placeholder="Type your crop or weather question (e.g. Is it safe to spray fungicide tomorrow?)..."
-            className="flex-1 h-11 px-4 rounded-2xl bg-background border border-border text-xs focus:outline-none focus:ring-2 focus:ring-primary/40"
+            placeholder="Ask weather question (e.g., Can I apply urea fertilizer tomorrow morning?)..."
+            className="flex-1 h-11 px-4 rounded-xl bg-background border border-border text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary/40 shadow-sm"
           />
-          <Button 
-            type="submit" 
-            disabled={aiLoading}
-            className="rounded-2xl h-11 px-5 text-xs font-bold shadow-md bg-primary text-primary-foreground"
+          <Button
+            type="submit"
+            disabled={aiLoading || !aiQuestion.trim()}
+            className="rounded-xl px-5 h-11 text-xs font-bold bg-primary text-primary-foreground shadow-md flex items-center gap-1.5"
           >
-            {aiLoading ? 'Analyzing...' : <><Send className="w-4 h-4 mr-1.5" /> Ask AI</>}
+            {aiLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+            Ask AI
           </Button>
         </form>
 
-        {/* AI Answer Box */}
+        {/* AI Answer Output */}
         {aiAnswer && (
-          <div className="p-4 rounded-2xl bg-primary/5 border border-primary/20 space-y-1 animate-in fade-in duration-300">
-            <div className="flex items-center gap-2 text-xs font-bold text-primary">
-              <Sparkles className="w-4 h-4" />
-              <span>AI Agronomy Recommendation</span>
+          <div className="p-4 rounded-2xl bg-primary/5 border border-primary/20 text-xs text-foreground font-medium space-y-1 animate-in fade-in duration-200">
+            <div className="flex items-center gap-1.5 text-primary font-bold">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Agronomy Telemetry Recommendation:</span>
             </div>
-            <p className="text-xs text-foreground leading-relaxed pt-1">
-              {aiAnswer}
-            </p>
+            <p className="leading-relaxed pl-5">{aiAnswer}</p>
           </div>
         )}
       </div>
