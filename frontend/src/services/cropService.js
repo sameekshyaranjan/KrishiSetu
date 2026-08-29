@@ -32,19 +32,26 @@ export const cropService = {
    */
   getAllListings: async (params = {}) => {
     try {
+      // NOTE: axios interceptor already returns response.data
+      // So `res` here IS the HTTP body: { source: 'mongodb'|'redis', data: { success, data: [...crops] } }
       const res = await api.get('/crops', { params })
-      const payload = res?.data
-      if (Array.isArray(payload)) return payload
-      if (Array.isArray(payload?.data?.data)) return payload.data.data
-      if (Array.isArray(payload?.data)) return payload.data
-      if (Array.isArray(payload?.docs)) return payload.docs
-      if (Array.isArray(payload?.data?.docs)) return payload.data.docs
+      console.log('[cropService.getAllListings] RAW RESPONSE:', JSON.stringify(res)?.slice(0, 500))
+
+      // res = { source, data: paginateResult }
+      // paginateResult = { success, count, total, page, pages, data: [crops] }
+      if (Array.isArray(res)) return res
+      if (Array.isArray(res?.data?.data)) return res.data.data   // { source, data: { data: [crops] } }
+      if (Array.isArray(res?.data?.docs)) return res.data.docs   // paginate with docs key
+      if (Array.isArray(res?.data)) return res.data              // { source, data: [crops] }
+      if (Array.isArray(res?.docs)) return res.docs              // { docs: [crops] }
+      console.warn('[cropService.getAllListings] Unexpected response shape:', res)
       return []
     } catch (err) {
       console.warn('[cropService] Failed to load marketplace listings:', err.message)
       return []
     }
   },
+
 
   /**
    * Fetch single crop lot by ID
