@@ -72,21 +72,25 @@ export const TraderRegister = () => {
   }
 
   // Step 1 Submit: Send Trader Data & Request OTP
+  const [formDataCache, setFormDataCache] = useState(null)
+
   const onFormSubmit = async (data) => {
     setLoading(true)
     try {
       const payload = {
         ...data,
+        mobile: data.phone || data.mobile,
         operatingStates: ['Karnataka'],
         operatingDistricts: selectedDistricts
       }
+      setFormDataCache(payload)
 
       await authService.registerTrader(payload)
       setSubmittedEmail(data.email.toLowerCase())
       setStep(2)
       setResendTimer(60)
       setCanResend(false)
-      toast.success('OTP sent to email for verification!')
+      toast.success('Verification OTP sent to your email address!')
     } catch (err) {
       const message = err.response?.data?.message || err.message || 'Trader registration failed'
       toast.error(message)
@@ -112,13 +116,14 @@ export const TraderRegister = () => {
       })
 
       if (res.success) {
-        toast.success('Welcome to KrishiSetu! Trader account activated.')
+        toast.success('Welcome to KrishiSetu! Trader account activated. 💼')
         navigate('/trader/dashboard')
       } else {
-        toast.error(res.error || 'Invalid OTP')
+        toast.error(res.error || 'Invalid OTP code')
       }
     } catch (err) {
-      toast.error('OTP verification failed. Please check the code and try again.')
+      const msg = err.response?.data?.message || err.message || 'OTP verification failed'
+      toast.error(msg)
     } finally {
       setLoading(false)
     }
@@ -129,12 +134,17 @@ export const TraderRegister = () => {
     if (!canResend) return
     setLoading(true)
     try {
-      await authService.sendLoginOTP(submittedEmail)
+      if (formDataCache) {
+        await authService.registerTrader(formDataCache)
+      } else {
+        await authService.sendLoginOTP(submittedEmail)
+      }
       setResendTimer(60)
       setCanResend(false)
-      toast.success('New OTP sent!')
+      toast.success('New OTP sent to your email!')
     } catch (err) {
-      toast.error('Failed to resend OTP. Please try again.')
+      const msg = err.response?.data?.message || 'Failed to resend OTP'
+      toast.error(msg)
     } finally {
       setLoading(false)
     }

@@ -85,31 +85,30 @@ export const FarmerRegister = () => {
     }
   }
 
+  const [formDataCache, setFormDataCache] = useState(null)
+
   // Step 1 Submit: Send Registration Data & Request OTP
   const onFormSubmit = async (data) => {
     setLoading(true)
     try {
       const payload = {
         ...data,
+        mobile: data.phone || data.mobile,
         rtcNumber: rtcNumber || 'RTC-HSN-88192',
         cropsGrown: selectedCrops,
         landSizeAcres: Number(data.landSizeAcres)
       }
+      setFormDataCache(payload)
 
       await authService.registerFarmer(payload)
       setSubmittedEmail(data.email.toLowerCase())
       setStep(2)
       setResendTimer(60)
       setCanResend(false)
-      toast.success('OTP sent to your email for verification!')
+      toast.success('Verification OTP sent to your email address!')
     } catch (err) {
       const message = err.response?.data?.message || err.message || 'Registration failed'
-      // If backend is running without email SMTP configured, allow test verification
-      setSubmittedEmail(data.email.toLowerCase())
-      setStep(2)
-      setResendTimer(60)
-      setCanResend(false)
-      toast.success('Registration data verified! Enter OTP sent to your phone/email.')
+      toast.error(message)
     } finally {
       setLoading(false)
     }
@@ -132,26 +131,14 @@ export const FarmerRegister = () => {
       })
 
       if (res.success) {
-        toast.success('Welcome to KrishiSetu! Farmer account activated.')
+        toast.success('Welcome to KrishiSetu! Farmer account activated. 🌾')
         navigate('/farmer/dashboard')
       } else {
-        // Fallback session provisioning for instant onboarding
-        const fallbackUser = {
-          _id: `FRM-${Date.now()}`,
-          name: 'Ramesh Gowda',
-          email: submittedEmail,
-          role: 'farmer',
-          district: 'Hassan',
-          village: 'Belur Village',
-          state: 'Karnataka',
-          cropsGrown: selectedCrops
-        }
-        authService.setAuthSession(`mock_jwt_${Date.now()}`, null, fallbackUser)
-        toast.success('Welcome to KrishiSetu! Account verified & activated. 🎉')
-        navigate('/farmer/dashboard')
+        toast.error(res.error || 'Invalid OTP code')
       }
     } catch (err) {
-      toast.error('OTP verification failed. Please check the code and try again.')
+      const msg = err.response?.data?.message || err.message || 'OTP verification failed'
+      toast.error(msg)
     } finally {
       setLoading(false)
     }
@@ -162,12 +149,17 @@ export const FarmerRegister = () => {
     if (!canResend) return
     setLoading(true)
     try {
-      await authService.sendLoginOTP(submittedEmail)
+      if (formDataCache) {
+        await authService.registerFarmer(formDataCache)
+      } else {
+        await authService.sendLoginOTP(submittedEmail)
+      }
       setResendTimer(60)
       setCanResend(false)
-      toast.success('New OTP sent!')
+      toast.success('New OTP sent to your email!')
     } catch (err) {
-      toast.error('Failed to resend OTP. Please try again.')
+      const msg = err.response?.data?.message || 'Failed to resend OTP'
+      toast.error(msg)
     } finally {
       setLoading(false)
     }
