@@ -42,14 +42,16 @@ const CROP_TYPES = [
   { name: 'Ginger', category: 'spices', defaultPrice: 6500, defaultImg: 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?w=600&auto=format&fit=crop' },
   { name: 'Groundnut (Peanut)', category: 'grains', defaultPrice: 5800, defaultImg: 'https://images.unsplash.com/photo-1567306226416-28f0efdc88ce?w=600&auto=format&fit=crop' },
   { name: 'Sugarcane', category: 'spices', defaultPrice: 3200, defaultImg: 'https://images.unsplash.com/photo-1589135233689-d56d25c68b6b?w=600&auto=format&fit=crop' },
-  { name: 'Wheat', category: 'grains', defaultPrice: 2400, defaultImg: 'https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?w=600&auto=format&fit=crop' },
+  { name: 'Wheat', category: 'grains', defaultPrice: 3200, defaultImg: 'https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?w=600&auto=format&fit=crop' },
+  { name: 'Copra / Coconut (Dry)', category: 'spices', defaultPrice: 13800, defaultImg: 'https://images.unsplash.com/photo-1589135233689-d56d25c68b6b?w=600&auto=format&fit=crop' },
   { name: 'Garlic', category: 'spices', defaultPrice: 12000, defaultImg: 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?w=600&auto=format&fit=crop' },
   { name: 'Other Crops', category: 'vegetables', defaultPrice: 2000, defaultImg: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=600&auto=format&fit=crop' }
 ]
 
 const KARNATAKA_DISTRICTS = [
   'Hassan', 'Kolar', 'Mandya', 'Belagavi', 'Hubballi / Dharwad', 
-  'Davanagere', 'Mysuru', 'Ballari', 'Shimoga', 'Tumakuru', 'Bagalkot'
+  'Davanagere', 'Mysuru', 'Ballari', 'Shimoga', 'Tumakuru', 'Bagalkote',
+  'Raichur', 'Vijayapura', 'Udupi', 'Dakshina Kannada', 'Ramanagara', 'Chikkaballapura'
 ]
 
 export const FarmerListings = () => {

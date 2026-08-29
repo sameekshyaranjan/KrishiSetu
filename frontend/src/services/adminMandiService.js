@@ -7,7 +7,71 @@ import api from './api'
 
 const DEFAULT_PRICE_INTELLIGENCE = [
   {
-    _id: 'PRC-TOM-KA-01',
+    _id: 'PRC-PAD-KA-01',
+    cropName: 'Paddy / Rice (Sona Masoori)',
+    category: 'grains',
+    primaryMandi: 'Mandya & Mysuru APMC',
+    district: 'Mandya',
+    currentModalRate: 3150,
+    mspFloorPrice: 2300,
+    shift7dPercent: 4.8,
+    shift30dPercent: 11.2,
+    volatilityStatus: 'STABLE',
+    stateBufferRequirementQtl: 25000,
+    allocatedStorage: 'Food Corporation of India (FCI) Silo Complex #3',
+    bufferStatus: 'procured',
+    recommendedAction: 'State PDS rice quota 96% fulfilled across Southern Karnataka mandis.'
+  },
+  {
+    _id: 'PRC-RAG-KA-02',
+    cropName: 'Organic Finger Millet (Ragi)',
+    category: 'grains',
+    primaryMandi: 'Kolar & Tumakuru APMC',
+    district: 'Kolar',
+    currentModalRate: 3500,
+    mspFloorPrice: 3578,
+    shift7dPercent: 2.1,
+    shift30dPercent: 4.8,
+    volatilityStatus: 'STABLE',
+    stateBufferRequirementQtl: 18000,
+    allocatedStorage: 'Civil Supplies PDS Distribution Hub, Kolar',
+    bufferStatus: 'procured',
+    recommendedAction: 'Regular PDS procurement quota 92% fulfilled across Southern Karnataka mandis.'
+  },
+  {
+    _id: 'PRC-WHT-KA-03',
+    cropName: 'Wheat (Sharbati Gold)',
+    category: 'grains',
+    primaryMandi: 'Belagavi & Dharwad APMC',
+    district: 'Belagavi',
+    currentModalRate: 3200,
+    mspFloorPrice: 2275,
+    shift7dPercent: 3.5,
+    shift30dPercent: 8.4,
+    volatilityStatus: 'STABLE',
+    stateBufferRequirementQtl: 14000,
+    allocatedStorage: 'Karnataka State Warehousing Corp (KSWC Belagavi Silo)',
+    bufferStatus: 'procured',
+    recommendedAction: 'Northern Karnataka wheat arrivals meeting commercial milling demand.'
+  },
+  {
+    _id: 'PRC-CPR-KA-04',
+    cropName: 'Copra (Tiptur Ball Copra)',
+    category: 'spices',
+    primaryMandi: 'Tiptur APMC (National Copra Yard)',
+    district: 'Tumakuru',
+    currentModalRate: 13800,
+    mspFloorPrice: 12000,
+    shift7dPercent: 6.2,
+    shift30dPercent: 18.5,
+    volatilityStatus: 'SURGE_RISK',
+    stateBufferRequirementQtl: 8000,
+    allocatedStorage: 'NAFED Coconut Procurement Center, Tiptur',
+    bufferStatus: 'requisition_open',
+    recommendedAction: 'Coconut oil extraction demand surged by 18%. NAFED MSP buffer acquisition open.'
+  },
+  {
+    _id: 'PRC-TOM-KA-05',
     cropName: 'Hybrid Tomato',
     category: 'vegetables',
     primaryMandi: 'Hassan & Kolar APMC',
@@ -23,7 +87,7 @@ const DEFAULT_PRICE_INTELLIGENCE = [
     recommendedAction: 'Trigger State Market Intervention to procure 5,000 Qtl for urban retail price stabilization.'
   },
   {
-    _id: 'PRC-ONI-KA-02',
+    _id: 'PRC-ONI-KA-06',
     cropName: 'Bellary Red Onion',
     category: 'vegetables',
     primaryMandi: 'Mandya & Hubballi APMC',
@@ -37,38 +101,6 @@ const DEFAULT_PRICE_INTELLIGENCE = [
     allocatedStorage: 'Mandya Ventilated Storage Shed #4',
     bufferStatus: 'requisition_open',
     recommendedAction: 'Acquire 8,000 Qtl buffer stock to counteract anticipated monsoon transport disruption.'
-  },
-  {
-    _id: 'PRC-MAI-KA-03',
-    cropName: 'Yellow Dent Maize',
-    category: 'grains',
-    primaryMandi: 'Bengaluru Rural (Doddaballapura)',
-    district: 'Bengaluru Rural',
-    currentModalRate: 2050,
-    mspFloorPrice: 2090,
-    shift7dPercent: -3.8,
-    shift30dPercent: -6.2,
-    volatilityStatus: 'DEFICIT_RISK',
-    stateBufferRequirementQtl: 12000,
-    allocatedStorage: 'Karnataka State Warehousing Corp (KSWC Silo #1)',
-    bufferStatus: 'requisition_open',
-    recommendedAction: 'Modal price is ₹40 below MSP. Immediate MSP floor procurement mandated to protect farmer incomes.'
-  },
-  {
-    _id: 'PRC-RAG-KA-04',
-    cropName: 'Organic Finger Millet (Ragi)',
-    category: 'grains',
-    primaryMandi: 'Kolar & Tumakuru APMC',
-    district: 'Kolar',
-    currentModalRate: 3450,
-    mspFloorPrice: 3578,
-    shift7dPercent: 2.1,
-    shift30dPercent: 4.8,
-    volatilityStatus: 'STABLE',
-    stateBufferRequirementQtl: 15000,
-    allocatedStorage: 'Civil Supplies PDS Distribution Hub',
-    bufferStatus: 'procured',
-    recommendedAction: 'Regular PDS procurement quota 92% fulfilled across Southern Karnataka mandis.'
   }
 ]
 
@@ -96,17 +128,39 @@ const DEFAULT_GATE_PASSES = [
     weighbridgeRef: 'WB-YPR-2026-8819'
   },
   {
-    _id: 'GP-KA-BLR-2026-7721',
-    timestamp: '22 mins ago (15:23 IST)',
-    mandiYard: 'Bengaluru Rural (Doddaballapura)',
-    vehicleNo: 'KA-50-E-4419',
-    vehicleType: '12-Wheel Tata Prima Commercial',
+    _id: 'GP-KA-TPT-2026-8840',
+    timestamp: '18 mins ago (15:28 IST)',
+    mandiYard: 'Tiptur APMC National Copra Market Yard',
+    vehicleNo: 'KA-06-B-9912',
+    vehicleType: '12-Wheel Ashok Leyland Commercial',
+    transporterName: 'Coconut Country Freight Co-op',
+    driverName: 'Chandrashekariah',
+    driverMobile: '+91 97412 66778',
+    farmerName: 'Thimmegowda (Tiptur, Tumakuru)',
+    farmerRtc: 'RTC-TPT-33214',
+    cropName: 'Tiptur Special Ball Copra',
+    declaredBags: '240 Gunny Bags (120 Qtl)',
+    grossWeightKg: 16800,
+    tareWeightKg: 4800,
+    netWeightKg: 12000,
+    netWeightQtl: 120.0,
+    weighbridgeTolerance: 'Passed (0.01% Variance)',
+    shedAllocation: 'Copra Platform #1A',
+    status: 'cleared',
+    weighbridgeRef: 'WB-TPT-2026-8840'
+  },
+  {
+    _id: 'GP-KA-MND-2026-7721',
+    timestamp: '35 mins ago (15:10 IST)',
+    mandiYard: 'Mandya APMC Main Yard',
+    vehicleNo: 'KA-11-M-4419',
+    vehicleType: '10-Wheel Tata Prima',
     transporterName: 'Deccan Grain Haulers Ltd',
     driverName: 'Shankar Rao',
     driverMobile: '+91 97412 88990',
-    farmerName: 'Channappa Gowda (Doddaballapura)',
-    farmerRtc: 'RTC-BLR-44102',
-    cropName: 'Yellow Dent Poultry Maize',
+    farmerName: 'Channappa Gowda (Mandya)',
+    farmerRtc: 'RTC-MND-44102',
+    cropName: 'Paddy / Rice (Sona Masoori Raw)',
     declaredBags: '600 Gunny Bags (300 Qtl)',
     grossWeightKg: 35850,
     tareWeightKg: 5850,
@@ -115,7 +169,7 @@ const DEFAULT_GATE_PASSES = [
     weighbridgeTolerance: 'Passed (0.01% Variance)',
     shedAllocation: 'Grain Silo Shed #12',
     status: 'cleared',
-    weighbridgeRef: 'WB-BLR-2026-7712'
+    weighbridgeRef: 'WB-MND-2026-7721'
   }
 ]
 
@@ -154,16 +208,10 @@ const saveStoredGatePasses = (data) => {
 }
 
 export const adminMandiService = {
-  /**
-   * Get price intelligence & buffer stock analysis
-   */
   getPriceIntelligence: async () => {
     return getStoredPricesIntel()
   },
 
-  /**
-   * Update buffer stock requisition status
-   */
   updateBufferStatus: async (cropId, newStatus) => {
     const current = getStoredPricesIntel()
     const updated = current.map((p) => (p._id === cropId ? { ...p, bufferStatus: newStatus } : p))
@@ -171,16 +219,10 @@ export const adminMandiService = {
     return updated
   },
 
-  /**
-   * Get active APMC gate passes and weighbridge traffic
-   */
   getGatePasses: async () => {
     return getStoredGatePasses()
   },
 
-  /**
-   * Advance gate pass status
-   */
   updateGatePassStatus: async (passId, newStatus) => {
     const current = getStoredGatePasses()
     const updated = current.map((gp) => (gp._id === passId ? { ...gp, status: newStatus } : gp))
