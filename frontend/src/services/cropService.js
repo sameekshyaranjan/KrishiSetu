@@ -33,13 +33,12 @@ export const cropService = {
   getAllListings: async (params = {}) => {
     try {
       const res = await api.get('/crops', { params })
-      const data = res?.data?.data || res?.data || res
-      if (Array.isArray(data)) {
-        return data
-      }
-      if (data?.docs && Array.isArray(data.docs)) {
-        return data.docs
-      }
+      const payload = res?.data
+      if (Array.isArray(payload)) return payload
+      if (Array.isArray(payload?.data?.data)) return payload.data.data
+      if (Array.isArray(payload?.data)) return payload.data
+      if (Array.isArray(payload?.docs)) return payload.docs
+      if (Array.isArray(payload?.data?.docs)) return payload.data.docs
       return []
     } catch (err) {
       console.warn('[cropService] Failed to load marketplace listings:', err.message)
@@ -53,7 +52,8 @@ export const cropService = {
   getListingById: async (id) => {
     try {
       const res = await api.get(`/crops/${id}`)
-      return res?.data || res || null
+      const payload = res?.data
+      return payload?.data || payload || null
     } catch (err) {
       console.warn('[cropService] Listing not found:', id, err.message)
       return null

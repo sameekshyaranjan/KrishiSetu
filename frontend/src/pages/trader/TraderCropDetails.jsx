@@ -35,163 +35,96 @@ import {
   RefreshCw
 } from 'lucide-react'
 
-const DEMO_FALLBACK_LOTS = {
-  'LOT-KA-HSN-101': {
-    _id: 'LOT-KA-HSN-101',
-    cropName: 'Grade-A Fresh Hybrid Tomato',
-    variety: 'Shiva Hybrid (Firm Red Skin)',
-    category: 'Vegetables',
-    grade: 'Grade-A Premium',
-    quantity: 120,
-    unit: 'Quintals',
-    reservePrice: 1800,
-    currentHighestBid: 2150,
-    apmcBenchmark: 2380,
-    instantBuyoutPrice: 2300,
-    harvestDate: '26 Aug 2026',
-    images: [
-      'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=800&q=80',
-      'https://images.unsplash.com/photo-1546470427-e26264be0b11?w=800&q=80',
-      'https://images.unsplash.com/photo-1561136594-7f68413baa99?w=800&q=80'
-    ],
-    qualityAssay: {
-      moisture: '12.4% (Standard < 14%)',
-      purity: '98.8% Foreign Matter Free',
-      diameter: '55mm - 65mm Uniform Caliber',
-      packaging: '25kg Standard Plastic Crates',
-      coldStorageTolerant: 'Yes (Up to 14 Days at 10°C)'
-    },
-    farmer: {
-      name: 'Ramesh Gowda',
-      village: 'Belur Village',
-      taluk: 'Belur',
-      district: 'Hassan',
-      state: 'Karnataka',
-      rating: 4.9,
-      totalTrades: 28,
-      distanceToMandi: '14 km to Hassan APMC Yard'
-    },
-    closingIn: '03h 42m 18s',
-    bidsHistory: [
-      { id: 'b1', bidder: 'Karnataka Agro Traders (You)', amount: 2150, time: '12 mins ago', isHighest: true },
-      { id: 'b2', bidder: 'Mysuru Wholesale Spices', amount: 2100, time: '28 mins ago', isHighest: false },
-      { id: 'b3', bidder: 'Hassan Retailers Co-op', amount: 2000, time: '1 hour ago', isHighest: false }
-    ]
-  },
-  'LOT-KA-MND-102': {
-    _id: 'LOT-KA-MND-102',
-    cropName: 'Bellary Premium Red Onion',
-    variety: 'Bellary Red (Thick Pungent Bulb)',
-    category: 'Vegetables',
-    grade: 'Export Grade-A',
-    quantity: 250,
-    unit: 'Quintals',
-    reservePrice: 2200,
-    currentHighestBid: 2550,
-    apmcBenchmark: 2750,
-    instantBuyoutPrice: 2680,
-    harvestDate: '24 Aug 2026',
-    images: [
-      'https://images.unsplash.com/photo-1618512496248-a07fe83aa8cb?w=800&q=80',
-      'https://images.unsplash.com/photo-1587049352846-4a222e784d38?w=800&q=80'
-    ],
-    qualityAssay: {
-      moisture: '10.2% (Well Cured)',
-      purity: '99.2% Single-Center Bulbs',
-      diameter: '50mm - 70mm Medium-Large',
-      packaging: '50kg Ventilated Jute Gunny Bags',
-      coldStorageTolerant: 'Yes (Ambient Dry Shed 30 Days)'
-    },
-    farmer: {
-      name: 'Basavaraj Patil',
-      village: 'Malavalli',
-      taluk: 'Malavalli',
-      district: 'Mandya',
-      state: 'Karnataka',
-      rating: 4.8,
-      totalTrades: 42,
-      distanceToMandi: '8 km to Mandya APMC Yard'
-    },
-    closingIn: '06h 15m 40s',
-    bidsHistory: [
-      { id: 'b1', bidder: 'Coastal Agro Processing Corp', amount: 2550, time: '18 mins ago', isHighest: true },
-      { id: 'b2', bidder: 'Karnataka Agro Traders', amount: 2480, time: '45 mins ago', isHighest: false }
-    ]
-  }
-}
-
 export const TraderCropDetails = () => {
   const { id } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
 
-  const [lot, setLot] = useState(() => DEMO_FALLBACK_LOTS[id] || DEMO_FALLBACK_LOTS['LOT-KA-HSN-101'])
+  const [lot, setLot] = useState(null)
   const [selectedImageIdx, setSelectedImageIdx] = useState(0)
-  const [bidInput, setBidInput] = useState('2200')
+  const [bidInput, setBidInput] = useState('2000')
   const [bidsList, setBidsList] = useState([])
-  const [currentHigh, setCurrentHigh] = useState(2150)
+  const [currentHigh, setCurrentHigh] = useState(2000)
   const [isPlacingBid, setIsPlacingBid] = useState(false)
   const [isInspectionOpen, setIsInspectionOpen] = useState(false)
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [loading, setLoading] = useState(true)
 
-  // Load Lot Details & Bids dynamically
+  // Load Lot Details & Bids dynamically from database
   useEffect(() => {
     const fetchLotData = async () => {
       setLoading(true)
       try {
-        const fetchedCrop = await cropService.getListingById(id)
+        const [fetchedCrop, fetchedBids] = await Promise.all([
+          cropService.getListingById(id),
+          bidService.getBidsForListing(id)
+        ])
+
         if (fetchedCrop) {
+          const rawBids = Array.isArray(fetchedBids) ? fetchedBids : []
+          const sortedBids = [...rawBids].sort((a, b) => (Number(b.amount) || 0) - (Number(a.amount) || 0))
+          const topBidAmount = sortedBids.length > 0 ? Number(sortedBids[0].amount) : Number(fetchedCrop.basePrice || 2000)
+
+          const formattedBids = sortedBids.map((b, idx) => ({
+            id: b._id || `b-${idx}`,
+            bidder: b.trader?.name ? `${b.trader.name}${b.trader?._id === user?._id ? ' (You)' : ''}` : 'Verified Bidder',
+            amount: Number(b.amount) || 0,
+            time: new Date(b.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            isHighest: idx === 0
+          }))
+
           const formatted = {
             _id: fetchedCrop._id || id,
             cropName: fetchedCrop.name || fetchedCrop.cropType || 'Farm Fresh Commodity',
-            variety: fetchedCrop.description || fetchedCrop.cropType || 'Graded Lot',
+            variety: fetchedCrop.description || fetchedCrop.variety || fetchedCrop.cropType || 'Graded Lot',
             category: fetchedCrop.category || 'Vegetables',
             grade: fetchedCrop.grade || 'Grade-A Premium',
-            quantity: fetchedCrop.quantity || 100,
+            quantity: Number(fetchedCrop.quantity) || 50,
             unit: fetchedCrop.unit || 'Quintals',
-            reservePrice: fetchedCrop.basePrice || 2000,
-            currentHighestBid: fetchedCrop.currentHighestBid || fetchedCrop.basePrice || 2000,
-            apmcBenchmark: Math.round((fetchedCrop.basePrice || 2000) * 1.12),
-            instantBuyoutPrice: Math.round((fetchedCrop.basePrice || 2000) * 1.08),
+            reservePrice: Number(fetchedCrop.basePrice) || 2000,
+            currentHighestBid: topBidAmount,
+            apmcBenchmark: Math.round((Number(fetchedCrop.basePrice) || 2000) * 1.12),
+            instantBuyoutPrice: Math.round((Number(fetchedCrop.basePrice) || 2000) * 1.08),
             harvestDate: new Date(fetchedCrop.createdAt || Date.now()).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
             images: fetchedCrop.images?.length > 0 ? fetchedCrop.images : ['https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=800&q=80'],
             qualityAssay: {
               moisture: '11.8% (APMC Assayed)',
               purity: '99.0% Purity Certified',
-              diameter: 'Standard Uniform Size',
+              diameter: 'Standard Uniform Caliber',
               packaging: `${fetchedCrop.unit || 'Quintal'} Standard Packaging`,
               coldStorageTolerant: 'Yes (Grade-A Compliant)'
             },
             farmer: {
-              name: fetchedCrop.farmer?.name || 'Ramesh Gowda',
-              village: fetchedCrop.farmer?.village || 'Belur Village',
-              taluk: 'Belur',
-              district: fetchedCrop.district || fetchedCrop.farmer?.district || 'Hassan',
+              name: fetchedCrop.farmer?.name || 'Verified Farmer',
+              village: fetchedCrop.farmer?.village || 'APMC Yard',
+              taluk: fetchedCrop.farmer?.district || 'Karnataka',
+              district: fetchedCrop.district || fetchedCrop.farmer?.district || 'Karnataka',
               state: 'Karnataka',
               rating: 4.9,
-              totalTrades: 34,
-              distanceToMandi: '12 km to APMC Yard'
+              totalTrades: 1,
+              distanceToMandi: 'Local APMC Yard'
             },
-            closingIn: '03h 45m 00s',
-            bidsHistory: [
-              { id: 'b1', bidder: 'Karnataka Agro Traders', amount: fetchedCrop.currentHighestBid || fetchedCrop.basePrice || 2150, time: '5 mins ago', isHighest: true }
-            ]
+            closingIn: 'Live Bidding',
+            bidsHistory: formattedBids
           }
+
           setLot(formatted)
-          setCurrentHigh(formatted.currentHighestBid)
-          setBidInput(String(formatted.currentHighestBid + 50))
-          setBidsList(formatted.bidsHistory)
+          setCurrentHigh(topBidAmount)
+          setBidInput(String(topBidAmount + 50))
+          setBidsList(formattedBids)
+        } else {
+          setLot(null)
         }
       } catch (err) {
-        console.warn('Failed to load dynamic crop lot, using fallback:', err)
+        console.warn('Failed to load dynamic crop lot:', err)
+        setLot(null)
       } finally {
         setLoading(false)
       }
     }
 
     fetchLotData()
-  }, [id])
+  }, [id, user])
 
   // Financial Calculations & Escrow Breakdown
   const numericBid = Number(bidInput) || 0
@@ -246,6 +179,28 @@ export const TraderCropDetails = () => {
   const handleInstantBuyout = () => {
     toast.success(`Instant Buyout Confirmed at ₹${lot.instantBuyoutPrice.toLocaleString('en-IN')}/Qtl! Escrow locked. 🔒`)
     navigate('/trader/orders')
+  }
+
+  if (loading) {
+    return (
+      <div className="p-12 text-center space-y-3">
+        <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto" />
+        <p className="text-sm font-bold text-foreground">Loading Crop Lot Telemetry...</p>
+      </div>
+    )
+  }
+
+  if (!lot) {
+    return (
+      <div className="p-12 text-center rounded-3xl bg-card border border-border space-y-4 max-w-md mx-auto my-12">
+        <AlertCircle className="w-12 h-12 text-amber-500 mx-auto" />
+        <h2 className="text-lg font-bold text-foreground">Crop Listing Not Found</h2>
+        <p className="text-xs text-muted-foreground">This crop listing may have concluded or is no longer available on the active APMC exchange.</p>
+        <Button asChild className="rounded-xl text-xs bg-amber-600 hover:bg-amber-700 text-white">
+          <Link to="/trader/marketplace">Return to Marketplace</Link>
+        </Button>
+      </div>
+    )
   }
 
   return (
