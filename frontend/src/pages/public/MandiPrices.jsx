@@ -15,22 +15,29 @@ import {
   Calendar, 
   ExternalLink, 
   Activity, 
-  Layers,
-  Bell,
-  X,
-  Sparkles,
-  Phone,
-  CheckCircle2
+  Layers, 
+  Bell, 
+  X, 
+  Sparkles, 
+  Phone, 
+  CheckCircle2,
+  Database
 } from 'lucide-react'
 import MandiPriceChart from '@/components/common/MandiPriceChart'
 
-const KARNATAKA_DISTRICTS = [
-  'All', 'Hassan', 'Mandya', 'Kolar', 'Belagavi', 'Davanagere', 'Mysuru', 'Ballari', 'Shimoga', 'Hubballi / Dharwad'
+const COMMODITY_CATEGORIES = [
+  'All', 'Vegetables', 'Fruits', 'Grains & Millets', 'Pulses', 'Spices & Cash Crops'
 ]
 
-const COMMODITY_CATEGORIES = [
-  'All', 'Vegetables', 'Grains & Millets', 'Spices & Cash Crops', 'Fruits', 'Pulses'
-]
+const getCategoryForCommodity = (commodity = '') => {
+  const c = commodity.toLowerCase()
+  if (c.includes('tomato') || c.includes('onion') || c.includes('potato') || c.includes('bhindi') || c.includes('cabbage') || c.includes('cauliflower') || c.includes('brinjal') || c.includes('carrot') || c.includes('radish') || c.includes('green chilli') || c.includes('capsicum') || c.includes('cowpea') || c.includes('gourd')) return 'Vegetables'
+  if (c.includes('banana') || c.includes('apple') || c.includes('mango') || c.includes('orange') || c.includes('grapes') || c.includes('papaya') || c.includes('guava') || c.includes('pomegranate') || c.includes('watermelon')) return 'Fruits'
+  if (c.includes('gram') || c.includes('dal') || c.includes('arhar') || c.includes('tur') || c.includes('moong') || c.includes('urad') || c.includes('lentil') || c.includes('peas')) return 'Pulses'
+  if (c.includes('ragi') || c.includes('maize') || c.includes('rice') || c.includes('paddy') || c.includes('wheat') || c.includes('jowar') || c.includes('bajra') || c.includes('millet') || c.includes('barley')) return 'Grains & Millets'
+  if (c.includes('chilli') || c.includes('cardamom') || c.includes('pepper') || c.includes('cotton') || c.includes('sugarcane') || c.includes('turmeric') || c.includes('ginger') || c.includes('garlic') || c.includes('coffee') || c.includes('tea') || c.includes('rubber')) return 'Spices & Cash Crops'
+  return 'Agricultural Produce'
+}
 
 export const MandiPrices = () => {
   const [prices, setPrices] = useState([])
@@ -64,9 +71,10 @@ export const MandiPrices = () => {
 
   const handleRefresh = async () => {
     setIsRefreshing(true)
+    await priceService.syncLivePrices()
     await fetchMandiData()
     setIsRefreshing(false)
-    toast.success('Live APMC Mandi rates & daily arrivals synchronized! ⚡')
+    toast.success('Live Agmarknet / data.gov.in Mandi rates synchronized! ⚡')
   }
 
   const handleSubscribeAlert = async (e) => {
@@ -88,16 +96,25 @@ export const MandiPrices = () => {
     }
   }
 
+  // Dynamic list of unique districts from actual data
+  const availableDistricts = useMemo(() => {
+    const dSet = new Set(prices.map((p) => p.district).filter(Boolean))
+    return ['All', ...Array.from(dSet).sort()]
+  }, [prices])
+
   // Filtered price list
   const filteredPrices = useMemo(() => {
     return prices.filter((item) => {
+      const q = searchQuery.toLowerCase()
       const matchesSearch = 
-        (item.commodity || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (item.market || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (item.district || '').toLowerCase().includes(searchQuery.toLowerCase())
+        (item.commodity || '').toLowerCase().includes(q) ||
+        (item.market || '').toLowerCase().includes(q) ||
+        (item.district || '').toLowerCase().includes(q) ||
+        (item.state || '').toLowerCase().includes(q)
 
       const matchesDistrict = selectedDistrict === 'All' || item.district === selectedDistrict
-      const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory
+      const cat = item.category || getCategoryForCommodity(item.commodity)
+      const matchesCategory = selectedCategory === 'All' || cat === selectedCategory
 
       return matchesSearch && matchesDistrict && matchesCategory
     })
@@ -123,13 +140,13 @@ export const MandiPrices = () => {
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 text-xs font-semibold border border-emerald-500/20 mb-2">
             <Radio className="w-3.5 h-3.5 text-emerald-500 animate-pulse" />
-            <span>Agmarknet & Karnataka APMC Live Price Stream</span>
+            <span>Official Agmarknet (data.gov.in) Live Mandi Stream</span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground">
             Live APMC Mandi Spot Rates 🌾
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-            Real-time daily arrival volume, minimum/maximum price spread, and benchmark wholesale rates across Karnataka markets.
+            Real-time daily arrival volume, minimum/maximum price spread, and benchmark wholesale rates from Ministry of Agriculture feeds.
           </p>
         </div>
 
@@ -142,7 +159,7 @@ export const MandiPrices = () => {
             className="rounded-xl text-xs h-10 shadow-sm"
           >
             <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Refresh Mandi Feeds
+            Sync Government Feeds
           </Button>
 
           <Button asChild size="sm" className="rounded-xl text-xs font-bold shadow-md h-10 px-5 bg-primary text-primary-foreground">
@@ -160,79 +177,64 @@ export const MandiPrices = () => {
             <Activity className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-xs font-semibold text-muted-foreground">Connected APMC Mandis</p>
-            <h3 className="text-2xl font-black text-foreground">{dynamicKpis.markets} Markets</h3>
-            <span className="text-[11px] text-emerald-600 font-medium">Live Agmarknet Telemetry</span>
+            <p className="text-xs font-semibold text-muted-foreground">Active Market Yards</p>
+            <h3 className="text-2xl font-black text-foreground">{dynamicKpis.markets} APMC Mandis</h3>
+            <span className="text-[11px] text-emerald-600 font-medium">100% Real-Time Agmarknet API</span>
           </div>
         </div>
 
         <div className="p-6 rounded-3xl bg-card border border-border shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-bold shrink-0">
-            <Layers className="w-6 h-6" />
+            <Database className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-xs font-semibold text-muted-foreground">Tracked Commodities</p>
-            <h3 className="text-2xl font-black text-primary">{dynamicKpis.commodities} Crops</h3>
-            <span className="text-[11px] text-muted-foreground">Updated every 15 minutes</span>
+            <p className="text-xs font-semibold text-muted-foreground">Commodities Tracked</p>
+            <h3 className="text-2xl font-black text-foreground">{dynamicKpis.commodities} Crops Active</h3>
+            <span className="text-[11px] text-muted-foreground">{prices.length} Live Rates in Database</span>
           </div>
         </div>
 
         <div className="p-6 rounded-3xl bg-card border border-border shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold shrink-0">
-            <TrendingUp className="w-6 h-6" />
+          <div className="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-600 flex items-center justify-center font-bold shrink-0">
+            <Sparkles className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-xs font-semibold text-muted-foreground">Peak Modal Benchmark</p>
-            <h3 className="text-2xl font-black text-amber-600 font-mono">₹{dynamicKpis.highestModal.toLocaleString('en-IN')}/Qtl</h3>
-            <span className="text-[11px] text-emerald-600 font-medium">Byadagi Chilli Grade-A</span>
+            <p className="text-xs font-semibold text-muted-foreground">Peak Commodity Benchmark</p>
+            <h3 className="text-2xl font-black text-purple-600 font-mono">₹{dynamicKpis.highestModal?.toLocaleString('en-IN')}/Qtl</h3>
+            <span className="text-[11px] text-purple-600 font-medium">Official Ministry Modal Rate</span>
           </div>
         </div>
       </div>
 
-      {/* 3. Interactive Price Trends Chart Widget */}
-      <div className="p-6 sm:p-8 rounded-3xl bg-card border border-border space-y-4 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-4">
-          <div>
-            <h2 className="text-lg font-extrabold text-foreground flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-primary" /> 7-Day APMC Modal Price Momentum
-            </h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Historical price trajectory across major Karnataka agricultural market yards.
-            </p>
-          </div>
-          <span className="text-xs font-mono font-bold text-emerald-600 bg-emerald-500/10 px-3 py-1 rounded-xl border border-emerald-500/20">
-            Avg Market Spread: +4.8% 📈
-          </span>
-        </div>
-
-        <MandiPriceChart />
+      {/* 3. Interactive Modal Price Trends Chart */}
+      <div className="p-6 sm:p-7 rounded-3xl bg-card border border-border shadow-sm">
+        <MandiPriceChart defaultCommodity="Tomato" defaultDistrict="Hassan" />
       </div>
 
-      {/* 4. Filters & Real-Time Search Bar */}
-      <div className="p-6 rounded-3xl bg-card border border-border space-y-4 shadow-sm">
+      {/* 4. Filters and Search Controls */}
+      <div className="p-6 rounded-3xl bg-card border border-border shadow-sm space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-          
-          {/* Search Box */}
-          <div className="sm:col-span-6 relative">
+          {/* Search Input */}
+          <div className="sm:col-span-5 relative">
             <Search className="w-4 h-4 text-muted-foreground absolute left-3.5 top-3.5" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by commodity, variety, APMC market yard, or district..."
+              placeholder="Search crop (e.g., Tomato, Bhindi, Maize, Onion, Cabbage)..."
               className="w-full h-11 pl-10 pr-4 rounded-xl bg-background border border-border text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 font-medium"
             />
           </div>
 
           {/* District Filter */}
-          <div className="sm:col-span-3">
+          <div className="sm:col-span-4">
             <select
               value={selectedDistrict}
               onChange={(e) => setSelectedDistrict(e.target.value)}
               className="w-full h-11 px-3 rounded-xl bg-background border border-border text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 font-medium"
             >
-              {KARNATAKA_DISTRICTS.map((d) => (
-                <option key={d} value={d}>{d === 'All' ? 'All Karnataka Districts' : `${d} District`}</option>
+              {availableDistricts.map((d) => (
+                <option key={d} value={d}>{d === 'All' ? 'All Districts / Regions' : d}</option>
               ))}
             </select>
           </div>
@@ -255,7 +257,8 @@ export const MandiPrices = () => {
       {/* 5. Live Price Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredPrices.map((item) => {
-          const isUp = item.trend === 'up' || (item.change24h && item.change24h.startsWith('+'))
+          const category = item.category || getCategoryForCommodity(item.commodity)
+          const arrivalFormatted = item.arrivalDate ? new Date(item.arrivalDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Today'
 
           return (
             <div
@@ -266,24 +269,22 @@ export const MandiPrices = () => {
                 {/* Card Header: Commodity & Trend Badge */}
                 <div className="flex items-start justify-between gap-2 border-b border-border/80 pb-3">
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-extrabold text-base text-foreground group-hover:text-primary transition-colors">
                         {item.commodity}
                       </h3>
                       <span className="text-[10px] uppercase font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded-md">
-                        {item.category}
+                        {category}
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1 font-medium">
-                      <MapPin className="w-3.5 h-3.5 text-primary" /> {item.market} ({item.district})
+                      <MapPin className="w-3.5 h-3.5 text-primary" /> {item.market} ({item.district}, {item.state})
                     </p>
                   </div>
 
-                  <span className={`px-2.5 py-1 rounded-xl text-xs font-bold font-mono flex items-center gap-1 shrink-0 ${
-                    isUp ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-600 border border-rose-500/20'
-                  }`}>
-                    {isUp ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
-                    {item.change24h || '+3.2%'}
+                  <span className="px-2.5 py-1 rounded-xl text-xs font-bold font-mono flex items-center gap-1 shrink-0 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                    <TrendingUp className="w-3.5 h-3.5" />
+                    {item.variety || 'Standard'}
                   </span>
                 </div>
 
@@ -297,14 +298,14 @@ export const MandiPrices = () => {
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/60 text-[11px] text-muted-foreground">
-                    <div>Min: <strong className="text-foreground font-mono">₹{item.minPrice}</strong></div>
-                    <div className="text-right">Max: <strong className="text-foreground font-mono">₹{item.maxPrice}</strong></div>
+                    <div>Min: <strong className="text-foreground font-mono">₹{item.minPrice?.toLocaleString('en-IN')}</strong></div>
+                    <div className="text-right">Max: <strong className="text-foreground font-mono">₹{item.maxPrice?.toLocaleString('en-IN')}</strong></div>
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between text-[11px] text-muted-foreground mt-3">
-                  <span>Arrivals: <strong className="text-foreground">{item.arrivals || '420 Qtl'}</strong></span>
-                  <span>{item.lastUpdated || 'Today, 08:30 AM'}</span>
+                  <span>Arrival: <strong className="text-foreground">{arrivalFormatted}</strong></span>
+                  <span className="text-emerald-600 font-semibold">Official Agmarknet Feed</span>
                 </div>
               </div>
 
@@ -327,84 +328,68 @@ export const MandiPrices = () => {
         })}
       </div>
 
-      {/* 6. SMS Price Alert Modal */}
+      {/* 6. SMS Price Alert Subscription Modal */}
       {selectedCropForAlert && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="relative w-full max-w-lg bg-card border border-border rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
-            
+          <div className="relative w-full max-w-md bg-card border border-border rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5">
             <button
               onClick={() => setSelectedCropForAlert(null)}
-              className="absolute right-5 top-5 p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted"
+              className="absolute right-4 top-4 p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
 
             <div className="space-y-1">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold border border-primary/20 mb-1">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold border border-primary/20">
                 <Bell className="w-3.5 h-3.5" />
-                <span>Instant SMS & WhatsApp Alert</span>
+                <span>CDAC Mobile Gov Gateway</span>
               </div>
               <h2 className="text-xl font-extrabold text-foreground">
-                Set Price Alert for {selectedCropForAlert.commodity}
+                Get Free Mandi SMS Alerts 📲
               </h2>
               <p className="text-xs text-muted-foreground">
-                Receive free daily SMS notifications when {selectedCropForAlert.market} modal prices cross your target rate.
+                Receive instant Kannada/English SMS alerts when {selectedCropForAlert.commodity} hits your target rate.
               </p>
             </div>
 
             <form onSubmit={handleSubscribeAlert} className="space-y-4 text-xs">
-              <div className="p-4 rounded-2xl bg-muted/40 border border-border space-y-1.5">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Current Mandi Rate:</span>
-                  <span className="font-mono font-bold text-foreground">₹{selectedCropForAlert.modalPrice}/Qtl</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Market Yard:</span>
-                  <span className="font-semibold text-foreground">{selectedCropForAlert.market}</span>
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">Selected Commodity & Yard:</label>
+                <div className="p-3 rounded-xl bg-muted/60 border border-border font-bold text-foreground">
+                  {selectedCropForAlert.commodity} ({selectedCropForAlert.market}, {selectedCropForAlert.district})
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="font-bold text-foreground">Target Trigger Price (₹ / Quintal) *</label>
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">Target Modal Price Alert (₹/Qtl):</label>
                 <input
                   type="number"
-                  required
-                  min={500}
                   value={targetPrice}
                   onChange={(e) => setTargetPrice(e.target.value)}
                   placeholder="e.g. 2400"
-                  className="w-full h-11 px-3.5 rounded-xl bg-background border border-border text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 font-mono font-bold"
+                  className="w-full h-10 px-3.5 rounded-xl bg-background border border-border focus:outline-none focus:ring-2 focus:ring-primary/40 font-mono font-bold"
+                  required
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <label className="font-bold text-foreground">Mobile Phone Number *</label>
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">Farmer Mobile Number:</label>
                 <input
                   type="tel"
-                  required
                   value={alertMobile}
                   onChange={(e) => setAlertMobile(e.target.value)}
-                  className="w-full h-11 px-3.5 rounded-xl bg-background border border-border text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 font-mono font-semibold"
+                  className="w-full h-10 px-3.5 rounded-xl bg-background border border-border focus:outline-none focus:ring-2 focus:ring-primary/40 font-mono font-bold"
+                  required
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-2 border-t border-border">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setSelectedCropForAlert(null)}
-                  className="rounded-xl text-xs h-10 px-4"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={subscribing}
-                  className="rounded-xl text-xs font-bold h-10 px-6 bg-primary text-primary-foreground shadow-md"
-                >
-                  {subscribing ? 'Subscribing...' : 'Activate Free Alert 📲'}
-                </Button>
-              </div>
+              <Button
+                type="submit"
+                disabled={subscribing}
+                className="w-full rounded-xl text-xs font-bold h-11 bg-primary text-primary-foreground shadow-md"
+              >
+                {subscribing ? 'Registering with Gateway...' : 'Activate Free SMS Alert 🔔'}
+              </Button>
             </form>
           </div>
         </div>
