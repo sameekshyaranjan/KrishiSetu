@@ -2,57 +2,75 @@ import axios from 'axios'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
-/**
- * Centralized Axios Instance for KrishiSetu
- * Automatically handles baseURL, headers, timeouts, and auth interceptors.
- */
-const api = axios.create({
+export const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000, // 15-second timeout for poor network resilience
+  withCredentials: true,
   headers: {
-    'Content-Type': 'application/json',
-  },
+    'Content-Type': 'application/json'
+  }
 })
 
-// Request Interceptor: Attach JWT Bearer Token to outgoing requests
+// Request Interceptor: Inject JWT Bearer Token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('krishisetu_token') || localStorage.getItem('token')
+    const token = localStorage.getItem('token') || localStorage.getItem('krishisetu_token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
     return config
   },
-  (error) => {
-    return Promise.reject(error)
-  }
+  (error) => Promise.reject(error)
 )
 
-// Response Interceptor: Centralized error handling & session expiration
+// Response Interceptor: Handle Global 401 Expiry & Error Extraction
 api.interceptors.response.use(
-  (response) => {
-    return response
-  },
+  (response) => response.data,
   (error) => {
-    // Check for expired or invalid JWT token
-    if (error.response && error.response.status === 401) {
-      // Clear expired local session
-      localStorage.removeItem('krishisetu_token')
-      localStorage.removeItem('token')
-      localStorage.removeItem('krishisetu_user')
-      localStorage.removeItem('user')
+    const status = error.response?.status
+    const message = error.response?.data?.message || error.message || 'API request failed'
 
-      // Avoid infinite redirect loops if already on an auth page
-      const currentPath = window.location.pathname
-      if (!currentPath.includes('/login') && !currentPath.includes('/register')) {
-        // Dispatch custom event so AuthContext can handle logout gracefully
-        window.dispatchEvent(new Event('krishisetu_auth_expired'))
-      }
+    if (status === 401) {
+      console.warn('Session expired or unauthorized. Clearing stored auth tokens.')
+      localStorage.removeItem('token')
+      localStorage.removeItem('krishisetu_token')
+      localStorage.removeItem('user')
+      localStorage.removeItem('krishisetu_user')
     }
 
-    return Promise.reject(error)
+    return Promise.reject(new Error(message))
   }
 )
 
+/**
+ * Auth API Endpoints
+ */
+export const authAPI = {
+  login: (credentials) => api.post('/auth/login', credentials),
+  adminLogin: (credentials) => api.post('/auth/admin/login', credentials),
+  registerFarmer: (data) => api.post('/auth/register/farmer', data),
+  registerTrader: (data) => api.post('/auth/register/trader', data),
+  verifyOTP: (data) => api.post('/auth/register/verify', data),
+  sendLoginOTP: (email) => api.post('/auth/login/otp', { email }),
+  verifyLoginOTP: (data) => api.post('/auth/login/otp/verify', data),
+  forgotPassword: (email) => api.post('/auth/password/forgot', { email }),
+  resetPassword: (data) => api.post('/auth/password/reset', data),
+  logout: () => api.post('/auth/logout')
+}
+
+/**
+ * Mandi & Market Intelligence API
+ */
+export const mandiAPI = {
+  getPrices: (params) => api.get('/prices/live', { params }),
+  getTrends: (cropName) => api.get(`/prices/trends/${cropName}`)
+}
+
+/**
+ * Government Welfare Schemes API
+ */
+export const schemesAPI = {
+  getAll: (params) => api.get('/schemes', { params }),
+  getById: (id) => api.get(`/schemes/${id}`)
+}
+
 export default api
-export { api }

@@ -9,7 +9,8 @@ import { Loader2 } from 'lucide-react'
  * @param {Array<string>} allowedRoles - Optional array of authorized roles (e.g. ['farmer', 'admin'])
  */
 export const ProtectedRoute = ({ allowedRoles }) => {
-  const { isAuthenticated, role, loading } = useAuth()
+  const { isAuthenticated, user, role: contextRole, loading } = useAuth()
+  const role = contextRole || user?.role
   const location = useLocation()
 
   // 1. Initial Session Hydration Gate

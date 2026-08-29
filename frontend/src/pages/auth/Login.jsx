@@ -32,7 +32,12 @@ export const Login = () => {
   const navigate = useNavigate()
   const location = useLocation()
 
-  const { register, handleSubmit, setValue, formState: { errors } } = useForm()
+  const { register, handleSubmit, setValue, formState: { errors } } = useForm({
+    defaultValues: {
+      email: '',
+      password: ''
+    }
+  })
 
   const destinationPath = (userRole) => {
     if (location.state?.from?.pathname) {
@@ -125,20 +130,41 @@ export const Login = () => {
     }
   }
 
-  // Quick Demo Autofill Helper
-  const fillDemoAccount = (role) => {
+  // 4. Quick Demo Autofill and Instant Login
+  const fillDemoAccount = async (role) => {
     if (role === 'farmer') {
       setAuthMode('password')
-      setValue('email', 'ramesh.farmer@example.com')
+      setValue('email', 'farmer1@krishisetu.com')
       setValue('password', 'password123')
+      setLoading(true)
+      const res = await loginWithPassword('farmer1@krishisetu.com', 'password123')
+      setLoading(false)
+      if (res.success) {
+        toast.success('Farmer demo session active!')
+        navigate('/farmer/dashboard')
+      }
     } else if (role === 'trader') {
       setAuthMode('password')
-      setValue('email', 'suresh.trader@example.com')
+      setValue('email', 'trader1@krishisetu.com')
       setValue('password', 'password123')
+      setLoading(true)
+      const res = await loginWithPassword('trader1@krishisetu.com', 'password123')
+      setLoading(false)
+      if (res.success) {
+        toast.success('Trader demo session active!')
+        navigate('/trader/dashboard')
+      }
     } else if (role === 'admin') {
       setAuthMode('admin')
       setValue('email', 'admin@krishisetu.in')
-      setValue('password', 'admin123')
+      setValue('password', 'password123')
+      setLoading(true)
+      const res = await loginWithAdmin('admin@krishisetu.in', 'password123')
+      setLoading(false)
+      if (res.success) {
+        toast.success('Admin authentication verified!')
+        navigate('/admin/dashboard')
+      }
     }
   }
 
@@ -210,7 +236,7 @@ export const Login = () => {
                 <input
                   type="email"
                   {...register('email', { required: 'Email is required' })}
-                  placeholder="name@example.com"
+                  placeholder="farmer1@krishisetu.com"
                   className="w-full h-10 pl-9 pr-3 rounded-xl bg-background border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
                 />
               </div>
@@ -235,7 +261,7 @@ export const Login = () => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                  className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -244,14 +270,14 @@ export const Login = () => {
             </div>
 
             <Button type="submit" disabled={loading} className="w-full h-11 rounded-2xl font-bold shadow-md">
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Sign In'}
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Sign In to Portal'}
             </Button>
           </form>
         )}
 
-        {/* MODE 2: Passwordless OTP Login */}
+        {/* MODE 2: OTP Login */}
         {authMode === 'otp' && (
-          <div>
+          <div className="space-y-4">
             {!otpSent ? (
               <form onSubmit={handleSubmit(handleRequestOtp)} className="space-y-4">
                 <div className="space-y-1.5">
@@ -341,30 +367,30 @@ export const Login = () => {
           </form>
         )}
 
-        {/* 1-Click Quick Demo Autofill Bar */}
+        {/* 1-Click Quick Demo Autofill & Login Bar */}
         <div className="pt-2 border-t border-border space-y-2">
           <p className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
-            <Sparkles className="w-3 h-3 text-amber-500" /> Quick Demo Login:
+            <Sparkles className="w-3 h-3 text-amber-500" /> Instant 1-Click Demo Login:
           </p>
           <div className="grid grid-cols-3 gap-1.5 text-[11px]">
             <button
               type="button"
               onClick={() => fillDemoAccount('farmer')}
-              className="py-1 px-2 rounded-lg bg-muted hover:bg-primary/10 hover:text-primary transition-colors text-muted-foreground border border-border"
+              className="py-1 px-2 rounded-lg bg-muted hover:bg-emerald-500/10 hover:text-emerald-600 transition-colors text-muted-foreground border border-border font-bold text-center"
             >
               🌾 Farmer
             </button>
             <button
               type="button"
               onClick={() => fillDemoAccount('trader')}
-              className="py-1 px-2 rounded-lg bg-muted hover:bg-amber-500/10 hover:text-amber-600 transition-colors text-muted-foreground border border-border"
+              className="py-1 px-2 rounded-lg bg-muted hover:bg-amber-500/10 hover:text-amber-600 transition-colors text-muted-foreground border border-border font-bold text-center"
             >
               💼 Trader
             </button>
             <button
               type="button"
               onClick={() => fillDemoAccount('admin')}
-              className="py-1 px-2 rounded-lg bg-muted hover:bg-purple-500/10 hover:text-purple-600 transition-colors text-muted-foreground border border-border"
+              className="py-1 px-2 rounded-lg bg-muted hover:bg-purple-500/10 hover:text-purple-600 transition-colors text-muted-foreground border border-border font-bold text-center"
             >
               🛡️ Admin
             </button>

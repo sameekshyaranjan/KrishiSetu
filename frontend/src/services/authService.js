@@ -8,101 +8,106 @@ export const authService = {
   /**
    * Send OTP for Farmer registration
    */
-  registerFarmer: async (data) => {
-    const response = await api.post('/auth/register/farmer', data)
-    return response.data
+  registerFarmer: async (formData) => {
+    const res = await api.post('/auth/register/farmer', formData)
+    return res?.data || res
   },
 
   /**
    * Send OTP for Trader registration
    */
-  registerTrader: async (data) => {
-    const response = await api.post('/auth/register/trader', data)
-    return response.data
+  registerTrader: async (formData) => {
+    const res = await api.post('/auth/register/trader', formData)
+    return res?.data || res
   },
 
   /**
    * Verify Registration OTP and create user account
    */
   verifyRegistrationOTP: async ({ email, otp }) => {
-    const response = await api.post('/auth/register/verify', { email, otp })
-    const token = response.data.accessToken || response.data.token
-    if (token && response.data.user) {
-      authService.setAuthSession(token, response.data.refreshToken, response.data.user)
+    const res = await api.post('/auth/register/verify', { email, otp })
+    const data = res?.data || res
+    const token = data.accessToken || data.token
+    if (token && data.user) {
+      authService.setAuthSession(token, data.refreshToken, data.user)
     }
-    return { ...response.data, token }
+    return { ...data, token }
   },
 
   /**
    * Login with Email & Password (Farmer or Trader)
    */
   login: async ({ email, password, role }) => {
-    const response = await api.post('/auth/login', { email, password, role })
-    const token = response.data.accessToken || response.data.token
-    if (token && response.data.user) {
-      authService.setAuthSession(token, response.data.refreshToken, response.data.user)
+    const res = await api.post('/auth/login', { email, password, role })
+    const data = res?.data || res
+    const token = data.accessToken || data.token
+    if (token && data.user) {
+      authService.setAuthSession(token, data.refreshToken, data.user)
     }
-    return { ...response.data, token }
+    return { ...data, token }
   },
 
   /**
    * Request OTP for passwordless login
    */
   sendLoginOTP: async (email) => {
-    const response = await api.post('/auth/login/otp', { email })
-    return response.data
+    const res = await api.post('/auth/login/otp', { email })
+    return res?.data || res
   },
 
   /**
    * Verify Passwordless Login OTP
    */
   verifyLoginOTP: async ({ email, otp }) => {
-    const response = await api.post('/auth/login/otp/verify', { email, otp })
-    const token = response.data.accessToken || response.data.token
-    if (token && response.data.user) {
-      authService.setAuthSession(token, response.data.refreshToken, response.data.user)
+    const res = await api.post('/auth/login/otp/verify', { email, otp })
+    const data = res?.data || res
+    const token = data.accessToken || data.token
+    if (token && data.user) {
+      authService.setAuthSession(token, data.refreshToken, data.user)
     }
-    return { ...response.data, token }
+    return { ...data, token }
   },
 
   /**
    * Admin Portal Direct Login
    */
   adminLogin: async ({ email, password }) => {
-    const response = await api.post('/auth/admin/login', { email, password })
-    const token = response.data.accessToken || response.data.token
-    if (token && response.data.user) {
-      authService.setAuthSession(token, response.data.refreshToken, response.data.user)
+    const res = await api.post('/auth/admin/login', { email, password })
+    const data = res?.data || res
+    const token = data.accessToken || data.token
+    if (token && data.user) {
+      authService.setAuthSession(token, data.refreshToken, data.user)
     }
-    return { ...response.data, token }
+    return { ...data, token }
   },
 
   /**
    * Send Password Reset Email
    */
   forgotPassword: async (email) => {
-    const response = await api.post('/auth/password/forgot', { email })
-    return response.data
+    const res = await api.post('/auth/password/forgot', { email })
+    return res?.data || res
   },
 
   /**
    * Reset Password with Token
    */
   resetPassword: async ({ token, newPassword }) => {
-    const response = await api.post('/auth/password/reset', { token, newPassword })
-    return response.data
+    const res = await api.post('/auth/password/reset', { token, newPassword })
+    return res?.data || res
   },
 
   /**
    * Refresh Expired Access Token
    */
   refreshToken: async (refreshToken) => {
-    const response = await api.post('/auth/refresh-token', { refreshToken })
-    const token = response.data.accessToken || response.data.token
+    const res = await api.post('/auth/refresh-token', { refreshToken })
+    const data = res?.data || res
+    const token = data.accessToken || data.token
     if (token) {
       localStorage.setItem('krishisetu_token', token)
     }
-    return { ...response.data, token }
+    return { ...data, token }
   },
 
   /**
@@ -122,9 +127,15 @@ export const authService = {
    * Store Auth Session in LocalStorage
    */
   setAuthSession: (token, refreshToken, user) => {
-    localStorage.setItem('krishisetu_token', token)
+    if (token) {
+      localStorage.setItem('krishisetu_token', token)
+      localStorage.setItem('token', token)
+    }
     if (refreshToken) localStorage.setItem('krishisetu_refresh_token', refreshToken)
-    if (user) localStorage.setItem('krishisetu_user', JSON.stringify(user))
+    if (user) {
+      localStorage.setItem('krishisetu_user', JSON.stringify(user))
+      localStorage.setItem('user', JSON.stringify(user))
+    }
   },
 
   /**

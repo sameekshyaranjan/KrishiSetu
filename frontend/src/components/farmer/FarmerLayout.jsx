@@ -16,7 +16,8 @@ import {
   Menu, 
   X,
   TrendingUp,
-  BookOpen
+  BookOpen,
+  Bell
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -43,6 +44,7 @@ export const FarmerLayout = () => {
     { to: '/farmer/bids', label: 'Inbound Bids', icon: Gavel },
     { to: '/farmer/orders', label: 'Orders & Escrow', icon: FileText },
     { to: '/farmer/weather', label: 'Weather & Advisory', icon: CloudSun },
+    { to: '/farmer/notifications', label: 'SMS & Alerts', icon: Bell },
     { to: '/mandi-prices', label: 'Live Mandi Rates', icon: TrendingUp },
     { to: '/schemes', label: 'Govt Schemes', icon: BookOpen },
     { to: '/farmer/profile', label: 'Farm & Bank Details', icon: UserCheck },

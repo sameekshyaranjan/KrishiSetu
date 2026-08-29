@@ -45,17 +45,7 @@ export const Home = () => {
   return (
     <div className="space-y-20 py-6 pb-20">
       
-      {/* 1. Live Mandi Ticker Stream Ribbon */}
-      <div className="border-y border-border bg-muted/40 overflow-hidden py-2.5">
-        <div className="container max-w-7xl mx-auto px-4 flex items-center gap-4">
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 text-[11px] font-bold shrink-0">
-            <Radio className="w-3 h-3 animate-pulse text-emerald-500" />
-            <span>LIVE APMC TICKER</span>
-          </div>
 
-
-        </div>
-      </div>
 
       {/* 2. Hero Main Section */}
       <section className="container max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-8">
