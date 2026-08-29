@@ -1,4 +1,5 @@
 const MandiPrice = require('../models/MandiPrice');
+const { fetchAgmarknetPrices } = require('../services/priceService');
 
 const getPrices = async (req, res, next) => {
   try {
@@ -7,7 +8,7 @@ const getPrices = async (req, res, next) => {
     if (req.query.district) filter.district = { $regex: req.query.district, $options: 'i' };
     if (req.query.market) filter.market = { $regex: req.query.market, $options: 'i' };
 
-    const prices = await MandiPrice.find(filter).sort({ fetchedAt: -1 });
+    const prices = await MandiPrice.find(filter).sort({ fetchedAt: -1, arrivalDate: -1 });
     res.status(200).json(prices);
   } catch (error) {
     next(error);
@@ -93,4 +94,13 @@ const getPriceTrend = async (req, res, next) => {
   }
 };
 
-module.exports = { getPrices, getPricesByCommodity, getPriceTrend };
+const syncPrices = async (req, res, next) => {
+  try {
+    const result = await fetchAgmarknetPrices();
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { getPrices, getPricesByCommodity, getPriceTrend, syncPrices };
