@@ -198,7 +198,7 @@ const DISTRICT_OPTIONS = ['All Districts', 'Hassan', 'Mandya', 'Mysuru', 'Belaga
 
 export const TraderMarketplace = () => {
   const { user } = useAuth()
-  const [lots, setLots] = useState(DEMO_MARKETPLACE_LOTS)
+  const [lots, setLots] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [selectedDistrict, setSelectedDistrict] = useState('All Districts')
@@ -220,7 +220,7 @@ export const TraderMarketplace = () => {
         const formatted = data.map((c, idx) => ({
           _id: c._id || `LOT-${idx + 101}`,
           cropName: c.name || c.cropType || 'Farm Fresh Commodity',
-          variety: c.description || c.cropType || 'Graded Lot',
+          variety: c.description || c.variety || c.cropType || 'Graded Produce',
           category: c.category || 'vegetables',
           grade: c.grade || 'Grade-A Premium',
           quantity: c.quantity || 100,
@@ -232,28 +232,25 @@ export const TraderMarketplace = () => {
           image: c.images?.[0] || 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=500&q=80',
           images: c.images || [],
           farmer: {
-            name: c.farmer?.name || 'Ramesh Gowda',
-            village: c.farmer?.village || 'Belur',
-            district: c.district || c.farmer?.district || 'Hassan',
+            name: c.farmer?.name || 'Verified Farmer',
+            village: c.farmer?.village || 'APMC Yard',
+            district: c.district || c.farmer?.district || 'Karnataka',
             rating: 4.9,
-            totalTrades: 42,
+            totalTrades: 1,
             verified: true
           },
-          closingIn: c.closingIn || '3h 30m',
+          closingIn: c.closingIn || 'Live Bidding',
           bidsCount: c.bidsCount || 0,
           harvestDate: new Date(c.createdAt || Date.now()).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
         }))
 
-        // Merge with demo lots to maintain full statewide density
-        const existingIds = new Set(formatted.map(l => l._id))
-        const nonDuplicateDemos = DEMO_MARKETPLACE_LOTS.filter(d => !existingIds.has(d._id))
-        setLots([...formatted, ...nonDuplicateDemos])
+        setLots(formatted)
       } else {
-        setLots(DEMO_MARKETPLACE_LOTS)
+        setLots([])
       }
     } catch (err) {
-      console.warn('Marketplace load error, using default lots:', err.message)
-      setLots(DEMO_MARKETPLACE_LOTS)
+      console.warn('Marketplace load error:', err.message)
+      setLots([])
     } finally {
       setLoading(false)
     }

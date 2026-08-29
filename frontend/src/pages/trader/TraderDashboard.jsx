@@ -1,6 +1,8 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import bidService from '@/services/bidService'
+import orderService from '@/services/orderService'
 import { Button } from '@/components/ui/button'
 import toast from 'react-hot-toast'
 import { 
@@ -26,126 +28,69 @@ import {
   Plus
 } from 'lucide-react'
 
-const DEMO_TRADER_BIDS = [
-  {
-    _id: 'bid-trd-1',
-    lotId: 'LOT-KA-HSN-9912',
-    crop: {
-      name: 'Grade-A Fresh Tomato (Hybrid Shiva)',
-      quantity: 120,
-      unit: 'Quintals',
-      basePrice: 1800,
-      image: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=400&q=80',
-      farmerName: 'Ramesh Gowda',
-      location: 'Belur, Hassan'
-    },
-    myBidAmount: 2200,
-    highestBid: 2200,
-    status: 'winning', // 'winning' | 'outbid' | 'accepted' | 'countered'
-    bidCount: 4,
-    closingIn: '1h 45m',
-    lastBidTime: '20 mins ago'
-  },
-  {
-    _id: 'bid-trd-2',
-    lotId: 'LOT-KA-MND-4410',
-    crop: {
-      name: 'Bellary Premium Red Onion',
-      quantity: 250,
-      unit: 'Quintals',
-      basePrice: 2200,
-      image: 'https://images.unsplash.com/photo-1618512496248-a07fe83aa8cb?w=400&q=80',
-      farmerName: 'Basavaraj Patil',
-      location: 'Malavalli, Mandya'
-    },
-    myBidAmount: 2500,
-    highestBid: 2650,
-    status: 'outbid',
-    bidCount: 7,
-    closingIn: '3h 10m',
-    lastBidTime: '45 mins ago'
-  },
-  {
-    _id: 'bid-trd-3',
-    lotId: 'LOT-KA-BLR-7721',
-    crop: {
-      name: 'Yellow Dent Maize (Poultry Grade)',
-      quantity: 300,
-      unit: 'Quintals',
-      basePrice: 1900,
-      image: 'https://images.unsplash.com/photo-1551754655-cd27e38d2076?w=400&q=80',
-      farmerName: 'Channappa Gowda',
-      location: 'Doddaballapura, Bengaluru Rural'
-    },
-    myBidAmount: 2050,
-    highestBid: 2050,
-    status: 'accepted',
-    bidCount: 3,
-    closingIn: 'Closed',
-    lastBidTime: 'Yesterday'
-  },
-  {
-    _id: 'bid-trd-4',
-    lotId: 'LOT-KA-KLR-3319',
-    crop: {
-      name: 'Organic Finger Millet (Ragi ML-365)',
-      quantity: 150,
-      unit: 'Quintals',
-      basePrice: 3200,
-      image: 'https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?w=400&q=80',
-      farmerName: 'Venkatesh Murthy',
-      location: 'Bangarapet, Kolar'
-    },
-    myBidAmount: 3400,
-    highestBid: 3500,
-    farmerCounterRate: 3500,
-    status: 'countered',
-    bidCount: 5,
-    closingIn: '5h 20m',
-    lastBidTime: '2 hours ago'
-  }
-]
-
-const DEMO_ACTIVE_PROCUREMENTS = [
-  {
-    _id: 'ORD-TRD-9912',
-    cropName: 'Grade-A Fresh Tomato (Hybrid Shiva)',
-    quantity: '120 Quintals',
-    seller: 'Ramesh Gowda (Hassan)',
-    totalPayout: 240000,
-    escrowStatus: 'Secured in Escrow',
-    transitStage: 'En Route to Warehouse',
-    transporter: 'KA-04-F-8812 (Driver: Manjunath)',
-    eta: 'Today, 6:30 PM'
-  },
-  {
-    _id: 'ORD-TRD-7721',
-    cropName: 'Yellow Dent Maize',
-    quantity: '300 Quintals',
-    seller: 'Channappa Gowda (Bengaluru Rural)',
-    totalPayout: 615000,
-    escrowStatus: 'Escrow Locked',
-    transitStage: 'Assigned for Farm Pickup',
-    transporter: 'KA-09-E-4421 (Driver: Ramesh)',
-    eta: 'Tomorrow, 10:00 AM'
-  }
-]
-
 export const TraderDashboard = () => {
   const { user } = useAuth()
-  const [bids, setBids] = useState(DEMO_TRADER_BIDS)
+  const [bids, setBids] = useState([])
+  const [orders, setOrders] = useState([])
+  const [loading, setLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
 
   // Raise Bid Modal State
   const [raiseBidLot, setRaiseBidLot] = useState(null)
   const [newBidAmount, setNewBidAmount] = useState('')
 
-  const handleRefresh = () => {
+  const loadDashboardData = async () => {
+    setLoading(true)
+    try {
+      const [rawBids, rawOrders] = await Promise.all([
+        bidService.getMyBids(),
+        orderService.getTraderOrders()
+      ])
+
+      const formattedBids = Array.isArray(rawBids) ? rawBids.map(b => {
+        const crop = b.crop || b.cropListing || {}
+        const rate = Number(b.amount || b.bidPrice || 0)
+        return {
+          _id: b._id,
+          lotId: `LOT-${b._id?.slice(-6)}`,
+          crop: {
+            name: crop.name || 'Crop Produce Lot',
+            quantity: Number(crop.quantity) || 50,
+            unit: crop.unit || 'Quintals',
+            basePrice: Number(crop.basePrice) || 2000,
+            image: crop.images?.[0] || 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=400&q=80',
+            farmerName: b.farmer?.name || 'Verified Farmer',
+            location: `${b.farmer?.village || 'APMC'}, ${b.farmer?.district || 'Karnataka'}`
+          },
+          myBidAmount: rate,
+          highestBid: rate,
+          status: b.status === 'accepted' ? 'accepted' : b.status === 'rejected' ? 'outbid' : 'winning',
+          bidCount: 1,
+          closingIn: 'Live',
+          lastBidTime: new Date(b.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }
+      }) : []
+
+      setBids(formattedBids)
+      setOrders(Array.isArray(rawOrders) ? rawOrders : [])
+    } catch (err) {
+      console.warn('[TraderDashboard] Load error:', err)
+      setBids([])
+      setOrders([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadDashboardData()
+  }, [])
+
+  const handleRefresh = async () => {
     setIsRefreshing(true)
-    setTimeout(() => {
-      setIsRefreshing(false)
-      toast.success('Live APMC marketplace & bid statuses synchronized!')
-    }, 600)
+    await loadDashboardData()
+    setIsRefreshing(false)
+    toast.success('Live APMC marketplace & bid statuses synchronized!')
   }
 
   const handleOpenRaiseBid = (bidItem) => {
@@ -237,11 +182,11 @@ export const TraderDashboard = () => {
               <Gavel className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-2xl font-black text-foreground">4 Lots</p>
+          <p className="text-2xl font-black text-foreground">{bids.length} Lots</p>
           <div className="flex items-center gap-2 text-[11px]">
-            <span className="text-emerald-600 font-bold">2 Winning</span>
+            <span className="text-emerald-600 font-bold">{bids.filter(b => b.status === 'winning' || b.status === 'accepted').length} Winning</span>
             <span>•</span>
-            <span className="text-rose-500 font-bold">1 Outbid</span>
+            <span className="text-rose-500 font-bold">{bids.filter(b => b.status === 'outbid' || b.status === 'rejected').length} Outbid</span>
           </div>
         </div>
 
@@ -253,7 +198,9 @@ export const TraderDashboard = () => {
               <DollarSign className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-2xl font-black text-emerald-600">₹8,55,000</p>
+          <p className="text-2xl font-black text-emerald-600">
+            ₹{orders.filter(o => o.paymentStatus === 'escrow_locked' || o.paymentStatus === 'dispatched').reduce((sum, o) => sum + (Number(o.escrowAmount) || 0), 0).toLocaleString('en-IN')}
+          </p>
           <span className="text-[11px] text-muted-foreground">100% Capital Protected</span>
         </div>
 
@@ -265,8 +212,12 @@ export const TraderDashboard = () => {
               <Truck className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-2xl font-black text-sky-600">2 Consignments</p>
-          <span className="text-[11px] text-muted-foreground">420 Quintals moving</span>
+          <p className="text-2xl font-black text-sky-600">
+            {orders.filter(o => o.deliveryStatus === 'in_transit' || o.deliveryStatus === 'dispatched').length} Consignments
+          </p>
+          <span className="text-[11px] text-muted-foreground">
+            {orders.filter(o => o.deliveryStatus === 'in_transit' || o.deliveryStatus === 'dispatched').reduce((sum, o) => sum + (Number(o.quantity) || 0), 0)} Quintals moving
+          </span>
         </div>
 
         {/* KPI 4: Direct Savings vs APMC Yard */}
@@ -292,142 +243,133 @@ export const TraderDashboard = () => {
           <span className="text-xs text-muted-foreground font-medium">Real-time socket updates</span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {bids.map((bid) => (
-            <div 
-              key={bid._id}
-              className={`p-5 rounded-3xl bg-card border transition-all flex flex-col justify-between space-y-4 shadow-sm ${
-                bid.status === 'winning' 
-                  ? 'border-emerald-500/40 bg-emerald-500/[0.02]' 
-                  : bid.status === 'outbid' 
-                  ? 'border-rose-500/40 bg-rose-500/[0.02]' 
-                  : bid.status === 'countered'
-                  ? 'border-amber-500/40 bg-amber-500/[0.02]'
-                  : 'border-primary/40 bg-primary/[0.02]'
-              }`}
-            >
-              <div className="flex items-start gap-3.5">
-                <img 
-                  src={bid.crop.image} 
-                  alt={bid.crop.name} 
-                  className="w-16 h-16 rounded-2xl object-cover border border-border shrink-0 shadow-sm"
-                />
+        {bids.length === 0 ? (
+          <div className="p-8 text-center rounded-3xl bg-card border border-border space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 mx-auto flex items-center justify-center">
+              <Gavel className="w-6 h-6" />
+            </div>
+            <p className="text-sm font-bold text-foreground">No Active Bids</p>
+            <p className="text-xs text-muted-foreground">Explore farm lots on the APMC marketplace to start bidding on fresh produce.</p>
+            <Button asChild size="sm" className="rounded-xl text-xs bg-amber-600 hover:bg-amber-700 text-white">
+              <Link to="/trader/marketplace">Explore Marketplace</Link>
+            </Button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {bids.map((bid) => (
+              <div 
+                key={bid._id}
+                className={`p-5 rounded-3xl bg-card border transition-all flex flex-col justify-between space-y-4 shadow-sm ${
+                  bid.status === 'winning' 
+                    ? 'border-emerald-500/40 bg-emerald-500/[0.02]' 
+                    : bid.status === 'outbid' 
+                    ? 'border-rose-500/40 bg-rose-500/[0.02]' 
+                    : bid.status === 'countered'
+                    ? 'border-amber-500/40 bg-amber-500/[0.02]'
+                    : 'border-primary/40 bg-primary/[0.02]'
+                }`}
+              >
+                <div className="flex items-start gap-3.5">
+                  <img 
+                    src={bid.crop.image} 
+                    alt={bid.crop.name} 
+                    className="w-16 h-16 rounded-2xl object-cover border border-border shrink-0 shadow-sm"
+                  />
 
-                <div className="space-y-1 flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase">
-                      {bid.lotId}
-                    </span>
-
-                    {/* Status Badge */}
-                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1 ${
-                      bid.status === 'winning' 
-                        ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' 
-                        : bid.status === 'outbid' 
-                        ? 'bg-rose-500/10 text-rose-600 border border-rose-500/20' 
-                        : bid.status === 'countered'
-                        ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
-                        : 'bg-primary/10 text-primary border border-primary/20'
-                    }`}>
-                      {bid.status === 'winning' && <CheckCircle2 className="w-3 h-3" />}
-                      {bid.status === 'outbid' && <AlertTriangle className="w-3 h-3" />}
-                      {bid.status === 'countered' && <Sparkles className="w-3 h-3" />}
-                      {bid.status === 'accepted' && <CheckCircle2 className="w-3 h-3" />}
-                      <span>
-                        {bid.status === 'winning' 
-                          ? 'Winning Bid' 
-                          : bid.status === 'outbid' 
-                          ? 'Outbid!' 
-                          : bid.status === 'countered'
-                          ? 'Counter Received'
-                          : 'Offer Accepted'}
+                  <div className="space-y-1 flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase">
+                        {bid.lotId}
                       </span>
+
+                      {/* Status Badge */}
+                      <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1 ${
+                        bid.status === 'winning' 
+                          ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' 
+                          : bid.status === 'outbid' 
+                          ? 'bg-rose-500/10 text-rose-600 border border-rose-500/20' 
+                          : bid.status === 'countered'
+                          ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
+                          : 'bg-primary/10 text-primary border border-primary/20'
+                      }`}>
+                        {bid.status === 'winning' && <CheckCircle2 className="w-3 h-3" />}
+                        {bid.status === 'outbid' && <AlertTriangle className="w-3 h-3" />}
+                        {bid.status === 'countered' && <Sparkles className="w-3 h-3" />}
+                        {bid.status === 'accepted' && <CheckCircle2 className="w-3 h-3" />}
+                        <span>
+                          {bid.status === 'winning' 
+                            ? 'Winning Bid' 
+                            : bid.status === 'outbid' 
+                            ? 'Outbid!' 
+                            : bid.status === 'countered'
+                            ? 'Counter Received'
+                            : 'Offer Accepted'}
+                        </span>
+                      </span>
+                    </div>
+
+                    <h3 className="font-extrabold text-sm text-foreground truncate">
+                      {bid.crop.name}
+                    </h3>
+
+                    <p className="text-xs text-muted-foreground flex items-center gap-2">
+                      <span><MapPin className="w-3 h-3 inline text-primary mr-0.5" />{bid.crop.location}</span>
+                      <span>•</span>
+                      <span className="font-semibold text-foreground">{bid.crop.quantity} {bid.crop.unit}</span>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Price Metrics Grid */}
+                <div className="grid grid-cols-3 gap-2 p-3 rounded-2xl bg-muted/40 border border-border/80 text-center text-xs">
+                  <div>
+                    <span className="text-[10px] text-muted-foreground block">My Offer</span>
+                    <span className="font-extrabold text-foreground">₹{bid.myBidAmount.toLocaleString('en-IN')}</span>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] text-muted-foreground block">Highest Bid</span>
+                    <span className={`font-black ${bid.status === 'outbid' ? 'text-rose-600' : 'text-emerald-600'}`}>
+                      ₹{bid.highestBid.toLocaleString('en-IN')}
                     </span>
                   </div>
 
-                  <h3 className="font-extrabold text-sm text-foreground truncate">
-                    {bid.crop.name}
-                  </h3>
-
-                  <p className="text-xs text-muted-foreground flex items-center gap-2">
-                    <span><MapPin className="w-3 h-3 inline text-primary mr-0.5" />{bid.crop.location}</span>
-                    <span>•</span>
-                    <span className="font-semibold text-foreground">{bid.crop.quantity} {bid.crop.unit}</span>
-                  </p>
-                </div>
-              </div>
-
-              {/* Price Metrics Grid */}
-              <div className="grid grid-cols-3 gap-2 p-3 rounded-2xl bg-muted/40 border border-border/80 text-center text-xs">
-                <div>
-                  <span className="text-[10px] text-muted-foreground block">My Offer</span>
-                  <span className="font-extrabold text-foreground">₹{bid.myBidAmount.toLocaleString('en-IN')}</span>
-                </div>
-
-                <div>
-                  <span className="text-[10px] text-muted-foreground block">Highest Bid</span>
-                  <span className={`font-black ${bid.status === 'outbid' ? 'text-rose-600' : 'text-emerald-600'}`}>
-                    ₹{bid.highestBid.toLocaleString('en-IN')}
-                  </span>
-                </div>
-
-                <div>
-                  <span className="text-[10px] text-muted-foreground block">Closing In</span>
-                  <span className="font-semibold text-foreground flex items-center justify-center gap-1">
-                    <Clock className="w-3 h-3 text-muted-foreground" /> {bid.closingIn}
-                  </span>
-                </div>
-              </div>
-
-              {/* Counter Proposal Alert */}
-              {bid.status === 'countered' && (
-                <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs space-y-1">
-                  <p className="font-bold text-amber-700">
-                    👨‍🌾 Farmer Countered: ₹{bid.farmerCounterRate}/Qtl
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">
-                    Farmer accepted to sell if price is locked at ₹{bid.farmerCounterRate}/Qtl.
-                  </p>
-                </div>
-              )}
-
-              {/* Actions Footer */}
-              <div className="flex items-center justify-between gap-2 pt-1">
-                <span className="text-[11px] text-muted-foreground font-medium">
-                  {bid.bidCount} Total Competitor Bids
-                </span>
-
-                <div className="flex items-center gap-2">
-                  {bid.status === 'outbid' && (
-                    <Button 
-                      size="sm" 
-                      onClick={() => handleOpenRaiseBid(bid)}
-                      className="rounded-xl text-xs font-bold h-8 bg-rose-600 hover:bg-rose-700 text-white shadow-sm"
-                    >
-                      <ArrowUpRight className="w-3.5 h-3.5 mr-1" /> Raise Bid
-                    </Button>
-                  )}
-
-                  {bid.status === 'countered' && (
-                    <Button 
-                      size="sm" 
-                      onClick={() => handleAcceptCounter(bid)}
-                      className="rounded-xl text-xs font-bold h-8 bg-amber-600 hover:bg-amber-700 text-white shadow-sm"
-                    >
-                      Accept Counter (₹{bid.farmerCounterRate})
-                    </Button>
-                  )}
-
-                  {bid.status === 'winning' && (
-                    <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
-                      <CheckCircle2 className="w-4 h-4" /> Top Bidder
+                  <div>
+                    <span className="text-[10px] text-muted-foreground block">Closing In</span>
+                    <span className="font-semibold text-foreground flex items-center justify-center gap-1">
+                      <Clock className="w-3 h-3 text-muted-foreground" /> {bid.closingIn}
                     </span>
-                  )}
+                  </div>
+                </div>
+
+                {/* Actions Footer */}
+                <div className="flex items-center justify-between gap-2 pt-1">
+                  <span className="text-[11px] text-muted-foreground font-medium">
+                    {bid.bidCount} Total Competitor Bids
+                  </span>
+
+                  <div className="flex items-center gap-2">
+                    {bid.status === 'outbid' && (
+                      <Button 
+                        size="sm" 
+                        onClick={() => handleOpenRaiseBid(bid)}
+                        className="rounded-xl text-xs font-bold h-8 bg-rose-600 hover:bg-rose-700 text-white shadow-sm"
+                      >
+                        <ArrowUpRight className="w-3.5 h-3.5 mr-1" /> Raise Bid
+                      </Button>
+                    )}
+
+                    {bid.status === 'winning' && (
+                      <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
+                        <CheckCircle2 className="w-4 h-4" /> Top Bidder
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 4. Active Procurement Orders & Logistics Tracker */}
@@ -440,55 +382,65 @@ export const TraderDashboard = () => {
           <span className="text-xs text-muted-foreground font-medium">APMC Weighment Verified</span>
         </div>
 
-        <div className="rounded-3xl bg-card border border-border overflow-hidden shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-muted/60 text-muted-foreground font-bold uppercase tracking-wider text-[10px] border-b border-border">
-                <tr>
-                  <th className="p-4">Order ID & Crop</th>
-                  <th className="p-4">Farmer / Producer</th>
-                  <th className="p-4 text-right">Escrow Payout</th>
-                  <th className="p-4">Logistics & ETA</th>
-                  <th className="p-4 text-right">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {DEMO_ACTIVE_PROCUREMENTS.map((order) => (
-                  <tr key={order._id} className="hover:bg-muted/30 transition-colors">
-                    <td className="p-4">
-                      <span className="font-mono font-bold text-[11px] text-primary block">{order._id}</span>
-                      <span className="font-extrabold text-foreground">{order.cropName}</span>
-                      <span className="text-[11px] text-muted-foreground block">{order.quantity}</span>
-                    </td>
-
-                    <td className="p-4 font-medium text-foreground">
-                      {order.seller}
-                    </td>
-
-                    <td className="p-4 text-right font-extrabold text-foreground">
-                      ₹{order.totalPayout.toLocaleString('en-IN')}
-                      <span className="block text-[10px] font-semibold text-emerald-600">{order.escrowStatus}</span>
-                    </td>
-
-                    <td className="p-4">
-                      <span className="font-semibold text-foreground block">{order.transitStage}</span>
-                      <span className="text-[11px] text-muted-foreground block">{order.transporter}</span>
-                      <span className="text-[10px] text-sky-600 font-bold">ETA: {order.eta}</span>
-                    </td>
-
-                    <td className="p-4 text-right">
-                      <Button asChild size="sm" variant="outline" className="rounded-xl text-xs h-8">
-                        <Link to="/trader/orders">
-                          Track Truck <ChevronRight className="w-3.5 h-3.5 ml-1" />
-                        </Link>
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {orders.length === 0 ? (
+          <div className="p-8 text-center rounded-3xl bg-card border border-border space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-sky-500/10 text-sky-600 mx-auto flex items-center justify-center">
+              <Truck className="w-6 h-6" />
+            </div>
+            <p className="text-sm font-bold text-foreground">No Active Shipments</p>
+            <p className="text-xs text-muted-foreground">When your bids are accepted and escrow is locked, live consignments and GPS tracking will appear here.</p>
           </div>
-        </div>
+        ) : (
+          <div className="rounded-3xl bg-card border border-border overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-muted/60 text-muted-foreground font-bold uppercase tracking-wider text-[10px] border-b border-border">
+                  <tr>
+                    <th className="p-4">Order ID & Crop</th>
+                    <th className="p-4">Farmer / Producer</th>
+                    <th className="p-4 text-right">Escrow Payout</th>
+                    <th className="p-4">Logistics & ETA</th>
+                    <th className="p-4 text-right">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {orders.map((order) => (
+                    <tr key={order._id} className="hover:bg-muted/30 transition-colors">
+                      <td className="p-4">
+                        <span className="font-mono font-bold text-[11px] text-primary block">{order.orderId || order._id}</span>
+                        <span className="font-extrabold text-foreground">{order.cropName}</span>
+                        <span className="text-[11px] text-muted-foreground block">{order.quantity}</span>
+                      </td>
+
+                      <td className="p-4 font-medium text-foreground">
+                        {order.farmerName || 'Verified Farmer'}
+                      </td>
+
+                      <td className="p-4 text-right font-extrabold text-foreground">
+                        ₹{(Number(order.totalPayout) || Number(order.escrowAmount) || 0).toLocaleString('en-IN')}
+                        <span className="block text-[10px] font-semibold text-emerald-600">{order.escrowStatus || 'Escrow Locked'}</span>
+                      </td>
+
+                      <td className="p-4">
+                        <span className="font-semibold text-foreground block">{order.transitStage || 'In-Transit'}</span>
+                        <span className="text-[11px] text-muted-foreground block">{order.transporter || 'APMC Assigned Fleet'}</span>
+                        <span className="text-[10px] text-sky-600 font-bold">ETA: {order.eta || 'Standard APMC Transit'}</span>
+                      </td>
+
+                      <td className="p-4 text-right">
+                        <Button asChild size="sm" variant="outline" className="rounded-xl text-xs h-8">
+                          <Link to="/trader/orders">
+                            Track Truck <ChevronRight className="w-3.5 h-3.5 ml-1" />
+                          </Link>
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 5. Modal: Raise Bid Overlay */}

@@ -37,42 +37,46 @@ export const TraderProfile = () => {
 
   // Form State
   const [profileData, setProfileData] = useState({
-    companyName: 'Karnataka Wholesale Traders Co-op',
-    contactPerson: 'Suresh Patil',
-    email: 'trader1@krishisetu.com',
-    phone: '+91 98860 12345',
-    panNumber: 'AABCK9921D',
-    gstin: '29ABCDE1234F1Z5',
-    apmcLicense: 'APMC-KA-MND-8821',
-    apmcYard: 'Mandya APMC Main Market Yard',
+    companyName: user?.companyName || user?.name || 'Trading Enterprise',
+    contactPerson: user?.name || 'Authorized Representative',
+    email: user?.email || '',
+    phone: user?.mobile || user?.phone || '',
+    panNumber: '',
+    gstin: user?.gstin || user?.gstNumber || '',
+    apmcLicense: user?.licenseNumber || user?.apmcLicense || '',
+    apmcYard: `${user?.district || 'Karnataka'} APMC Main Yard`,
     licenseCategory: 'Category-A: Bulk Wholesale Procurement',
-    validUntil: '31 March 2028',
-    address: 'Plot #14, APMC Market Yard, Mandya - 571401',
-    bankName: 'HDFC Bank Ltd',
-    accountNumber: '50200088992144',
-    ifscCode: 'HDFC0000240',
-    accountType: 'Corporate Current Account',
-    mandateLimit: '₹50,00,000'
+    validUntil: 'Active Karnataka License',
+    address: user?.businessAddress || `${user?.district || 'Karnataka'}, India`,
+    bankName: 'Escrow Designated Bank',
+    accountNumber: '',
+    ifscCode: '',
+    accountType: 'Current Account',
+    mandateLimit: '₹0'
   })
 
   useEffect(() => {
     const loadProfile = async () => {
-      const data = await profileService.getTraderProfile()
-      if (data) {
-        setProfileData((prev) => ({
-          ...prev,
-          companyName: data.name || prev.companyName,
-          contactPerson: data.contactPerson || prev.contactPerson,
-          email: data.email || prev.email,
-          phone: data.mobile || prev.phone,
-          gstin: data.gstin || prev.gstin,
-          apmcLicense: data.apmcLicense || prev.apmcLicense,
-          address: data.businessAddress || prev.address
-        }))
+      try {
+        const data = await profileService.getTraderProfile()
+        if (data) {
+          setProfileData((prev) => ({
+            ...prev,
+            companyName: data.companyName || data.name || prev.companyName,
+            contactPerson: data.name || prev.contactPerson,
+            email: data.email || prev.email,
+            phone: data.mobile || prev.phone,
+            gstin: data.gstin || data.gstNumber || prev.gstin,
+            apmcLicense: data.licenseNumber || data.apmcLicense || prev.apmcLicense,
+            address: data.businessAddress || prev.address
+          }))
+        }
+      } catch (err) {
+        console.warn('Failed to load profile:', err)
       }
     }
     loadProfile()
-  }, [])
+  }, [user])
 
   const handleCopy = (text, label) => {
     navigator.clipboard.writeText(text)

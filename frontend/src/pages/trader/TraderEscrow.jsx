@@ -31,9 +31,9 @@ import {
 
 export const TraderEscrow = () => {
   const { user } = useAuth()
-  const [availableBalance, setAvailableBalance] = useState(1450000)
-  const [lockedBalance, setLockedBalance] = useState(534000)
-  const [totalDisbursed, setTotalDisbursed] = useState(1155000)
+  const [availableBalance, setAvailableBalance] = useState(0)
+  const [lockedBalance, setLockedBalance] = useState(0)
+  const [totalDisbursed, setTotalDisbursed] = useState(0)
   const [transactions, setTransactions] = useState([])
   const [selectedFilter, setSelectedFilter] = useState('all')
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -49,13 +49,22 @@ export const TraderEscrow = () => {
     try {
       const overview = await escrowService.getWalletOverview()
       if (overview) {
-        setAvailableBalance(overview.availableBalance || 1450000)
-        setLockedBalance(overview.lockedEscrow || 534000)
-        setTotalDisbursed(overview.totalDisbursed || 1155000)
-        setTransactions(overview.transactions || [])
+        setAvailableBalance(Number(overview.availableBalance) || 0)
+        setLockedBalance(Number(overview.lockedEscrow) || 0)
+        setTotalDisbursed(Number(overview.totalDisbursed) || 0)
+        setTransactions(Array.isArray(overview.transactions) ? overview.transactions : [])
+      } else {
+        setAvailableBalance(0)
+        setLockedBalance(0)
+        setTotalDisbursed(0)
+        setTransactions([])
       }
     } catch (err) {
       console.warn('Failed to load escrow overview:', err)
+      setAvailableBalance(0)
+      setLockedBalance(0)
+      setTotalDisbursed(0)
+      setTransactions([])
     } finally {
       setLoading(false)
     }
