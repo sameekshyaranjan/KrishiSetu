@@ -371,6 +371,23 @@ export const FarmerDashboard = () => {
                 </Button>
               </div>
             ))}
+
+            {listings.length === 0 && !loading && (
+              <div className="p-8 text-center rounded-3xl bg-card border border-border space-y-3">
+                <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto">
+                  <Package className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-foreground">No harvest lots listed yet</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">List your harvest with 0% brokerage to receive live bids from verified APMC traders.</p>
+                </div>
+                <Button asChild size="sm" className="rounded-xl text-xs font-bold shadow-sm">
+                  <Link to="/farmer/listings">
+                    <Plus className="w-3.5 h-3.5 mr-1" /> List New Harvest
+                  </Link>
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </div>

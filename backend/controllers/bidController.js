@@ -60,15 +60,24 @@ const getBidsForListing = async (req, res, next) => {
 
 const getMyBids = async (req, res, next) => {
   try {
+    const isFarmer = req.user.role === 'farmer';
+    const filter = isFarmer ? { farmer: req.user.id } : { trader: req.user.id };
+    const populatePaths = isFarmer 
+      ? [
+          { path: 'crop', select: 'name category basePrice status quantity unit' },
+          { path: 'trader', select: 'name mobile companyName district' }
+        ]
+      : [
+          { path: 'crop', select: 'name category basePrice status quantity unit' },
+          { path: 'farmer', select: 'name village district mobile' }
+        ];
+
     const result = await paginate(
       Bid,
-      { trader: req.user.id },
+      filter,
       req.query.page,
       req.query.limit,
-      [
-        { path: 'crop', select: 'name category basePrice status' },
-        { path: 'farmer', select: 'name village district mobile' }
-      ],
+      populatePaths,
       { createdAt: -1 }
     );
 

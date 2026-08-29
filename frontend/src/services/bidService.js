@@ -2,84 +2,50 @@ import api from './api'
 
 /**
  * KrishiSetu Bidding & Escrow Commitments Service
- * Connects directly to backend /api/bids endpoints with local session fallback.
+ * 100% Real-Time Database Connection (MongoDB Atlas)
+ * Strict User Scoping: Zero Dummy / Fallback Data Contamination
  */
-const getStoredTraderBids = () => {
-  try {
-    const raw = localStorage.getItem('krishisetu_trader_bids')
-    return raw ? JSON.parse(raw) : []
-  } catch {
-    return []
-  }
-}
-
-const saveStoredTraderBids = (bids) => {
-  try {
-    localStorage.setItem('krishisetu_trader_bids', JSON.stringify(bids))
-  } catch (e) {
-    console.warn('Failed to persist trader bids:', e)
-  }
-}
 
 export const bidService = {
   /**
-   * Place a new binding auction bid on a crop lot
+   * Place a new binding auction bid on a crop lot in MongoDB
    */
   placeBid: async ({ cropId, amount, message }) => {
-    const newBid = {
-      _id: `bid-${Date.now()}`,
-      cropId,
-      amount: Number(amount),
-      message: message || 'Binding APMC wholesale bid submitted with escrow lock.',
-      status: 'pending',
-      createdAt: new Date().toISOString()
-    }
-
-    // Persist to local storage
-    const currentBids = getStoredTraderBids()
-    saveStoredTraderBids([newBid, ...currentBids])
-
-    try {
-      const res = await api.post('/bids', { cropId, amount: Number(amount), message })
-      const data = res?.data || res
-      if (data?._id) {
-        newBid._id = data._id
-        saveStoredTraderBids([newBid, ...currentBids])
-      }
-      return newBid
-    } catch (err) {
-      console.warn('Backend bid notice, returning optimistic bid:', err.message)
-      return newBid
-    }
+    const res = await api.post('/bids', { cropId, amount: Number(amount), message })
+    return res?.data || res
   },
 
   /**
-   * Get all bids placed by the authenticated trader
+   * Get all bids placed by the authenticated trader from MongoDB
    */
   getMyBids: async () => {
-    const localBids = getStoredTraderBids()
     try {
       const res = await api.get('/bids/my')
-      const data = res?.data || res
-      if (Array.isArray(data) && data.length > 0) {
-        return [...localBids, ...data]
+      const data = res?.data?.docs || res?.data || res
+      if (Array.isArray(data)) {
+        return data
       }
-      return localBids
-    } catch {
-      return localBids
+      return []
+    } catch (err) {
+      console.warn('[bidService] Failed to load my bids:', err.message)
+      return []
     }
   },
 
   /**
-   * Get all bids placed on a specific crop listing
+   * Get all bids placed on a specific crop listing from MongoDB
    */
   getBidsForListing: async (cropId) => {
     try {
       const res = await api.get(`/bids/listing/${cropId}`)
-      return res?.data || res || []
-    } catch {
-      const local = getStoredTraderBids().filter((b) => b.cropId === cropId)
-      return local
+      const data = res?.data?.docs || res?.data || res
+      if (Array.isArray(data)) {
+        return data
+      }
+      return []
+    } catch (err) {
+      console.warn('[bidService] Failed to load listing bids:', err.message)
+      return []
     }
   },
 
@@ -87,16 +53,16 @@ export const bidService = {
    * Withdraw an active bid
    */
   withdrawBid: async (bidId) => {
-    const localBids = getStoredTraderBids()
-    const filtered = localBids.filter((b) => b._id !== bidId)
-    saveStoredTraderBids(filtered)
+    const res = await api.put(`/bids/${bidId}/withdraw`)
+    return res?.data || res
+  },
 
-    try {
-      const res = await api.put(`/bids/${bidId}/withdraw`)
-      return res?.data || res
-    } catch {
-      return { success: true }
-    }
+  /**
+   * Update an existing bid amount
+   */
+  updateBid: async (bidId, amount, message) => {
+    const res = await api.put(`/bids/${bidId}`, { amount: Number(amount), message })
+    return res?.data || res
   }
 }
 

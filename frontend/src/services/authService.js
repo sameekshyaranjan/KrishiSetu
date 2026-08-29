@@ -147,6 +147,14 @@ export const authService = {
     localStorage.removeItem('krishisetu_user')
     localStorage.removeItem('token')
     localStorage.removeItem('user')
+    localStorage.removeItem('krishisetu_farmer_crops')
+    localStorage.removeItem('krishisetu_farmer_orders')
+    localStorage.removeItem('krishisetu_trader_orders')
+    localStorage.removeItem('krishisetu_farmer_notifs')
+    localStorage.removeItem('krishisetu_trader_notifs')
+    localStorage.removeItem('krishisetu_trader_bids')
+    localStorage.removeItem('krishisetu_trader_escrow')
+    localStorage.removeItem('krishisetu_disputes')
   },
 
   /**

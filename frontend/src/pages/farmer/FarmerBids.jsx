@@ -101,7 +101,8 @@ export const FarmerBids = () => {
   const uniqueCropNames = useMemo(() => {
     const names = new Set()
     bids.forEach((b) => {
-      if (b.cropListing?.name) names.add(b.cropListing.name)
+      const cName = b.crop?.name || b.cropListing?.name
+      if (cName) names.add(cName)
     })
     return Array.from(names)
   }, [bids])
@@ -109,12 +110,14 @@ export const FarmerBids = () => {
   // Filtered Bids List
   const filteredBids = useMemo(() => {
     return bids.filter((b) => {
+      const cName = b.crop?.name || b.cropListing?.name || ''
+      const tName = b.trader?.name || b.trader?.companyName || ''
       const matchesSearch = 
-        (b.trader?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (b.cropListing?.name || '').toLowerCase().includes(searchQuery.toLowerCase())
+        tName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        cName.toLowerCase().includes(searchQuery.toLowerCase())
       
       const matchesStatus = statusFilter === 'all' || b.status === statusFilter
-      const matchesCrop = selectedCropFilter === 'all' || b.cropListing?.name === selectedCropFilter
+      const matchesCrop = selectedCropFilter === 'all' || cName === selectedCropFilter
 
       return matchesSearch && matchesStatus && matchesCrop
     })
@@ -122,10 +125,17 @@ export const FarmerBids = () => {
 
   // KPIs
   const pendingCount = bids.filter((b) => b.status === 'pending').length
-  const highestOffer = bids.reduce((max, b) => (b.bidPrice > max ? b.bidPrice : max), 0)
+  const highestOffer = bids.reduce((max, b) => {
+    const amt = b.amount || b.bidPrice || 0
+    return amt > max ? amt : max
+  }, 0)
   const totalEscrowPotential = bids
     .filter((b) => b.status === 'pending' || b.status === 'accepted')
-    .reduce((sum, b) => sum + (b.totalAmount || b.bidPrice * (b.cropListing?.quantity || 50)), 0)
+    .reduce((sum, b) => {
+      const amt = b.amount || b.bidPrice || 0
+      const qty = b.crop?.quantity || b.cropListing?.quantity || 50
+      return sum + (b.totalAmount || (amt * qty))
+    }, 0)
 
   return (
     <div className="space-y-8">
@@ -272,10 +282,12 @@ export const FarmerBids = () => {
           const isPending = bid.status === 'pending'
           const isAccepted = bid.status === 'accepted'
           const isRejected = bid.status === 'rejected'
-          const crop = bid.cropListing || {}
+          const crop = bid.crop || bid.cropListing || {}
           const quantity = crop.quantity || 50
-          const totalVal = bid.totalAmount || (bid.bidPrice * quantity)
-          const reserveDiff = bid.bidPrice - (crop.basePrice || 2000)
+          const offerRate = Number(bid.amount || bid.bidPrice || 0)
+          const baseRate = Number(crop.basePrice || 2000)
+          const totalVal = bid.totalAmount || (offerRate * quantity)
+          const reserveDiff = offerRate - baseRate
 
           return (
             <div 
@@ -314,7 +326,7 @@ export const FarmerBids = () => {
                     <div className="flex flex-wrap items-center gap-2 text-xs">
                       <span className="font-bold text-foreground flex items-center gap-1">
                         <Building2 className="w-3.5 h-3.5 text-primary" />
-                        {bid.trader?.name || 'Verified APMC Trader'}
+                        {bid.trader?.name || bid.trader?.companyName || 'Verified APMC Trader'}
                       </span>
                       <span className="px-2 py-0.5 rounded-md bg-primary/10 text-primary text-[10px] font-bold border border-primary/20 flex items-center gap-1">
                         <ShieldCheck className="w-3 h-3" /> APMC Verified
@@ -325,7 +337,7 @@ export const FarmerBids = () => {
                     </div>
 
                     <p className="text-xs text-muted-foreground pt-1">
-                      Reserve floor: <span className="font-semibold text-foreground">₹{(crop.basePrice || 2000).toLocaleString('en-IN')}/Qtl</span>
+                      Reserve floor: <span className="font-semibold text-foreground">₹{baseRate.toLocaleString('en-IN')}/Qtl</span>
                     </p>
                   </div>
                 </div>
@@ -338,7 +350,7 @@ export const FarmerBids = () => {
                     <div className="flex items-center lg:justify-end gap-2">
                       <span className="text-xs font-semibold text-muted-foreground">Offer Rate:</span>
                       <span className="text-2xl font-black text-primary">
-                        ₹{bid.bidPrice?.toLocaleString('en-IN')}/Qtl
+                        ₹{offerRate.toLocaleString('en-IN')}/Qtl
                       </span>
                     </div>
 

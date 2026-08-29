@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import bidService from '@/services/bidService'
 import { Button } from '@/components/ui/button'
 import toast from 'react-hot-toast'
 import { 
@@ -26,110 +27,6 @@ import {
   Zap
 } from 'lucide-react'
 
-const INITIAL_TRADER_BIDS = [
-  {
-    _id: 'bid-101',
-    lotId: 'LOT-KA-HSN-101',
-    cropName: 'Grade-A Fresh Hybrid Tomato',
-    variety: 'Shiva Hybrid (Firm Red Skin)',
-    category: 'Vegetables',
-    grade: 'Grade-A Premium',
-    quantity: 120,
-    unit: 'Quintals',
-    reservePrice: 1800,
-    myBidAmount: 2200,
-    highestBid: 2200,
-    highestBidder: 'You (Top Bidder)',
-    status: 'winning', // 'winning' | 'outbid' | 'countered' | 'won'
-    closingIn: '1h 45m',
-    bidsCount: 6,
-    image: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=500&q=80',
-    farmer: {
-      name: 'Ramesh Gowda',
-      village: 'Belur',
-      district: 'Hassan',
-      rating: 4.9
-    },
-    autoBidCeiling: 2400
-  },
-  {
-    _id: 'bid-102',
-    lotId: 'LOT-KA-MND-102',
-    cropName: 'Bellary Premium Red Onion',
-    variety: 'Nasik Red Medium-Large Bulbs',
-    category: 'Vegetables',
-    grade: 'Grade-A Export',
-    quantity: 250,
-    unit: 'Quintals',
-    reservePrice: 2200,
-    myBidAmount: 2500,
-    highestBid: 2650,
-    highestBidder: 'Bengaluru Produce Alliance',
-    status: 'outbid',
-    closingIn: '3h 15m',
-    bidsCount: 8,
-    image: 'https://images.unsplash.com/photo-1618512496248-a07fe83aa8cb?w=500&q=80',
-    farmer: {
-      name: 'Basavaraj Patil',
-      village: 'Malavalli',
-      district: 'Mandya',
-      rating: 4.8
-    },
-    autoBidCeiling: null
-  },
-  {
-    _id: 'bid-103',
-    lotId: 'LOT-KA-KLR-104',
-    cropName: 'Organic Finger Millet (Ragi)',
-    variety: 'ML-365 High-Calcium Grain',
-    category: 'Grains',
-    grade: 'Grade-A Organic',
-    quantity: 150,
-    unit: 'Quintals',
-    reservePrice: 3200,
-    myBidAmount: 3400,
-    highestBid: 3500,
-    farmerCounterRate: 3500,
-    highestBidder: 'Karnataka Spices Ltd',
-    status: 'countered',
-    closingIn: '6h 10m',
-    bidsCount: 5,
-    image: 'https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?w=500&q=80',
-    farmer: {
-      name: 'Venkatesh Murthy',
-      village: 'Bangarapet',
-      district: 'Kolar',
-      rating: 5.0
-    },
-    autoBidCeiling: 3600
-  },
-  {
-    _id: 'bid-104',
-    lotId: 'LOT-KA-BLR-103',
-    cropName: 'Yellow Dent Poultry Maize',
-    variety: 'Kargil 900M Hybrid',
-    category: 'Grains',
-    grade: 'Grade-A Commercial',
-    quantity: 300,
-    unit: 'Quintals',
-    reservePrice: 1900,
-    myBidAmount: 2050,
-    highestBid: 2050,
-    highestBidder: 'You (Winning Buyer)',
-    status: 'won',
-    closingIn: 'Auction Closed',
-    bidsCount: 4,
-    image: 'https://images.unsplash.com/photo-1551754655-cd27e38d2076?w=500&q=80',
-    farmer: {
-      name: 'Channappa Gowda',
-      village: 'Doddaballapura',
-      district: 'Bengaluru Rural',
-      rating: 4.9
-    },
-    autoBidCeiling: 2150
-  }
-]
-
 const STATUS_TABS = [
   { id: 'all', label: 'All Bids' },
   { id: 'winning', label: 'Winning' },
@@ -140,7 +37,8 @@ const STATUS_TABS = [
 
 export const TraderBids = () => {
   const { user } = useAuth()
-  const [bids, setBids] = useState(INITIAL_TRADER_BIDS)
+  const [bids, setBids] = useState([])
+  const [loading, setLoading] = useState(true)
   const [activeStatus, setActiveStatus] = useState('all')
   const [isRefreshing, setIsRefreshing] = useState(false)
 
@@ -152,12 +50,60 @@ export const TraderBids = () => {
   const [autoBidLot, setAutoBidLot] = useState(null)
   const [autoBidCeilingInput, setAutoBidCeilingInput] = useState('')
 
-  const handleRefresh = () => {
+  const loadTraderBids = async () => {
+    setLoading(true)
+    try {
+      const data = await bidService.getMyBids()
+      if (Array.isArray(data)) {
+        const formatted = data.map(b => {
+          const crop = b.crop || b.cropListing || {}
+          const rate = Number(b.amount || b.bidPrice || 0)
+          return {
+            _id: b._id,
+            lotId: `LOT-${b._id?.slice(-6)}`,
+            cropName: crop.name || 'Crop Produce Lot',
+            variety: crop.category || 'Standard',
+            category: crop.category || 'Agricultural',
+            grade: 'Grade-A Standard',
+            quantity: Number(crop.quantity) || 50,
+            unit: crop.unit || 'Quintals',
+            reservePrice: Number(crop.basePrice) || 2000,
+            myBidAmount: rate,
+            highestBid: rate,
+            highestBidder: 'You (Top Bidder)',
+            status: b.status === 'accepted' ? 'won' : b.status === 'rejected' ? 'outbid' : 'winning',
+            closingIn: 'Live Bidding',
+            bidsCount: 1,
+            image: crop.images?.[0] || 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=500&q=80',
+            farmer: {
+              name: b.farmer?.name || 'Verified Farmer',
+              village: b.farmer?.village || 'Karnataka',
+              district: b.farmer?.district || 'APMC Yard',
+              rating: 5.0
+            }
+          }
+        })
+        setBids(formatted)
+      } else {
+        setBids([])
+      }
+    } catch (err) {
+      console.warn('[TraderBids] Failed to load bids:', err.message)
+      setBids([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadTraderBids()
+  }, [])
+
+  const handleRefresh = async () => {
     setIsRefreshing(true)
-    setTimeout(() => {
-      setIsRefreshing(false)
-      toast.success('Live bidding console updated with state APMC bids!')
-    }, 600)
+    await loadTraderBids()
+    setIsRefreshing(false)
+    toast.success('Live bidding console updated with state APMC bids!')
   }
 
   const handleQuickRaise = (bidItem, increment = 50) => {
