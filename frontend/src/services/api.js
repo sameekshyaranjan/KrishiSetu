@@ -37,7 +37,10 @@ api.interceptors.response.use(
       localStorage.removeItem('krishisetu_user')
     }
 
-    return Promise.reject(new Error(message))
+    const customError = new Error(message)
+    customError.response = error.response
+    customError.status = status
+    return Promise.reject(customError)
   }
 )
 
