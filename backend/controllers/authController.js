@@ -35,8 +35,11 @@ exports.registerFarmer = async (req, res, next) => {
 
     await sendEmail({
       email: lowerEmail,
-      subject: 'KrishiSetu Registration OTP',
-      message: `Your OTP for KrishiSetu farmer registration is: ${otp}. It will expire in 5 minutes.`
+      subject: '🌾 KrishiSetu Registration OTP — Email Verification',
+      message: `Your OTP for KrishiSetu farmer registration is: ${otp}. It will expire in 5 minutes.`,
+      otp,
+      role: 'farmer',
+      name: userData.name || 'Farmer'
     });
 
     res.status(200).json({ message: 'OTP sent to email for verification' });
@@ -61,8 +64,11 @@ exports.registerTrader = async (req, res, next) => {
 
     await sendEmail({
       email: lowerEmail,
-      subject: 'KrishiSetu Registration OTP',
-      message: `Your OTP for KrishiSetu trader registration is: ${otp}. It will expire in 5 minutes.`
+      subject: '🌾 KrishiSetu Trader Registration OTP — Email Verification',
+      message: `Your OTP for KrishiSetu trader registration is: ${otp}. It will expire in 5 minutes.`,
+      otp,
+      role: 'trader',
+      name: userData.name || companyName || 'Trader'
     });
 
     res.status(200).json({ message: 'OTP sent to email for verification' });
