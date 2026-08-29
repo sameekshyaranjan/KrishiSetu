@@ -28,13 +28,11 @@ const traderSchema = new mongoose.Schema({
   district: {
     type: String,
     required: true,
-    index: true,
-    enum: ['Bengaluru Urban', 'Bengaluru Rural', 'Mysuru', 'Hubballi', 'Dharwad', 'Belagavi', 'Mangaluru', 'Tumakuru', 'Mandya', 'Hassan', 'Kalaburagi', 'Raichur', 'Ballari']
+    index: true
   },
   state: {
     type: String,
-    default: 'Karnataka',
-    enum: ['Karnataka']
+    default: 'Karnataka'
   },
   companyName: {
     type: String

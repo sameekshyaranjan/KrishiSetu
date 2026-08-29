@@ -63,10 +63,19 @@ exports.registerFarmer = async (req, res, next) => {
 
 exports.registerTrader = async (req, res, next) => {
   try {
-    const { email, companyName, phone, mobile, ...userData } = req.body;
+    const { email, companyName, phone, mobile, district, operatingDistricts, operatingLocations, ...userData } = req.body;
     const lowerEmail = email.toLowerCase().trim();
     const cleanMobile = String(mobile || phone || '').trim();
     
+    // Normalize district
+    let cleanDistrict = district;
+    if (!cleanDistrict && Array.isArray(operatingDistricts) && operatingDistricts.length > 0) {
+      cleanDistrict = operatingDistricts[0];
+    } else if (!cleanDistrict && Array.isArray(operatingLocations) && operatingLocations.length > 0) {
+      cleanDistrict = operatingLocations[0];
+    }
+    cleanDistrict = String(cleanDistrict || 'Bengaluru Urban').replace(' APMC', '').trim();
+
     const { user: existingUser } = await findUserByEmail(lowerEmail);
     if (existingUser) {
       return res.status(400).json({ message: 'Email already registered. Please log in or use another email.' });
@@ -81,7 +90,16 @@ exports.registerTrader = async (req, res, next) => {
     await redisClient.set(`rl:register:otp:${lowerEmail}`, otp, 'EX', 300);
     await redisClient.set(
       `rl:register:data:${lowerEmail}`,
-      JSON.stringify({ role: 'trader', email: lowerEmail, companyName, mobile: cleanMobile, ...userData }),
+      JSON.stringify({ 
+        role: 'trader', 
+        email: lowerEmail, 
+        companyName, 
+        mobile: cleanMobile, 
+        district: cleanDistrict, 
+        operatingLocations: operatingLocations || operatingDistricts || [cleanDistrict],
+        state: 'Karnataka',
+        ...userData 
+      }),
       'EX',
       300
     );

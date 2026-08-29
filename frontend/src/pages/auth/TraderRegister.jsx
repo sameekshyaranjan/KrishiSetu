@@ -77,11 +77,15 @@ export const TraderRegister = () => {
   const onFormSubmit = async (data) => {
     setLoading(true)
     try {
+      const primaryDistrict = data.district || selectedDistricts[0]?.replace(' APMC', '') || 'Hubballi / Dharwad'
       const payload = {
         ...data,
+        district: primaryDistrict,
+        state: 'Karnataka',
         mobile: data.phone || data.mobile,
         operatingStates: ['Karnataka'],
-        operatingDistricts: selectedDistricts
+        operatingDistricts: selectedDistricts,
+        operatingLocations: selectedDistricts
       }
       setFormDataCache(payload)
 
