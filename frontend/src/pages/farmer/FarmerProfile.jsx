@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
+import profileService from '@/services/profileService'
 import { Button } from '@/components/ui/button'
 import toast from 'react-hot-toast'
 import { 
@@ -19,56 +20,79 @@ import {
   FileText, 
   Landmark, 
   Award,
-  Lock
+  Lock,
+  RefreshCw
 } from 'lucide-react'
 
 export const FarmerProfile = () => {
   const { user } = useAuth()
   const [activeTab, setActiveTab] = useState('personal') // 'personal' | 'farm' | 'bank'
   const [saving, setSaving] = useState(false)
+  const [verifyingFruits, setVerifyingFruits] = useState(false)
+  const [fruitsVerificationData, setFruitsVerificationData] = useState(null)
 
   // Profile Form State
   const [profileData, setProfileData] = useState({
-    // Personal
-    name: user?.name || 'Lori Osinski-Rodriguez',
-    mobile: user?.mobile || '9845011223',
-    email: user?.email || 'farmer1@krishisetu.com',
-    language: 'kn', // 'kn' | 'en'
+    name: 'Ramesh Gowda',
+    mobile: '9845011223',
+    email: 'farmer1@krishisetu.com',
+    language: 'kn',
     village: 'Belur Village',
     taluk: 'Belur Taluk',
-    district: user?.district || 'Hassan',
+    district: 'Hassan',
     state: 'Karnataka',
     pincode: '573115',
-
-    // Farm & Land
+    fruitsId: 'KA-FRUITS-881920-HSN',
     surveyNumber: 'KA-HSN-SRV-4412/A',
     landArea: 4.5,
     landUnit: 'Acres',
     soilType: 'Red Loam (Suitable for Horticulture)',
     irrigationSource: 'Borewell with Solar Drip Irrigation',
-    sowingSeason: 'Kharif & Rabi Dual Season',
     cropsGrown: ['Tomato', 'Red Onion', 'Ragi', 'Yellow Maize', 'Potato'],
-
-    // Banking & Escrow Settlement
-    accountHolderName: user?.name || 'Lori Osinski-Rodriguez',
-    accountNumber: '•••• •••• •••• 4492',
-    rawAccountNumber: '50100492814492',
-    ifscCode: 'HDFC0001234',
-    bankName: 'HDFC Bank Ltd',
-    branchName: 'Hassan Central Branch',
-    upiId: 'farmer1@okhdfcbank',
-    autoDisburse: true,
-    kccLinked: true,
-    kccCardNumber: 'KCC-KA-2026-8812'
+    accountHolderName: 'Ramesh Gowda',
+    accountNumber: '•••• •••• •••• 3891',
+    ifscCode: 'SBIN0001244',
+    bankName: 'State Bank of India',
+    branchName: 'Belur Town Branch',
+    upiId: 'rameshgowda@oksbi',
+    dbtEnabled: true,
+    kccLinked: true
   })
 
-  const handleSave = (e) => {
+  useEffect(() => {
+    const loadProfile = async () => {
+      const data = await profileService.getFarmerProfile()
+      if (data) {
+        setProfileData((prev) => ({ ...prev, ...data }))
+      }
+    }
+    loadProfile()
+  }, [])
+
+  const handleSave = async (e) => {
     e.preventDefault()
     setSaving(true)
-    setTimeout(() => {
+    try {
+      await profileService.updateFarmerProfile(profileData)
+      toast.success('Farmer profile & bank payout details saved successfully! 🌾')
+    } catch {
+      toast.error('Failed to save profile.')
+    } finally {
       setSaving(false)
-      toast.success('Farmer profile & bank payout details saved successfully!')
-    }, 600)
+    }
+  }
+
+  const handleVerifyFruits = async () => {
+    setVerifyingFruits(true)
+    try {
+      const res = await profileService.verifyFruitsId(profileData.fruitsId)
+      setFruitsVerificationData(res)
+      toast.success('Karnataka FRUITS AgriStack Verified! 🟢')
+    } catch {
+      toast.error('FRUITS verification failed.')
+    } finally {
+      setVerifyingFruits(false)
+    }
   }
 
   return (
@@ -79,10 +103,10 @@ export const FarmerProfile = () => {
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 text-xs font-semibold border border-emerald-500/20 mb-2">
             <ShieldCheck className="w-3.5 h-3.5" />
-            <span>APMC eNAM & KYC Verified Producer</span>
+            <span>Karnataka FRUITS & APMC KYC Verified Producer</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
-            Farmer Profile & Payout Settings
+            Farmer Profile & Payout Settings 🌾
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">
             Manage your land demographics, regional language, and bank accounts for direct escrow disbursements.
@@ -139,7 +163,7 @@ export const FarmerProfile = () => {
       <div className="flex items-center bg-muted/60 p-1.5 rounded-2xl border border-border text-xs font-bold">
         <button
           onClick={() => setActiveTab('personal')}
-          className={`flex-1 py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 ${
+          className={`flex-1 py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer ${
             activeTab === 'personal' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
           }`}
         >
@@ -149,22 +173,22 @@ export const FarmerProfile = () => {
 
         <button
           onClick={() => setActiveTab('farm')}
-          className={`flex-1 py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 ${
+          className={`flex-1 py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer ${
             activeTab === 'farm' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
           }`}
         >
           <Sprout className="w-4 h-4 text-emerald-500" />
-          <span>Farm & Land Demographics</span>
+          <span>Farm & FRUITS ID</span>
         </button>
 
         <button
           onClick={() => setActiveTab('bank')}
-          className={`flex-1 py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 ${
+          className={`flex-1 py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer ${
             activeTab === 'bank' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
           }`}
         >
           <Landmark className="w-4 h-4 text-amber-500" />
-          <span>Bank & Escrow Payouts</span>
+          <span>Bank & DBT Payouts</span>
         </button>
       </div>
 
@@ -175,7 +199,7 @@ export const FarmerProfile = () => {
         {activeTab === 'personal' && (
           <div className="p-6 sm:p-8 rounded-3xl bg-card border border-border shadow-sm space-y-6 animate-in fade-in duration-200">
             <div className="border-b border-border pb-3">
-              <h3 className="text-base font-extrabold text-foreground">Personal Details & Preferences</h3>
+              <h3 className="text-base font-extrabold text-foreground">Personal Details & Regional Preferences</h3>
               <p className="text-xs text-muted-foreground">Information used on official APMC lot sheets and SMS alerts.</p>
             </div>
 
@@ -187,7 +211,7 @@ export const FarmerProfile = () => {
                   required
                   value={profileData.name}
                   onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
-                  className="w-full h-11 px-3 rounded-xl bg-background border border-border text-xs focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  className="w-full h-11 px-3.5 rounded-xl bg-background border border-border text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 font-semibold"
                 />
               </div>
 
@@ -198,7 +222,7 @@ export const FarmerProfile = () => {
                   required
                   value={profileData.mobile}
                   onChange={(e) => setProfileData({ ...profileData, mobile: e.target.value })}
-                  className="w-full h-11 px-3 rounded-xl bg-background border border-border text-xs focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  className="w-full h-11 px-3.5 rounded-xl bg-background border border-border text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 font-mono font-semibold"
                 />
               </div>
 
@@ -209,7 +233,7 @@ export const FarmerProfile = () => {
                   required
                   value={profileData.email}
                   onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
-                  className="w-full h-11 px-3 rounded-xl bg-background border border-border text-xs focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  className="w-full h-11 px-3.5 rounded-xl bg-background border border-border text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 font-semibold"
                 />
               </div>
 
@@ -218,64 +242,57 @@ export const FarmerProfile = () => {
                 <select
                   value={profileData.language}
                   onChange={(e) => setProfileData({ ...profileData, language: e.target.value })}
-                  className="w-full h-11 px-3 rounded-xl bg-background border border-border text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  className="w-full h-11 px-3.5 rounded-xl bg-background border border-border text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary/40"
                 >
                   <option value="kn">ಕನ್ನಡ (Kannada) - Regional Default</option>
                   <option value="en">English - Primary</option>
                 </select>
               </div>
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-foreground">Village / Habitation</label>
-                <input
-                  type="text"
-                  value={profileData.village}
-                  onChange={(e) => setProfileData({ ...profileData, village: e.target.value })}
-                  className="w-full h-11 px-3 rounded-xl bg-background border border-border text-xs focus:outline-none focus:ring-2 focus:ring-primary/40"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-foreground">District</label>
-                <input
-                  type="text"
-                  disabled
-                  value={profileData.district}
-                  className="w-full h-11 px-3 rounded-xl bg-muted/60 border border-border text-xs font-semibold text-muted-foreground cursor-not-allowed"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-foreground">Postal Pin Code</label>
-                <input
-                  type="text"
-                  value={profileData.pincode}
-                  onChange={(e) => setProfileData({ ...profileData, pincode: e.target.value })}
-                  className="w-full h-11 px-3 rounded-xl bg-background border border-border text-xs focus:outline-none focus:ring-2 focus:ring-primary/40"
-                />
-              </div>
-            </div>
           </div>
         )}
 
-        {/* Tab 2: Farm & Land Demographics */}
+        {/* Tab 2: Farm & FRUITS ID */}
         {activeTab === 'farm' && (
           <div className="p-6 sm:p-8 rounded-3xl bg-card border border-border shadow-sm space-y-6 animate-in fade-in duration-200">
-            <div className="border-b border-border pb-3">
-              <h3 className="text-base font-extrabold text-foreground">Farm Holdings & Soil Demographics</h3>
-              <p className="text-xs text-muted-foreground">Agricultural specifications used to tailor government schemes and APMC verification.</p>
+            <div className="border-b border-border pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 className="text-base font-extrabold text-foreground">Karnataka FRUITS & Land Records</h3>
+                <p className="text-xs text-muted-foreground">Agricultural landholding details verified through Karnataka State AgriStack.</p>
+              </div>
+
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleVerifyFruits}
+                disabled={verifyingFruits}
+                className="rounded-xl text-xs font-bold h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+              >
+                <Sparkles className="w-3.5 h-3.5 mr-1" />
+                {verifyingFruits ? 'Verifying FRUITS...' : 'Validate FRUITS ID'}
+              </Button>
             </div>
+
+            {fruitsVerificationData && (
+              <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs space-y-1">
+                <span className="font-bold text-emerald-700 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4" /> Karnataka State AgriStack Land Records Verified
+                </span>
+                <p className="text-muted-foreground">
+                  Owner: <strong>{fruitsVerificationData.ownerName}</strong> | Survey Nos: {fruitsVerificationData.surveyNumbers.join(', ')} | Status: {fruitsVerificationData.rtcStatus}
+                </p>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-foreground">Land Parcel / RTC Survey Number</label>
+                <label className="text-xs font-bold text-foreground">Karnataka FRUITS Farmer ID *</label>
                 <input
                   type="text"
-                  value={profileData.surveyNumber}
-                  onChange={(e) => setProfileData({ ...profileData, surveyNumber: e.target.value })}
-                  className="w-full h-11 px-3 rounded-xl bg-background border border-border text-xs font-mono font-bold text-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  required
+                  value={profileData.fruitsId}
+                  onChange={(e) => setProfileData({ ...profileData, fruitsId: e.target.value })}
+                  className="w-full h-11 px-3.5 rounded-xl bg-background border border-border text-xs font-mono font-bold text-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
                 />
               </div>
 
@@ -286,17 +303,7 @@ export const FarmerProfile = () => {
                   step="0.1"
                   value={profileData.landArea}
                   onChange={(e) => setProfileData({ ...profileData, landArea: Number(e.target.value) })}
-                  className="w-full h-11 px-3 rounded-xl bg-background border border-border text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary/40"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-foreground">Soil Classification</label>
-                <input
-                  type="text"
-                  value={profileData.soilType}
-                  onChange={(e) => setProfileData({ ...profileData, soilType: e.target.value })}
-                  className="w-full h-11 px-3 rounded-xl bg-background border border-border text-xs focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  className="w-full h-11 px-3.5 rounded-xl bg-background border border-border text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary/40"
                 />
               </div>
 
@@ -306,117 +313,74 @@ export const FarmerProfile = () => {
                   type="text"
                   value={profileData.irrigationSource}
                   onChange={(e) => setProfileData({ ...profileData, irrigationSource: e.target.value })}
-                  className="w-full h-11 px-3 rounded-xl bg-background border border-border text-xs focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  className="w-full h-11 px-3.5 rounded-xl bg-background border border-border text-xs focus:outline-none focus:ring-2 focus:ring-primary/40"
                 />
               </div>
-            </div>
 
-            <div className="space-y-2 pt-2">
-              <label className="text-xs font-bold text-foreground">Primary Crops Cultivated This Year</label>
-              <div className="flex flex-wrap gap-2">
-                {profileData.cropsGrown.map((crop, idx) => (
-                  <span key={idx} className="px-3 py-1.5 rounded-xl bg-primary/10 border border-primary/20 text-primary text-xs font-bold flex items-center gap-1.5">
-                    <Sprout className="w-3.5 h-3.5" /> {crop}
-                  </span>
-                ))}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-foreground">Soil Classification</label>
+                <input
+                  type="text"
+                  value={profileData.soilType}
+                  onChange={(e) => setProfileData({ ...profileData, soilType: e.target.value })}
+                  className="w-full h-11 px-3.5 rounded-xl bg-background border border-border text-xs focus:outline-none focus:ring-2 focus:ring-primary/40"
+                />
               </div>
             </div>
           </div>
         )}
 
-        {/* Tab 3: Bank Account & Escrow Settlement */}
+        {/* Tab 3: Bank & DBT Settlement */}
         {activeTab === 'bank' && (
           <div className="p-6 sm:p-8 rounded-3xl bg-card border border-border shadow-sm space-y-6 animate-in fade-in duration-200">
-            <div className="border-b border-border pb-3 flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-extrabold text-foreground">Direct Bank Payout & Escrow Settlement</h3>
-                <p className="text-xs text-muted-foreground">Buyer funds are deposited directly into this account upon APMC weighment confirmation.</p>
-              </div>
-              <div className="px-3 py-1 rounded-xl bg-emerald-500/10 text-emerald-600 text-xs font-bold flex items-center gap-1">
-                <ShieldCheck className="w-4 h-4" /> Direct DBT Enabled
-              </div>
+            <div className="border-b border-border pb-3">
+              <h3 className="text-base font-extrabold text-foreground">Direct Bank Transfer (DBT) Settlement Account</h3>
+              <p className="text-xs text-muted-foreground">The Aadhaar-linked bank account where buyer escrow settlements are deposited upon weighbridge verification.</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-foreground">Beneficiary Name (Bank Account)</label>
+                <label className="text-xs font-bold text-foreground">Bank Name</label>
                 <input
                   type="text"
-                  value={profileData.accountHolderName}
-                  onChange={(e) => setProfileData({ ...profileData, accountHolderName: e.target.value })}
-                  className="w-full h-11 px-3 rounded-xl bg-background border border-border text-xs focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  value={profileData.bankName}
+                  onChange={(e) => setProfileData({ ...profileData, bankName: e.target.value })}
+                  className="w-full h-11 px-3.5 rounded-xl bg-background border border-border text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary/40"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-foreground">Bank Account Number</label>
-                <div className="relative">
-                  <Lock className="w-3.5 h-3.5 text-muted-foreground absolute left-3 top-3.5" />
-                  <input
-                    type="text"
-                    value={profileData.rawAccountNumber}
-                    onChange={(e) => setProfileData({ ...profileData, rawAccountNumber: e.target.value })}
-                    className="w-full h-11 pl-9 pr-3 rounded-xl bg-background border border-border text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-primary/40"
-                  />
-                </div>
+                <label className="text-xs font-bold text-foreground">Account Number (Masked)</label>
+                <input
+                  type="text"
+                  value={profileData.accountNumber}
+                  onChange={(e) => setProfileData({ ...profileData, accountNumber: e.target.value })}
+                  className="w-full h-11 px-3.5 rounded-xl bg-background border border-border text-xs font-mono font-bold text-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-foreground">Bank IFSC Code</label>
+                <label className="text-xs font-bold text-foreground">IFSC Code</label>
                 <input
                   type="text"
                   value={profileData.ifscCode}
-                  onChange={(e) => setProfileData({ ...profileData, ifscCode: e.target.value.toUpperCase() })}
-                  className="w-full h-11 px-3 rounded-xl bg-background border border-border text-xs font-mono font-bold text-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  onChange={(e) => setProfileData({ ...profileData, ifscCode: e.target.value })}
+                  className="w-full h-11 px-3.5 rounded-xl bg-background border border-border text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-primary/40"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-foreground">Bank & Branch Name</label>
-                <input
-                  type="text"
-                  value={`${profileData.bankName}, ${profileData.branchName}`}
-                  disabled
-                  className="w-full h-11 px-3 rounded-xl bg-muted/60 border border-border text-xs text-muted-foreground cursor-not-allowed"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-foreground">UPI ID (For Instant Payouts)</label>
+                <label className="text-xs font-bold text-foreground">UPI ID (Optional Instant Payout)</label>
                 <input
                   type="text"
                   value={profileData.upiId}
                   onChange={(e) => setProfileData({ ...profileData, upiId: e.target.value })}
-                  className="w-full h-11 px-3 rounded-xl bg-background border border-border text-xs focus:outline-none focus:ring-2 focus:ring-primary/40"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-foreground">Kisan Credit Card (KCC) ID</label>
-                <input
-                  type="text"
-                  disabled
-                  value={profileData.kccCardNumber}
-                  className="w-full h-11 px-3 rounded-xl bg-muted/60 border border-border text-xs font-mono text-muted-foreground cursor-not-allowed"
+                  className="w-full h-11 px-3.5 rounded-xl bg-background border border-border text-xs font-mono focus:outline-none focus:ring-2 focus:ring-primary/40"
                 />
               </div>
             </div>
           </div>
         )}
-
-        {/* Bottom Save Button */}
-        <div className="flex items-center justify-end gap-3 pt-2">
-          <Button 
-            type="submit" 
-            disabled={saving}
-            className="rounded-2xl text-xs font-bold shadow-md h-11 px-8 bg-primary text-primary-foreground"
-          >
-            <Save className="w-4 h-4 mr-2" />
-            {saving ? 'Saving Changes...' : 'Save Profile Changes'}
-          </Button>
-        </div>
       </form>
     </div>
   )

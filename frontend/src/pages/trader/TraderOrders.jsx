@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import orderService from '@/services/orderService'
 import { Button } from '@/components/ui/button'
 import toast from 'react-hot-toast'
 import { 
@@ -24,139 +25,17 @@ import {
   Printer
 } from 'lucide-react'
 
-const DEMO_TRADER_ORDERS = [
-  {
-    _id: 'ORD-KA-TRD-9912',
-    cropName: 'Grade-A Fresh Hybrid Tomato',
-    variety: 'Shiva Hybrid (Firm Red Skin)',
-    grade: 'Grade-A Premium',
-    quantity: 120,
-    unit: 'Quintals',
-    agreedRate: 2200,
-    grossEscrow: 264000,
-    statutoryCess: 3960,
-    freightCharges: 3200,
-    totalEscrowLocked: 271160,
-    image: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=500&q=80',
-    farmer: {
-      name: 'Ramesh Gowda',
-      mobile: '+91 98450 11223',
-      village: 'Belur Village',
-      taluk: 'Belur',
-      district: 'Hassan'
-    },
-    transporter: {
-      agency: 'Kisan Express Logistics Ltd',
-      vehicleNumber: 'KA-04-F-8812',
-      driverName: 'Manjunath Gowda',
-      driverPhone: '+91 98860 55432',
-      currentLocation: 'Nelamangala Highway Plaza',
-      speed: '54 km/h',
-      eta: 'Today, 06:30 PM (34 km away)'
-    },
-    weighment: {
-      declaredWeight: 12000,
-      grossWeight: 14280,
-      tareWeight: 2280,
-      netWeight: 12000,
-      moistureChecked: '12.4%',
-      status: 'pending' // 'pending' | 'verified'
-    },
-    stage: 2, // 1: Escrow Funded, 2: In-Transit, 3: Weighment Verified, 4: Delivered & Settled
-    orderDate: '28 Aug 2026'
-  },
-  {
-    _id: 'ORD-KA-TRD-4410',
-    cropName: 'Bellary Premium Red Onion',
-    variety: 'Nasik Red Medium-Large Bulbs',
-    grade: 'Grade-A Export',
-    quantity: 250,
-    unit: 'Quintals',
-    agreedRate: 2650,
-    grossEscrow: 662500,
-    statutoryCess: 9937,
-    freightCharges: 5800,
-    totalEscrowLocked: 678237,
-    image: 'https://images.unsplash.com/photo-1618512496248-a07fe83aa8cb?w=500&q=80',
-    farmer: {
-      name: 'Basavaraj Patil',
-      mobile: '+91 98860 77123',
-      village: 'Malavalli Village',
-      taluk: 'Malavalli',
-      district: 'Mandya'
-    },
-    transporter: {
-      agency: 'APMC Mandya Transport Syndicate',
-      vehicleNumber: 'KA-09-E-4421',
-      driverName: 'Ramesh Patil',
-      driverPhone: '+91 98450 88321',
-      currentLocation: 'Arrived at APMC Mandya Weighbridge #3',
-      speed: '0 km/h (At Yard)',
-      eta: 'Arrived at Weighbridge'
-    },
-    weighment: {
-      declaredWeight: 25000,
-      grossWeight: 31200,
-      tareWeight: 6200,
-      netWeight: 25000,
-      moistureChecked: '10.8%',
-      status: 'pending'
-    },
-    stage: 3, // Ready for weighment verification
-    orderDate: '27 Aug 2026'
-  },
-  {
-    _id: 'ORD-KA-TRD-7721',
-    cropName: 'Yellow Dent Poultry Maize',
-    variety: 'Kargil 900M Hybrid',
-    grade: 'Grade-A Commercial',
-    quantity: 300,
-    unit: 'Quintals',
-    agreedRate: 2050,
-    grossEscrow: 615000,
-    statutoryCess: 9225,
-    freightCharges: 4800,
-    totalEscrowLocked: 629025,
-    image: 'https://images.unsplash.com/photo-1551754655-cd27e38d2076?w=500&q=80',
-    farmer: {
-      name: 'Channappa Gowda',
-      mobile: '+91 98450 99441',
-      village: 'Doddaballapura',
-      taluk: 'Doddaballapura',
-      district: 'Bengaluru Rural'
-    },
-    transporter: {
-      agency: 'South Karnataka Cargo Fleet',
-      vehicleNumber: 'KA-51-B-9912',
-      driverName: 'Suresh Kumar',
-      driverPhone: '+91 99000 44123',
-      currentLocation: 'Delivered at Bengaluru Central Warehouse',
-      speed: '0 km/h',
-      eta: 'Completed'
-    },
-    weighment: {
-      declaredWeight: 30000,
-      grossWeight: 37400,
-      tareWeight: 7400,
-      netWeight: 30000,
-      moistureChecked: '13.1%',
-      status: 'verified'
-    },
-    stage: 4, // Fully delivered and settled
-    orderDate: '26 Aug 2026'
-  }
-]
-
 const STAGE_FILTERS = [
   { id: 'all', label: 'All Shipments' },
-  { id: 'in_transit', label: 'In-Transit (2)' },
-  { id: 'weighment_pending', label: 'Weighment Ready (1)' },
-  { id: 'delivered', label: 'Delivered & Settled (1)' }
+  { id: 'in_transit', label: 'In-Transit 🚚' },
+  { id: 'weighment_pending', label: 'Weighment Ready ⚖️' },
+  { id: 'delivered', label: 'Delivered & Settled 💸' }
 ]
 
 export const TraderOrders = () => {
   const { user } = useAuth()
-  const [orders, setOrders] = useState(DEMO_TRADER_ORDERS)
+  const [orders, setOrders] = useState([])
+  const [loading, setLoading] = useState(true)
   const [selectedFilter, setSelectedFilter] = useState('all')
   const [isRefreshing, setIsRefreshing] = useState(false)
 
@@ -165,36 +44,46 @@ export const TraderOrders = () => {
   const [selectedOrderForGps, setSelectedOrderForGps] = useState(null)
   const [selectedOrderForWaybill, setSelectedOrderForWaybill] = useState(null)
 
-  const handleRefresh = () => {
-    setIsRefreshing(true)
-    setTimeout(() => {
-      setIsRefreshing(false)
-      toast.success('Live logistics fleet positions and weighbridge telemetry updated!')
-    }, 600)
+  const loadOrders = async () => {
+    setLoading(true)
+    try {
+      const data = await orderService.getTraderOrders()
+      setOrders(data || [])
+    } catch (err) {
+      console.error('[TraderOrders] Failed to load orders:', err)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleAuthorizeWeighment = (orderId) => {
-    setOrders((prev) =>
-      prev.map((o) =>
-        o._id === orderId
-          ? {
-              ...o,
-              stage: 4,
-              weighment: { ...o.weighment, status: 'verified' },
-              transporter: { ...o.transporter, eta: 'Delivered & Verified' }
-            }
-          : o
-      )
-    )
-    toast.success('APMC Weighment Verified! Escrow funds released directly to the farmer. 🎉')
-    setSelectedOrderForWeighment(null)
+  useEffect(() => {
+    loadOrders()
+  }, [])
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    await loadOrders()
+    setIsRefreshing(false)
+    toast.success('Live logistics fleet positions and weighbridge telemetry updated! ⚡')
+  }
+
+  const handleAuthorizeWeighment = async (orderId) => {
+    try {
+      const updated = await orderService.advanceTraderOrderStage(orderId, 4)
+      setOrders(updated)
+      toast.success('APMC Weighment Verified! Escrow funds released directly to the farmer via DBT! 💸')
+      setSelectedOrderForWeighment(null)
+    } catch (err) {
+      toast.error('Failed to verify weighment.')
+    }
   }
 
   const filteredOrders = useMemo(() => {
     return orders.filter((o) => {
-      if (selectedFilter === 'in_transit') return o.stage === 2
-      if (selectedFilter === 'weighment_pending') return o.stage === 3
-      if (selectedFilter === 'delivered') return o.stage === 4
+      const stage = o.currentStage || o.stage || 2
+      if (selectedFilter === 'in_transit') return stage === 2
+      if (selectedFilter === 'weighment_pending') return stage === 3
+      if (selectedFilter === 'delivered') return stage === 4
       return true
     })
   }, [orders, selectedFilter])
@@ -218,61 +107,34 @@ export const TraderOrders = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className="rounded-xl text-xs h-10 shadow-sm"
+            className="rounded-xl text-xs font-semibold shadow-sm h-10 px-4"
           >
             <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Refresh Fleet
+            Refresh Telemetry
           </Button>
 
-          <Button asChild size="sm" className="rounded-xl text-xs h-10 px-4 font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-md">
+          <Button asChild size="sm" className="rounded-xl text-xs font-bold shadow-md h-10 px-5 bg-primary text-primary-foreground">
             <Link to="/trader/marketplace">
-              <Package className="w-4 h-4 mr-1.5" /> Source More Crops
+              Browse More Lots
             </Link>
           </Button>
         </div>
       </div>
 
-      {/* 2. 4 Operational Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 rounded-3xl bg-card border border-border shadow-sm space-y-1">
-          <span className="text-xs font-bold text-muted-foreground">Active Shipments</span>
-          <p className="text-2xl font-black text-sky-600">3 Consignments</p>
-          <span className="text-[11px] text-muted-foreground">670 Quintals moving</span>
-        </div>
-
-        <div className="p-5 rounded-3xl bg-card border border-border shadow-sm space-y-1">
-          <span className="text-xs font-bold text-muted-foreground">Capital Locked in Transit</span>
-          <p className="text-2xl font-black text-amber-600">₹15,78,422</p>
-          <span className="text-[11px] text-emerald-600 font-bold">100% Escrow Protected</span>
-        </div>
-
-        <div className="p-5 rounded-3xl bg-card border border-border shadow-sm space-y-1">
-          <span className="text-xs font-bold text-muted-foreground">On-Time Transit Rate</span>
-          <p className="text-2xl font-black text-emerald-600">98.4%</p>
-          <span className="text-[11px] text-muted-foreground">APMC Certified Fleet</span>
-        </div>
-
-        <div className="p-5 rounded-3xl bg-card border border-border shadow-sm space-y-1">
-          <span className="text-xs font-bold text-muted-foreground">Avg Transit Speed</span>
-          <p className="text-2xl font-black text-foreground">52 km/h</p>
-          <span className="text-[11px] text-muted-foreground">Live Telemetry Active</span>
-        </div>
-      </div>
-
-      {/* 3. Filter Navigation Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+      {/* 2. Filter Pills */}
+      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
         {STAGE_FILTERS.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setSelectedFilter(tab.id)}
             className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all shrink-0 ${
               selectedFilter === tab.id
-                ? 'bg-amber-600 text-white shadow-sm'
+                ? 'bg-sky-600 text-white shadow-md'
                 : 'bg-card border border-border text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -281,259 +143,165 @@ export const TraderOrders = () => {
         ))}
       </div>
 
-      {/* 4. Active Consignments Stream */}
+      {/* 3. Orders List */}
       <div className="space-y-6">
-        {filteredOrders.map((order) => (
-          <div 
-            key={order._id}
-            className="p-6 sm:p-7 rounded-3xl bg-card border border-border hover:border-amber-500/40 transition-all shadow-sm space-y-6"
-          >
-            {/* Top Bar: Order ID, Crop Snapshot & Financial Value */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4">
-              <div className="flex items-start gap-4">
-                <img 
-                  src={order.image} 
-                  alt={order.cropName} 
-                  className="w-16 h-16 rounded-2xl object-cover border border-border shrink-0 shadow-sm"
-                />
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono font-extrabold text-xs text-primary bg-primary/10 px-2.5 py-0.5 rounded-md border border-primary/20">
-                      {order._id}
-                    </span>
-                    <span className="text-[10px] font-extrabold bg-muted text-foreground px-2 py-0.5 rounded-md border border-border">
-                      {order.grade}
+        {filteredOrders.map((order) => {
+          const currentStage = order.currentStage || order.stage || 2
+          const isDelivered = currentStage === 4
+
+          return (
+            <div
+              key={order._id}
+              className="p-6 sm:p-7 rounded-3xl bg-card border border-border hover:border-border/80 shadow-sm transition-all space-y-6"
+            >
+              {/* Top Row: Order ID & Financial Escrow Tag */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/80 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-sky-500/10 text-sky-600 flex items-center justify-center font-black text-base shrink-0">
+                    <Truck className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-sm text-foreground">{order._id}</span>
+                      <span className="text-xs text-muted-foreground">• Ordered on {order.createdAt || order.orderDate || '28 Aug 2026'}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                      <MapPin className="w-3.5 h-3.5 text-amber-500" /> Origin: <span className="font-semibold text-foreground">{order.farmer?.name}</span> ({order.farmer?.district}, Karnataka)
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between sm:justify-end gap-4">
+                  <div className="text-left sm:text-right">
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground block">Escrow Protected Value</span>
+                    <span className="text-xl font-black text-amber-600 font-mono">
+                      ₹{order.grossEscrow?.toLocaleString('en-IN') || order.totalEscrowLocked?.toLocaleString('en-IN')}
                     </span>
                   </div>
 
-                  <h3 className="text-base font-extrabold text-foreground">
-                    {order.cropName}
-                  </h3>
+                  <span className={`px-3 py-1 rounded-xl text-xs font-bold ${
+                    isDelivered
+                      ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
+                      : 'bg-sky-500/10 text-sky-600 border border-sky-500/20'
+                  }`}>
+                    {isDelivered ? 'Settled & Delivered 💸' : 'In Transit 🚚'}
+                  </span>
+                </div>
+              </div>
 
-                  <p className="text-xs text-muted-foreground flex items-center gap-2">
-                    <span><MapPin className="w-3.5 h-3.5 inline text-primary mr-0.5" />{order.farmer.village}, {order.farmer.district}</span>
-                    <span>•</span>
-                    <span className="font-bold text-foreground">{order.quantity} {order.unit}</span>
-                    <span>•</span>
-                    <span>Agreed: ₹{order.agreedRate}/Qtl</span>
+              {/* Middle Row: Crop & Transporter Telemetry */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
+                
+                {/* Crop item info */}
+                <div className="flex items-center gap-3.5">
+                  <div className="w-16 h-16 rounded-2xl bg-muted overflow-hidden shrink-0 border border-border">
+                    <img src={order.image} alt={order.cropName} className="w-full h-full object-cover" />
+                  </div>
+                  <div className="space-y-0.5">
+                    <h4 className="font-extrabold text-sm text-foreground">{order.cropName}</h4>
+                    <p className="text-xs text-muted-foreground">{order.variety}</p>
+                    <p className="text-xs font-mono font-bold text-primary">
+                      {order.quantity} {order.unit} @ ₹{order.agreedRate}/Qtl
+                    </p>
+                  </div>
+                </div>
+
+                {/* Transporter Tracking Snippet */}
+                <div className="p-3.5 rounded-2xl bg-muted/40 border border-border space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-foreground flex items-center gap-1">
+                      <Truck className="w-3.5 h-3.5 text-sky-600" /> {order.transporter?.agency}
+                    </span>
+                    <span className="font-mono font-bold text-sky-600">{order.transporter?.vehicleNumber}</span>
+                  </div>
+                  <p className="text-muted-foreground flex items-center gap-1">
+                    <Navigation className="w-3 h-3 text-amber-500" /> {order.transporter?.currentLocation}
+                  </p>
+                  <p className="text-[10px] text-emerald-600 font-semibold">
+                    ETA: {order.transporter?.eta}
                   </p>
                 </div>
+
+                {/* Weighbridge verification status */}
+                <div className="p-3.5 rounded-2xl bg-muted/40 border border-border space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-foreground flex items-center gap-1">
+                      <Scale className="w-3.5 h-3.5 text-emerald-600" /> Weighbridge Tare
+                    </span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                      order.weighment?.isVerified || currentStage === 4
+                        ? 'bg-emerald-500/10 text-emerald-600'
+                        : 'bg-amber-500/10 text-amber-600'
+                    }`}>
+                      {order.weighment?.isVerified || currentStage === 4 ? 'Verified ⚖️' : 'Pending Weighment'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-muted-foreground text-[11px]">
+                    <span>Declared: <strong>{order.weighment?.declaredWeight / 100} Qtl</strong></span>
+                    <span>Net Verified: <strong className="text-foreground">{order.weighment?.netWeight ? order.weighment.netWeight / 100 : order.quantity} Qtl</strong></span>
+                  </div>
+                </div>
               </div>
 
-              <div className="text-right sm:self-center">
-                <span className="text-xs text-muted-foreground block">Total Escrow Locked</span>
-                <span className="text-xl font-black text-amber-600">
-                  ₹{order.totalEscrowLocked.toLocaleString('en-IN')}
+              {/* Bottom Actions */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4 border-t border-border/80 text-xs">
+                <span className="text-muted-foreground flex items-center gap-1 font-medium">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> APMC Electronic Gate Pass Protected
                 </span>
-                <span className="block text-[10px] text-emerald-600 font-bold">Includes 1.5% Cess & Freight</span>
-              </div>
-            </div>
 
-            {/* 4-Stage Visual Logistics Progress Stepper */}
-            <div className="space-y-2">
-              <div className="grid grid-cols-4 gap-2 text-center text-[11px]">
-                <div className="space-y-1">
-                  <div className={`h-2 rounded-full ${order.stage >= 1 ? 'bg-amber-600' : 'bg-border'}`} />
-                  <span className={`block font-bold ${order.stage >= 1 ? 'text-amber-700' : 'text-muted-foreground'}`}>
-                    1. Escrow Funded
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <div className={`h-2 rounded-full ${order.stage >= 2 ? 'bg-sky-600' : 'bg-border'}`} />
-                  <span className={`block font-bold ${order.stage >= 2 ? 'text-sky-700' : 'text-muted-foreground'}`}>
-                    2. In-Transit
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <div className={`h-2 rounded-full ${order.stage >= 3 ? 'bg-amber-600' : 'bg-border'}`} />
-                  <span className={`block font-bold ${order.stage >= 3 ? 'text-amber-700' : 'text-muted-foreground'}`}>
-                    3. Weighment Ready
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <div className={`h-2 rounded-full ${order.stage >= 4 ? 'bg-emerald-600' : 'bg-border'}`} />
-                  <span className={`block font-bold ${order.stage >= 4 ? 'text-emerald-700' : 'text-muted-foreground'}`}>
-                    4. Settled
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Transporter Live Fleet Details Box */}
-            <div className="p-4 rounded-2xl bg-muted/40 border border-border/80 grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-              <div className="space-y-1">
-                <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Assigned Vehicle</span>
-                <p className="font-mono font-black text-sm text-foreground flex items-center gap-1.5">
-                  <Truck className="w-4 h-4 text-sky-600" /> {order.transporter.vehicleNumber}
-                </p>
-                <span className="text-[11px] text-muted-foreground block">{order.transporter.agency}</span>
-              </div>
-
-              <div className="space-y-1">
-                <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Driver Contact</span>
-                <p className="font-bold text-foreground">{order.transporter.driverName}</p>
-                <a 
-                  href={`tel:${order.transporter.driverPhone}`}
-                  className="text-[11px] font-mono text-primary hover:underline flex items-center gap-1"
-                >
-                  <Phone className="w-3 h-3" /> {order.transporter.driverPhone}
-                </a>
-              </div>
-
-              <div className="space-y-1">
-                <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Live ETA & Telemetry</span>
-                <p className="font-extrabold text-foreground">{order.transporter.eta}</p>
-                <span className="text-[11px] text-sky-600 font-semibold block">{order.transporter.currentLocation}</span>
-              </div>
-            </div>
-
-            {/* Bottom Action Controls */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-              <div className="flex items-center gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => setSelectedOrderForWaybill(order)}
-                  className="rounded-xl text-xs h-9 shadow-sm"
-                >
-                  <FileText className="w-3.5 h-3.5 mr-1 text-primary" /> APMC Waybill
-                </Button>
-
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => setSelectedOrderForGps(order)}
-                  className="rounded-xl text-xs h-9 shadow-sm"
-                >
-                  <Navigation className="w-3.5 h-3.5 mr-1 text-sky-600" /> Live GPS Track
-                </Button>
-              </div>
-
-              <div className="flex items-center gap-2">
-                {order.stage === 3 && (
-                  <Button 
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
                     size="sm"
-                    onClick={() => setSelectedOrderForWeighment(order)}
-                    className="rounded-xl text-xs font-bold h-9 bg-amber-600 hover:bg-amber-700 text-white shadow-md"
+                    onClick={() => setSelectedOrderForGps(order)}
+                    className="rounded-xl text-xs font-semibold h-9 px-3"
                   >
-                    <Scale className="w-3.5 h-3.5 mr-1.5" /> Verify Weighbridge & Release Escrow
+                    <Navigation className="w-3.5 h-3.5 mr-1" /> Live GPS
                   </Button>
-                )}
 
-                {order.stage === 4 && (
-                  <span className="text-xs font-extrabold text-emerald-600 flex items-center gap-1.5 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/20">
-                    <CheckCircle2 className="w-4 h-4" /> Weighment Verified & Funds Settled
-                  </span>
-                )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedOrderForWaybill(order)}
+                    className="rounded-xl text-xs font-semibold h-9 px-3"
+                  >
+                    <FileText className="w-3.5 h-3.5 mr-1" /> e-Waybill
+                  </Button>
+
+                  {currentStage < 4 && (
+                    <Button
+                      size="sm"
+                      onClick={() => handleAuthorizeWeighment(order._id)}
+                      className="rounded-xl text-xs font-bold h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                    >
+                      <Scale className="w-3.5 h-3.5 mr-1" /> Authorize Weighment & DBT 💸
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
-      {/* 5. Modal: APMC Electronic Weighbridge Slip & Escrow Release */}
-      {selectedOrderForWeighment && (
-        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-card border border-border rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-6">
-            
-            <div className="flex items-start justify-between border-b border-border pb-4">
-              <div className="space-y-1">
-                <span className="text-[10px] font-mono font-bold text-amber-600 uppercase">
-                  APMC Karnataka Certified Weighbridge Slip
-                </span>
-                <h3 className="text-lg font-extrabold text-foreground flex items-center gap-2">
-                  <Scale className="w-5 h-5 text-amber-600" />
-                  Weighment Audit & Escrow Release
-                </h3>
-                <p className="text-xs text-muted-foreground">
-                  Order #{selectedOrderForWeighment._id} • {selectedOrderForWeighment.cropName}
-                </p>
-              </div>
-
-              <button 
-                onClick={() => setSelectedOrderForWeighment(null)}
-                className="p-1 rounded-xl text-muted-foreground hover:text-foreground"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Weighment Telemetry Grid */}
-            <div className="p-4 rounded-2xl bg-muted/40 border border-border space-y-3 text-xs">
-              <div className="grid grid-cols-2 gap-3 pb-2 border-b border-border">
-                <div>
-                  <span className="text-muted-foreground block">Vehicle Registration:</span>
-                  <span className="font-mono font-bold text-foreground text-sm">{selectedOrderForWeighment.transporter.vehicleNumber}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground block">Lab Moisture Checked:</span>
-                  <span className="font-bold text-emerald-600 text-sm">{selectedOrderForWeighment.weighment.moistureChecked}</span>
-                </div>
-              </div>
-
-              <div className="space-y-1.5 font-mono">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Gross Vehicle Weight (Loaded):</span>
-                  <span className="font-bold text-foreground">{selectedOrderForWeighment.weighment.grossWeight.toLocaleString('en-IN')} kg</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Tare Weight (Empty Truck):</span>
-                  <span className="font-bold text-muted-foreground">-{selectedOrderForWeighment.weighment.tareWeight.toLocaleString('en-IN')} kg</span>
-                </div>
-                <div className="flex justify-between font-extrabold text-base text-emerald-600 pt-2 border-t border-border">
-                  <span>Net Verified Produce Weight:</span>
-                  <span>{selectedOrderForWeighment.weighment.netWeight.toLocaleString('en-IN')} kg ({selectedOrderForWeighment.weighment.netWeight / 100} Qtl)</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Escrow Release Notice */}
-            <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-800 space-y-1">
-              <p className="font-bold flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                Escrow Payout Authorization: ₹{selectedOrderForWeighment.grossEscrow.toLocaleString('en-IN')}
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                Authorizing will disburse funds directly to {selectedOrderForWeighment.farmer.name}&apos;s verified bank account and mark consignment as delivered.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 pt-2">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => setSelectedOrderForWeighment(null)}
-                className="rounded-xl text-xs h-11"
-              >
-                Cancel
-              </Button>
-              <Button 
-                onClick={() => handleAuthorizeWeighment(selectedOrderForWeighment._id)}
-                className="rounded-xl text-xs font-bold h-11 bg-emerald-600 hover:bg-emerald-700 text-white shadow-md"
-              >
-                Confirm & Release Funds
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 6. Modal: Live GPS Tracking Simulation */}
+      {/* 4. Real-time GPS Fleet Position Modal */}
       {selectedOrderForGps && (
-        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-card border border-border rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-6">
-            
-            <div className="flex items-start justify-between border-b border-border pb-4">
-              <div className="space-y-1">
-                <span className="text-[10px] font-mono font-bold text-sky-600 uppercase">
-                  Live Satellite Telemetry
-                </span>
-                <h3 className="text-lg font-extrabold text-foreground flex items-center gap-2">
-                  <Navigation className="w-5 h-5 text-sky-600 animate-spin" />
-                  Vehicle {selectedOrderForGps.transporter.vehicleNumber}
-                </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-card border border-border rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-6">
+            <div className="flex items-center justify-between border-b border-border pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-sky-500/10 flex items-center justify-center text-sky-600">
+                  <Navigation className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-foreground">
+                    Live GPS Vehicle Telemetry
+                  </h3>
+                  <span className="text-[10px] font-mono text-muted-foreground">
+                    Vehicle #{selectedOrderForGps.transporter?.vehicleNumber}
+                  </span>
+                </div>
               </div>
-
               <button 
                 onClick={() => setSelectedOrderForGps(null)}
                 className="p-1 rounded-xl text-muted-foreground hover:text-foreground"
@@ -542,59 +310,57 @@ export const TraderOrders = () => {
               </button>
             </div>
 
-            <div className="space-y-3 text-xs">
-              <div className="h-44 rounded-2xl bg-muted/60 border border-border relative overflow-hidden flex items-center justify-center text-center p-4">
-                <div className="space-y-2">
-                  <div className="w-10 h-10 rounded-full bg-sky-500/20 text-sky-600 mx-auto flex items-center justify-center animate-bounce">
-                    <Truck className="w-5 h-5" />
-                  </div>
-                  <p className="font-bold text-foreground">{selectedOrderForGps.transporter.currentLocation}</p>
-                  <span className="text-[11px] text-muted-foreground font-mono">Current Speed: {selectedOrderForGps.transporter.speed}</span>
-                </div>
+            <div className="p-4 rounded-2xl bg-muted/40 border border-border space-y-3 text-xs">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Agency:</span>
+                <span className="font-bold text-foreground">{selectedOrderForGps.transporter?.agency}</span>
               </div>
-
-              <div className="p-3.5 rounded-2xl bg-muted/40 border border-border space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Transporter:</span>
-                  <span className="font-bold text-foreground">{selectedOrderForGps.transporter.agency}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Driver:</span>
-                  <span className="font-bold text-foreground">{selectedOrderForGps.transporter.driverName} ({selectedOrderForGps.transporter.driverPhone})</span>
-                </div>
-                <div className="flex justify-between text-sky-600 font-extrabold pt-1 border-t border-border">
-                  <span>Estimated Arrival:</span>
-                  <span>{selectedOrderForGps.transporter.eta}</span>
-                </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Driver:</span>
+                <span className="font-bold text-foreground">{selectedOrderForGps.transporter?.driverName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Driver Mobile:</span>
+                <span className="font-mono font-bold text-sky-600">{selectedOrderForGps.transporter?.driverPhone}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Current GPS Fix:</span>
+                <span className="font-semibold text-foreground">{selectedOrderForGps.transporter?.currentLocation}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Speed & Telemetry:</span>
+                <span className="font-mono text-emerald-600 font-bold">{selectedOrderForGps.transporter?.speed}</span>
               </div>
             </div>
 
             <Button 
-              type="button" 
               onClick={() => setSelectedOrderForGps(null)}
-              className="w-full rounded-xl text-xs font-bold h-10 bg-sky-600 hover:bg-sky-700 text-white shadow-sm"
+              className="w-full rounded-xl text-xs font-bold h-10"
             >
-              Close Live Telemetry
+              Close Telemetry Stream
             </Button>
           </div>
         </div>
       )}
 
-      {/* 7. Modal: APMC Electronic Waybill & Transit Pass */}
+      {/* 5. e-Waybill Print Modal */}
       {selectedOrderForWaybill && (
-        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-card border border-border rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
-            
-            <div className="flex items-start justify-between border-b border-border pb-4">
-              <div className="space-y-1">
-                <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-amber-500/10 text-amber-600 text-[10px] font-bold">
-                  Government of Karnataka • APMC e-Waybill
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-card border border-border rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-6">
+            <div className="flex items-center justify-between border-b border-border pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                  <FileText className="w-5 h-5" />
                 </div>
-                <h3 className="text-lg font-extrabold text-foreground">
-                  Official Mandi Transit Pass
-                </h3>
+                <div>
+                  <h3 className="text-base font-black text-foreground">
+                    APMC Inter-Mandi Electronic e-Waybill
+                  </h3>
+                  <span className="text-[10px] font-mono text-muted-foreground">
+                    e-Waybill #{selectedOrderForWaybill._id}
+                  </span>
+                </div>
               </div>
-
               <button 
                 onClick={() => setSelectedOrderForWaybill(null)}
                 className="p-1 rounded-xl text-muted-foreground hover:text-foreground"
@@ -603,54 +369,38 @@ export const TraderOrders = () => {
               </button>
             </div>
 
-            {/* Formatted Electronic Transit Pass */}
-            <div className="p-5 rounded-2xl bg-muted/30 border border-border space-y-4 text-xs font-mono">
-              <div className="flex justify-between border-b border-border pb-2">
-                <span>WAYBILL NO: WB-KA-{selectedOrderForWaybill._id.slice(-4)}</span>
-                <span>DATE: {selectedOrderForWaybill.orderDate}</span>
+            <div className="p-4 rounded-2xl bg-muted/40 border border-border space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Consignor (Farmer):</span>
+                <span className="font-bold text-foreground">{selectedOrderForWaybill.farmer?.name}</span>
               </div>
-
-              <div className="space-y-1">
-                <p className="font-bold text-foreground">CONSIGNOR (PRODUCER):</p>
-                <p className="text-muted-foreground">{selectedOrderForWaybill.farmer.name} • {selectedOrderForWaybill.farmer.village}, {selectedOrderForWaybill.farmer.district}</p>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Consignee (Trader):</span>
+                <span className="font-bold text-foreground">{user?.name || 'Mysuru Agro Exporters Pvt Ltd'}</span>
               </div>
-
-              <div className="space-y-1">
-                <p className="font-bold text-foreground">CONSIGNEE (BUYER):</p>
-                <p className="text-muted-foreground">{user?.name || 'Karnataka Agro Traders'} (APMC License #KA-BLR-TRD-2026)</p>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Vehicle Reg:</span>
+                <span className="font-mono font-bold text-foreground">{selectedOrderForWaybill.transporter?.vehicleNumber}</span>
               </div>
-
-              <div className="space-y-1">
-                <p className="font-bold text-foreground">COMMODITY SPECIFICATIONS:</p>
-                <p className="text-muted-foreground">{selectedOrderForWaybill.cropName} ({selectedOrderForWaybill.quantity} Qtl @ ₹{selectedOrderForWaybill.agreedRate}/Qtl)</p>
-                <p className="text-muted-foreground">APMC Cess (1.5%): ₹{selectedOrderForWaybill.statutoryCess.toLocaleString('en-IN')}</p>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Produce:</span>
+                <span className="font-bold text-foreground">{selectedOrderForWaybill.cropName}</span>
               </div>
-
-              <div className="space-y-1 pt-2 border-t border-border">
-                <p className="font-bold text-foreground">TRANSPORTER & VEHICLE:</p>
-                <p className="text-muted-foreground">{selectedOrderForWaybill.transporter.agency} • Vehicle #{selectedOrderForWaybill.transporter.vehicleNumber}</p>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Declared Net Qty:</span>
+                <span className="font-mono font-bold text-foreground">{selectedOrderForWaybill.quantity} {selectedOrderForWaybill.unit}</span>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 pt-2">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => setSelectedOrderForWaybill(null)}
-                className="rounded-xl text-xs h-10"
-              >
-                Close
-              </Button>
-              <Button 
-                onClick={() => {
-                  toast.success('Official APMC e-Waybill sent to printer!')
-                  setSelectedOrderForWaybill(null)
-                }}
-                className="rounded-xl text-xs font-bold h-10 bg-amber-600 hover:bg-amber-700 text-white shadow-md"
-              >
-                <Printer className="w-4 h-4 mr-1.5" /> Print Waybill PDF
-              </Button>
-            </div>
+            <Button 
+              onClick={() => {
+                window.print()
+                toast.success('e-Waybill printed!')
+              }}
+              className="w-full rounded-xl text-xs font-bold h-10 bg-primary text-primary-foreground"
+            >
+              <Printer className="w-4 h-4 mr-1.5" /> Print Physical Mandi Waybill
+            </Button>
           </div>
         </div>
       )}

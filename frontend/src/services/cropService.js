@@ -55,6 +55,23 @@ const SAMPLE_FARMER_LISTINGS = [
   }
 ]
 
+const getStoredCustomCrops = () => {
+  try {
+    const raw = localStorage.getItem('krishisetu_farmer_crops')
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+const saveStoredCustomCrops = (crops) => {
+  try {
+    localStorage.setItem('krishisetu_farmer_crops', JSON.stringify(crops))
+  } catch (e) {
+    console.warn('Failed to persist custom crops:', e)
+  }
+}
+
 const SAMPLE_INBOUND_BIDS = [
   {
     _id: 'bid-201',
@@ -100,17 +117,52 @@ const SAMPLE_INBOUND_BIDS = [
 
 export const cropService = {
   /**
-   * Fetch authenticated farmer's active listings
+   * Fetch authenticated farmer's active listings (with dual-sync persistence)
    */
   getMyListings: async () => {
+    const customCrops = getStoredCustomCrops()
     try {
-      const res = await api.get('/listings/my/listings')
-      if (Array.isArray(res.data) && res.data.length > 0) {
-        return res.data
+      const res = await api.get('/crops/my/listings')
+      const data = res?.data || res
+      if (Array.isArray(data) && data.length > 0) {
+        return [...customCrops, ...data]
       }
-      return SAMPLE_FARMER_LISTINGS
+      return [...customCrops, ...SAMPLE_FARMER_LISTINGS]
     } catch {
-      return SAMPLE_FARMER_LISTINGS
+      return [...customCrops, ...SAMPLE_FARMER_LISTINGS]
+    }
+  },
+
+  /**
+   * Fetch all active marketplace listings (with optional filtering)
+   */
+  getAllListings: async (params = {}) => {
+    const customCrops = getStoredCustomCrops()
+    try {
+      const res = await api.get('/crops', { params })
+      const data = res?.data || res
+      if (Array.isArray(data) && data.length > 0) {
+        return [...customCrops, ...data]
+      }
+      return [...customCrops, ...SAMPLE_FARMER_LISTINGS]
+    } catch {
+      return [...customCrops, ...SAMPLE_FARMER_LISTINGS]
+    }
+  },
+
+  /**
+   * Fetch single crop lot by ID
+   */
+  getListingById: async (id) => {
+    const customCrops = getStoredCustomCrops()
+    const foundCustom = customCrops.find((c) => c._id === id)
+    if (foundCustom) return foundCustom
+
+    try {
+      const res = await api.get(`/crops/${id}`)
+      return res?.data || res
+    } catch {
+      return SAMPLE_FARMER_LISTINGS.find((c) => c._id === id) || SAMPLE_FARMER_LISTINGS[0]
     }
   },
 
@@ -121,11 +173,45 @@ export const cropService = {
     try {
       if (cropId) {
         const res = await api.get(`/bids/listing/${cropId}`)
-        return res.data || []
+        return res?.data || res || []
       }
+      const res = await api.get('/bids/my')
+      const data = res?.data || res
+      if (Array.isArray(data) && data.length > 0) return data
       return SAMPLE_INBOUND_BIDS
     } catch {
       return SAMPLE_INBOUND_BIDS
+    }
+  },
+
+  /**
+   * Alias for farmer bids list
+   */
+  getMyBids: async () => {
+    return cropService.getInboundBids()
+  },
+
+  /**
+   * Accept an inbound bid
+   */
+  acceptBid: async (bidId) => {
+    try {
+      const res = await api.put(`/bids/${bidId}/respond`, { status: 'accepted' })
+      return res?.data || res
+    } catch (err) {
+      throw err
+    }
+  },
+
+  /**
+   * Reject an inbound bid
+   */
+  rejectBid: async (bidId) => {
+    try {
+      const res = await api.put(`/bids/${bidId}/respond`, { status: 'rejected' })
+      return res?.data || res
+    } catch (err) {
+      throw err
     }
   },
 
@@ -135,23 +221,91 @@ export const cropService = {
   respondToBid: async (bidId, status) => {
     try {
       const res = await api.put(`/bids/${bidId}/respond`, { status })
-      return res.data
+      return res?.data || res
     } catch (err) {
       throw err
     }
   },
 
   /**
-   * Create a new crop listing
+   * Create a new crop listing with persistent storage
    */
-  createListing: async (formData) => {
+  createListing: async (listingData) => {
+    const newLot = {
+      _id: `crop-custom-${Date.now()}`,
+      ...listingData,
+      status: 'available',
+      bidsCount: 0,
+      currentHighestBid: listingData.basePrice,
+      createdAt: new Date().toISOString()
+    }
+
+    // Persist to local custom crops
+    const currentCustom = getStoredCustomCrops()
+    saveStoredCustomCrops([newLot, ...currentCustom])
+
     try {
-      const res = await api.post('/listings', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      })
-      return res.data
+      const isFormData = listingData instanceof FormData
+      const config = isFormData
+        ? { headers: { 'Content-Type': 'multipart/form-data' } }
+        : {}
+
+      const res = await api.post('/crops', listingData, config)
+      const data = res?.data || res
+      if (data?._id) {
+        newLot._id = data._id
+        saveStoredCustomCrops([newLot, ...currentCustom])
+      }
+      return newLot
     } catch (err) {
-      throw err
+      console.warn('Backend API notice, saved optimistic lot:', err.message)
+      return newLot
+    }
+  },
+
+  /**
+   * Update existing crop listing
+   */
+  updateListing: async (id, updateData) => {
+    const currentCustom = getStoredCustomCrops()
+    const updated = currentCustom.map((c) => (c._id === id ? { ...c, ...updateData } : c))
+    saveStoredCustomCrops(updated)
+
+    try {
+      const res = await api.put(`/crops/${id}`, updateData)
+      return res?.data || res
+    } catch (err) {
+      console.warn('Update notice:', err.message)
+      return updateData
+    }
+  },
+
+  /**
+   * Delete / Withdraw crop listing
+   */
+  deleteListing: async (id) => {
+    const currentCustom = getStoredCustomCrops()
+    const filtered = currentCustom.filter((c) => c._id !== id)
+    saveStoredCustomCrops(filtered)
+
+    try {
+      const res = await api.delete(`/crops/${id}`)
+      return res?.data || res
+    } catch (err) {
+      console.warn('Delete notice:', err.message)
+      return { success: true }
+    }
+  },
+
+  /**
+   * Download / View APMC Lot Sheet Pass
+   */
+  getLotSheet: async (id) => {
+    try {
+      const res = await api.get(`/crops/${id}/lot-sheet`)
+      return res?.data || res
+    } catch {
+      return { success: true }
     }
   }
 }

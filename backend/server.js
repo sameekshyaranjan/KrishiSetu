@@ -162,6 +162,7 @@ const registerRoutes = (prefix) => {
   app.use(`${prefix}/farmers`, farmerRoutes);
   app.use(`${prefix}/traders`, traderRoutes);
   app.use(`${prefix}/listings`, cropListingRoutes);
+  app.use(`${prefix}/crops`, cropListingRoutes);
   app.use(`${prefix}/bids`, bidRoutes);
   app.use(`${prefix}/prices`, priceRoutes);
   app.use(`${prefix}/mandi`, priceRoutes);
