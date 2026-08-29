@@ -8,11 +8,11 @@ import api from './api'
 const DEFAULT_PRICE_INTELLIGENCE = [
   {
     _id: 'PRC-PAD-KA-01',
-    cropName: 'Paddy / Rice (Sona Masoori)',
+    cropName: 'Paddy(Common)',
     category: 'grains',
-    primaryMandi: 'Mandya & Mysuru APMC',
+    primaryMandi: 'Mandya APMC Yard',
     district: 'Mandya',
-    currentModalRate: 3150,
+    currentModalRate: 2321.52,
     mspFloorPrice: 2300,
     shift7dPercent: 4.8,
     shift30dPercent: 11.2,
