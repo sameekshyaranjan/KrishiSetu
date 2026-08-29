@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import auditService from '@/services/auditService'
+import exportService from '@/services/exportService'
 import { Button } from '@/components/ui/button'
 import toast from 'react-hot-toast'
 import { 
@@ -181,11 +182,11 @@ export const AdminAuditLogs = () => {
           </Button>
 
           <Button 
-            onClick={() => toast.success('Cryptographic Audit Trail JSON exported!')}
+            onClick={() => exportService.exportAuditLogs(filteredLogs)}
             size="sm" 
             className="rounded-xl text-xs font-bold shadow-md h-10 px-4 bg-primary text-primary-foreground"
           >
-            <Download className="w-3.5 h-3.5 mr-1.5" /> Export Compliance Dump
+            <Download className="w-3.5 h-3.5 mr-1.5" /> Export Forensics CSV
           </Button>
         </div>
       </div>

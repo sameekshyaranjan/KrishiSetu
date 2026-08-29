@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import adminUserService from '@/services/adminUserService'
+import exportService from '@/services/exportService'
 import { Button } from '@/components/ui/button'
 import toast from 'react-hot-toast'
 import { 
@@ -131,11 +132,11 @@ export const AdminUsers = () => {
           </Button>
 
           <Button 
-            onClick={() => toast.success('APMC Registered Participants Registry PDF exported!')}
+            onClick={() => exportService.exportUserRegistry(filteredUsers)}
             size="sm" 
             className="rounded-xl text-xs font-bold shadow-md h-10 px-4 bg-primary text-primary-foreground"
           >
-            <Download className="w-3.5 h-3.5 mr-1.5" /> Export Registry PDF
+            <Download className="w-3.5 h-3.5 mr-1.5" /> Export Registry CSV
           </Button>
         </div>
       </div>

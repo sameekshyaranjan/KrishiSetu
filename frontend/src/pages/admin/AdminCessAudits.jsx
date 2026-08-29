@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import cessService from '@/services/cessService'
+import exportService from '@/services/exportService'
 import { Button } from '@/components/ui/button'
 import toast from 'react-hot-toast'
 import { 
@@ -129,11 +130,19 @@ export const AdminCessAudits = () => {
             Sync Treasury
           </Button>
 
+          <Button 
+            onClick={() => exportService.exportCessLedger(filteredAudits)}
+            size="sm" 
+            className="rounded-xl text-xs font-bold shadow-md h-10 px-4 bg-primary text-primary-foreground"
+          >
+            <Download className="w-3.5 h-3.5 mr-1.5" /> Export Cess CSV
+          </Button>
+
           {totalPendingCess > 0 && (
             <Button
               onClick={handleRemitAll}
               size="sm"
-              className="rounded-xl text-xs font-bold shadow-md h-10 px-4 bg-primary text-primary-foreground"
+              className="rounded-xl text-xs font-bold shadow-md h-10 px-4 bg-emerald-600 hover:bg-emerald-700 text-white"
             >
               <Landmark className="w-3.5 h-3.5 mr-1.5" /> Batch Remit Pending Cess
             </Button>

@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
+import settingsService from '@/services/settingsService'
 import { Button } from '@/components/ui/button'
 import toast from 'react-hot-toast'
 import { 
@@ -17,58 +18,62 @@ import {
   ToggleLeft, 
   ToggleRight, 
   Radio, 
-  Sparkles,
-  Layers,
-  Lock,
+  Sparkles, 
+  Layers, 
+  Lock, 
   Globe
 } from 'lucide-react'
 
-const DEFAULT_SETTINGS = {
-  // 1. Statutory Cess & Escrow
-  apmcCessPercent: 1.50,
-  ruralCessPercent: 0.50,
-  escrowAdvancePercent: 100,
-  minTradeValue: 10000,
-
-  // 2. KYC & Bhoomi Land Registry
-  autoVerifyBhoomiRtc: true,
-  requireGstinForBidding: true,
-  requireFssaiForProcessed: true,
-  minLicenseValidityMonths: 6,
-
-  // 3. Auction Engine & Market Rules
-  defaultAuctionHours: 24,
-  minBidIncrementRupees: 50,
-  antiSnipingExtensionMinutes: 5,
-  maxBuyoutPremiumPercent: 25,
-
-  // 4. Gateways & Telemetry
-  smsGatewayProvider: 'CDAC e-Gov Mobile Gateway (Govt of India)',
-  enableKannadaSms: true,
-  socketPushIntervalSeconds: 3,
-  maintenanceMode: false
-}
-
 export const AdminSettings = () => {
   const { user } = useAuth()
-  const [settings, setSettings] = useState(DEFAULT_SETTINGS)
+  const [settings, setSettings] = useState({
+    apmcCessPercent: 1.50,
+    ruralCessPercent: 0.50,
+    escrowAdvancePercent: 100,
+    minTradeValue: 10000,
+    autoVerifyBhoomiRtc: true,
+    requireGstinForBidding: true,
+    requireFssaiForProcessed: true,
+    minLicenseValidityMonths: 6,
+    defaultAuctionHours: 24,
+    minBidIncrementRupees: 50,
+    antiSnipingExtensionMinutes: 5,
+    maxBuyoutPremiumPercent: 25,
+    smsGatewayProvider: 'CDAC e-Gov Mobile Gateway (Govt of India)',
+    enableKannadaSms: true,
+    socketPushIntervalSeconds: 3,
+    maintenanceMode: false
+  })
   const [isSaving, setIsSaving] = useState(false)
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      const data = await settingsService.getSettings()
+      if (data) setSettings(data)
+    }
+    loadSettings()
+  }, [])
 
   const handleChange = (field, value) => {
     setSettings((prev) => ({ ...prev, [field]: value }))
   }
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e?.preventDefault()
     setIsSaving(true)
-    setTimeout(() => {
-      setIsSaving(false)
+    try {
+      await settingsService.updateSettings(settings)
       toast.success('State APMC regulatory policy & platform parameters updated successfully! 🟢')
-    }, 600)
+    } catch {
+      toast.error('Failed to update settings.')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
-  const handleReset = () => {
-    setSettings(DEFAULT_SETTINGS)
+  const handleReset = async () => {
+    const defaults = await settingsService.resetDefaults()
+    setSettings(defaults)
     toast.success('Statutory default parameters restored.')
   }
 
@@ -199,27 +204,26 @@ export const AdminSettings = () => {
                 onChange={(e) => handleChange('ruralCessPercent', parseFloat(e.target.value))}
                 className="w-full h-10 px-3.5 rounded-xl bg-background border border-border focus:outline-none focus:ring-2 focus:ring-purple-500/40 font-mono"
               />
-              <span className="text-[10px] text-muted-foreground block">Statutory standard: 0.50%</span>
+              <span className="text-[10px] text-muted-foreground block">Rural roads levy: 0.50%</span>
             </div>
 
             <div className="space-y-1.5">
-              <label className="font-bold text-foreground">Escrow Buyer Lock (%)</label>
+              <label className="font-bold text-foreground">Escrow Upfront Lock (%)</label>
               <input
                 type="number"
                 value={settings.escrowAdvancePercent}
-                onChange={(e) => handleChange('escrowAdvancePercent', parseInt(e.target.value))}
+                onChange={(e) => handleChange('escrowAdvancePercent', parseInt(e.target.value, 10))}
                 className="w-full h-10 px-3.5 rounded-xl bg-background border border-border focus:outline-none focus:ring-2 focus:ring-purple-500/40 font-mono"
               />
-              <span className="text-[10px] text-muted-foreground block">Default: 100% upfront lock</span>
+              <span className="text-[10px] text-muted-foreground block">Mandatory 100% full lock</span>
             </div>
 
             <div className="space-y-1.5">
-              <label className="font-bold text-foreground">Min Trade Lot Value (₹)</label>
+              <label className="font-bold text-foreground">Minimum Lot Value (₹)</label>
               <input
                 type="number"
-                step="1000"
                 value={settings.minTradeValue}
-                onChange={(e) => handleChange('minTradeValue', parseInt(e.target.value))}
+                onChange={(e) => handleChange('minTradeValue', parseInt(e.target.value, 10))}
                 className="w-full h-10 px-3.5 rounded-xl bg-background border border-border focus:outline-none focus:ring-2 focus:ring-purple-500/40 font-mono"
               />
               <span className="text-[10px] text-muted-foreground block">Minimum auction threshold</span>
@@ -227,99 +231,7 @@ export const AdminSettings = () => {
           </div>
         </div>
 
-        {/* Section 2: Stakeholder KYC & Land Record Integration */}
-        <div className="p-6 sm:p-7 rounded-3xl bg-card border border-border space-y-5 shadow-sm">
-          <div className="flex items-center gap-2.5 border-b border-border pb-3">
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 font-bold">
-              <ShieldCheck className="w-4 h-4" />
-            </div>
-            <div>
-              <h3 className="text-sm font-extrabold text-foreground">
-                2. Stakeholder KYC & Bhoomi Land Registry Integration
-              </h3>
-              <p className="text-[11px] text-muted-foreground">
-                Automate real-time verification against the Karnataka Revenue Department Bhoomi database.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/40 border border-border">
-              <div>
-                <p className="font-extrabold text-foreground">Auto-Verify Bhoomi RTC Landholdings</p>
-                <span className="text-[11px] text-muted-foreground">
-                  Match farmer survey numbers with Bhoomi state database automatically
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleChange('autoVerifyBhoomiRtc', !settings.autoVerifyBhoomiRtc)}
-                className="text-purple-600 ml-4"
-              >
-                {settings.autoVerifyBhoomiRtc ? (
-                  <ToggleRight className="w-8 h-8 text-emerald-600" />
-                ) : (
-                  <ToggleLeft className="w-8 h-8 text-muted-foreground" />
-                )}
-              </button>
-            </div>
-
-            <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/40 border border-border">
-              <div>
-                <p className="font-extrabold text-foreground">Mandatory GSTIN for Wholesale Bidders</p>
-                <span className="text-[11px] text-muted-foreground">
-                  Enforce active 29AABCK... state GST identification before bidding
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleChange('requireGstinForBidding', !settings.requireGstinForBidding)}
-                className="text-purple-600 ml-4"
-              >
-                {settings.requireGstinForBidding ? (
-                  <ToggleRight className="w-8 h-8 text-emerald-600" />
-                ) : (
-                  <ToggleLeft className="w-8 h-8 text-muted-foreground" />
-                )}
-              </button>
-            </div>
-
-            <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/40 border border-border">
-              <div>
-                <p className="font-extrabold text-foreground">Mandatory FSSAI for Grain Lots</p>
-                <span className="text-[11px] text-muted-foreground">
-                  Require food safety registration for processed pulses and grains
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleChange('requireFssaiForProcessed', !settings.requireFssaiForProcessed)}
-                className="text-purple-600 ml-4"
-              >
-                {settings.requireFssaiForProcessed ? (
-                  <ToggleRight className="w-8 h-8 text-emerald-600" />
-                ) : (
-                  <ToggleLeft className="w-8 h-8 text-muted-foreground" />
-                )}
-              </button>
-            </div>
-
-            <div className="space-y-1.5 p-4 rounded-2xl bg-muted/40 border border-border">
-              <label className="font-bold text-foreground">Min APMC License Buffer (Months)</label>
-              <input
-                type="number"
-                value={settings.minLicenseValidityMonths}
-                onChange={(e) => handleChange('minLicenseValidityMonths', parseInt(e.target.value))}
-                className="w-full h-9 px-3 rounded-xl bg-background border border-border focus:outline-none focus:ring-2 focus:ring-purple-500/40 font-mono"
-              />
-              <span className="text-[10px] text-muted-foreground block">
-                Flag renewal notice when license expiry is within X months
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Section 3: Digital Auction & Market Rules Engine */}
+        {/* Section 2: Auction Engine & Anti-Sniping Parameters */}
         <div className="p-6 sm:p-7 rounded-3xl bg-card border border-border space-y-5 shadow-sm">
           <div className="flex items-center gap-2.5 border-b border-border pb-3">
             <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-600 font-bold">
@@ -327,130 +239,95 @@ export const AdminSettings = () => {
             </div>
             <div>
               <h3 className="text-sm font-extrabold text-foreground">
-                3. Digital Auction Engine & Anti-Sniping Rules
+                2. Real-Time Auction Engine & Anti-Sniping Windows
               </h3>
               <p className="text-[11px] text-muted-foreground">
-                Configure fair bidding parameters and automatic auction extension triggers.
+                Fair-trade bidding extensions preventing last-second algorithmic sniping.
               </p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="space-y-1.5">
-              <label className="font-bold text-foreground">Default Auction Window (Hours)</label>
-              <input
-                type="number"
-                value={settings.defaultAuctionHours}
-                onChange={(e) => handleChange('defaultAuctionHours', parseInt(e.target.value))}
-                className="w-full h-10 px-3.5 rounded-xl bg-background border border-border focus:outline-none focus:ring-2 focus:ring-purple-500/40 font-mono"
-              />
-              <span className="text-[10px] text-muted-foreground block">Default: 24 Hours</span>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="font-bold text-foreground">Min Bid Increment (₹/Qtl)</label>
-              <input
-                type="number"
-                value={settings.minBidIncrementRupees}
-                onChange={(e) => handleChange('minBidIncrementRupees', parseInt(e.target.value))}
-                className="w-full h-10 px-3.5 rounded-xl bg-background border border-border focus:outline-none focus:ring-2 focus:ring-purple-500/40 font-mono"
-              />
-              <span className="text-[10px] text-muted-foreground block">Default: ₹50 / Quintal</span>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="font-bold text-foreground">Anti-Sniping Extension (Mins)</label>
+              <label className="font-bold text-foreground">Anti-Sniping Extension (Minutes)</label>
               <input
                 type="number"
                 value={settings.antiSnipingExtensionMinutes}
-                onChange={(e) => handleChange('antiSnipingExtensionMinutes', parseInt(e.target.value))}
-                className="w-full h-10 px-3.5 rounded-xl bg-background border border-border focus:outline-none focus:ring-2 focus:ring-purple-500/40 font-mono"
+                onChange={(e) => handleChange('antiSnipingExtensionMinutes', parseInt(e.target.value, 10))}
+                className="w-full h-10 px-3.5 rounded-xl bg-background border border-border focus:outline-none focus:ring-2 focus:ring-amber-500/40 font-mono"
               />
-              <span className="text-[10px] text-muted-foreground block">Auto-extends if bid placed in last 5m</span>
+              <span className="text-[10px] text-muted-foreground block">Adds +5m if bid in final 2 mins</span>
             </div>
 
             <div className="space-y-1.5">
-              <label className="font-bold text-foreground">Buyout Premium Cap (%)</label>
+              <label className="font-bold text-foreground">Minimum Bid Increment (₹ / Qtl)</label>
               <input
                 type="number"
-                value={settings.maxBuyoutPremiumPercent}
-                onChange={(e) => handleChange('maxBuyoutPremiumPercent', parseInt(e.target.value))}
-                className="w-full h-10 px-3.5 rounded-xl bg-background border border-border focus:outline-none focus:ring-2 focus:ring-purple-500/40 font-mono"
+                value={settings.minBidIncrementRupees}
+                onChange={(e) => handleChange('minBidIncrementRupees', parseInt(e.target.value, 10))}
+                className="w-full h-10 px-3.5 rounded-xl bg-background border border-border focus:outline-none focus:ring-2 focus:ring-amber-500/40 font-mono"
               />
-              <span className="text-[10px] text-muted-foreground block">Instant Buyout Cap vs Reserve</span>
+              <span className="text-[10px] text-muted-foreground block">Minimum auction tick</span>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="font-bold text-foreground">Default Auction Duration (Hours)</label>
+              <input
+                type="number"
+                value={settings.defaultAuctionHours}
+                onChange={(e) => handleChange('defaultAuctionHours', parseInt(e.target.value, 10))}
+                className="w-full h-10 px-3.5 rounded-xl bg-background border border-border focus:outline-none focus:ring-2 focus:ring-amber-500/40 font-mono"
+              />
+              <span className="text-[10px] text-muted-foreground block">Standard lot expiration</span>
             </div>
           </div>
         </div>
 
-        {/* Section 4: Communication Gateways & Telemetry */}
+        {/* Section 3: SMS Gateway & Emergency Maintenance */}
         <div className="p-6 sm:p-7 rounded-3xl bg-card border border-border space-y-5 shadow-sm">
           <div className="flex items-center gap-2.5 border-b border-border pb-3">
-            <div className="w-8 h-8 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-600 font-bold">
+            <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold">
               <Smartphone className="w-4 h-4" />
             </div>
             <div>
               <h3 className="text-sm font-extrabold text-foreground">
-                4. Communication Gateways & Real-Time Telemetry
+                3. CDAC e-Gov SMS Gateway & Platform Operational Status
               </h3>
               <p className="text-[11px] text-muted-foreground">
-                Configure regional SMS messaging hubs and live WebSocket push frequencies.
+                Manage bilingual push notification gateways and system-wide maintenance locks.
               </p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="font-bold text-foreground">Official SMS Gateway Provider</label>
+              <label className="font-bold text-foreground">SMS Gateway Provider</label>
               <input
                 type="text"
                 value={settings.smsGatewayProvider}
                 onChange={(e) => handleChange('smsGatewayProvider', e.target.value)}
-                className="w-full h-10 px-3.5 rounded-xl bg-background border border-border focus:outline-none focus:ring-2 focus:ring-purple-500/40 font-mono"
+                className="w-full h-10 px-3.5 rounded-xl bg-background border border-border focus:outline-none focus:ring-2 focus:ring-primary/40 font-semibold"
               />
-              <span className="text-[10px] text-muted-foreground block">CDAC e-Gov SMS Hub (State Agriculture)</span>
             </div>
 
-            <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/40 border border-border">
+            <div className="flex items-center justify-between p-3.5 rounded-2xl bg-muted/40 border border-border">
               <div>
-                <p className="font-extrabold text-foreground">Automatic Kannada SMS Translation</p>
-                <span className="text-[11px] text-muted-foreground">
-                  Send transactional SMS alerts in Kannada (ಕನ್ನಡ) for rural farmers
-                </span>
+                <span className="font-bold text-foreground block">Platform Maintenance Lock</span>
+                <span className="text-[11px] text-muted-foreground">Temporarily halt live auctions for APMC annual audits</span>
               </div>
               <button
                 type="button"
-                onClick={() => handleChange('enableKannadaSms', !settings.enableKannadaSms)}
-                className="text-purple-600 ml-4"
+                onClick={() => handleChange('maintenanceMode', !settings.maintenanceMode)}
+                className="cursor-pointer"
               >
-                {settings.enableKannadaSms ? (
-                  <ToggleRight className="w-8 h-8 text-emerald-600" />
+                {settings.maintenanceMode ? (
+                  <ToggleRight className="w-8 h-8 text-rose-600" />
                 ) : (
                   <ToggleLeft className="w-8 h-8 text-muted-foreground" />
                 )}
               </button>
             </div>
           </div>
-        </div>
-
-        {/* Bottom Save Action Bar */}
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
-          <Button 
-            type="button"
-            variant="outline" 
-            onClick={handleReset}
-            className="rounded-xl text-xs h-11 px-6 shadow-sm"
-          >
-            Discard Changes
-          </Button>
-
-          <Button 
-            type="submit"
-            disabled={isSaving}
-            className="rounded-xl text-xs font-bold h-11 px-8 bg-purple-600 hover:bg-purple-700 text-white shadow-lg"
-          >
-            <Save className={`w-4 h-4 mr-2 ${isSaving ? 'animate-spin' : ''}`} />
-            {isSaving ? 'Saving Parameters...' : 'Apply & Publish Policy Rules 🚀'}
-          </Button>
         </div>
       </form>
     </div>
