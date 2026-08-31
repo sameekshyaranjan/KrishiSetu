@@ -70,7 +70,8 @@ export const TradeChatModal = ({
     if (!recipientId) return
     setLoading(true)
     try {
-      const data = await chatService.getConversationWithUser(recipientId)
+      const cropListingId = crop?._id || crop?.lotId || null
+      const data = await chatService.getConversationWithUser(recipientId, cropListingId)
       if (data?.conversation) {
         setConversationId(data.conversation._id)
       }

@@ -16,7 +16,8 @@ import {
   X,
   TrendingUp,
   Landmark,
-  Bell
+  Bell,
+  MessageSquare
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -41,6 +42,7 @@ export const TraderLayout = () => {
     { to: '/trader/dashboard', label: 'Trader Command Center', icon: LayoutDashboard, end: true },
     { to: '/trader/marketplace', label: 'Crop Marketplace', icon: ShoppingCart },
     { to: '/trader/my-bids', label: 'My Active Bids', icon: Gavel },
+    { to: '/trader/chats', label: 'Farmer Chats', icon: MessageSquare },
     { to: '/trader/escrow', label: 'Escrow Vault & Wallet', icon: Landmark },
     { to: '/trader/orders', label: 'Procurement Shipments', icon: Truck },
     { to: '/trader/invoices', label: 'Mandi Invoices & Tax', icon: FileText },

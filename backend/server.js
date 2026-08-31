@@ -109,6 +109,18 @@ io.on('connection', (socket) => {
     logger.info(`[Socket] Secure user connected and joined room: ${userId}`);
   }
 
+  socket.on('join_conversation', (conversationId) => {
+    if (conversationId) {
+      socket.join(conversationId.toString());
+    }
+  });
+
+  socket.on('leave_conversation', (conversationId) => {
+    if (conversationId) {
+      socket.leave(conversationId.toString());
+    }
+  });
+
   socket.on('disconnect', () => {
     logger.info(`[Socket] Secure user disconnected: ${userId}`);
   });
@@ -122,9 +134,14 @@ socketEmitter.on('new-notification', (notification, recipientId) => {
   }
 });
 
-socketEmitter.on('newMessage', (message, receiverId) => {
-  if (io && receiverId) {
-    io.to(receiverId.toString()).emit('newMessage', message);
+socketEmitter.on('newMessage', (message, receiverId, conversationId) => {
+  if (io) {
+    if (receiverId) {
+      io.to(receiverId.toString()).emit('newMessage', message);
+    }
+    if (conversationId) {
+      io.to(conversationId.toString()).emit('newMessage', message);
+    }
   }
 });
 

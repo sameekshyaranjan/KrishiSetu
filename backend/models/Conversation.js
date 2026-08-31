@@ -17,15 +17,23 @@ const conversationSchema = new mongoose.Schema({
   ],
   listingId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Crop'
+    ref: 'Crop',
+    index: true
   },
   lastMessage: {
     type: String,
     default: ''
+  },
+  lastMessageAt: {
+    type: Date,
+    default: Date.now
   }
 }, {
-  timestamps: true // Adds createdAt and updatedAt automatically
+  timestamps: true
 });
+
+conversationSchema.index({ 'participants.user': 1, listingId: 1 });
+conversationSchema.index({ updatedAt: -1 });
 
 const Conversation = mongoose.model('Conversation', conversationSchema);
 

@@ -23,6 +23,7 @@ import FarmerOrders from '@/pages/farmer/FarmerOrders'
 import FarmerWeather from '@/pages/farmer/FarmerWeather'
 import FarmerProfile from '@/pages/farmer/FarmerProfile'
 import FarmerNotifications from '@/pages/farmer/FarmerNotifications'
+import FarmerChats from '@/pages/farmer/FarmerChats'
 import TraderDashboard from '@/pages/trader/TraderDashboard'
 import TraderMarketplace from '@/pages/trader/TraderMarketplace'
 import TraderCropDetails from '@/pages/trader/TraderCropDetails'
@@ -32,6 +33,7 @@ import TraderOrders from '@/pages/trader/TraderOrders'
 import TraderInvoices from '@/pages/trader/TraderInvoices'
 import TraderProfile from '@/pages/trader/TraderProfile'
 import TraderNotifications from '@/pages/trader/TraderNotifications'
+import TraderChats from '@/pages/trader/TraderChats'
 import AdminDashboard from '@/pages/admin/AdminDashboard'
 import AdminUsers from '@/pages/admin/AdminUsers'
 import AdminSchemes from '@/pages/admin/AdminSchemes'
@@ -68,6 +70,7 @@ export const AppRoutes = () => {
           <Route path="my-crops" element={<FarmerListings />} />
           <Route path="add-crop" element={<FarmerListings />} />
           <Route path="bids" element={<FarmerBids />} />
+          <Route path="chats" element={<FarmerChats />} />
           <Route path="orders" element={<FarmerOrders />} />
           <Route path="weather" element={<FarmerWeather />} />
           <Route path="profile" element={<FarmerProfile />} />
@@ -83,6 +86,7 @@ export const AppRoutes = () => {
           <Route path="marketplace" element={<TraderMarketplace />} />
           <Route path="crops/:id" element={<TraderCropDetails />} />
           <Route path="my-bids" element={<TraderBids />} />
+          <Route path="chats" element={<TraderChats />} />
           <Route path="escrow" element={<TraderEscrow />} />
           <Route path="wallet" element={<TraderEscrow />} />
           <Route path="orders" element={<TraderOrders />} />
