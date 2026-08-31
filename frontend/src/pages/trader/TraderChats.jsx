@@ -246,13 +246,6 @@ export const TraderChats = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border ${
-            isConnected ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-amber-500/10 text-amber-600 border-amber-500/20'
-          }`}>
-            <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-            {isConnected ? 'Live WebSocket Active' : 'Connecting Stream...'}
-          </span>
-
           <Button
             variant="outline"
             size="sm"
