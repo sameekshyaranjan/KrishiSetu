@@ -87,7 +87,11 @@ const getMyListings = async (req, res, next) => {
 
 const getAllListings = async (req, res, next) => {
   try {
-    const version = await redisClient.get('crops_feed_version') || '1';
+    let version = await redisClient.get('crops_feed_version');
+    if (!version) {
+      version = String(Date.now());
+      await redisClient.set('crops_feed_version', version);
+    }
     const cacheKey = `crops:feed:v${version}:${req.query.category || 'all'}:${req.query.name || 'none'}:${req.query.page || 1}:${req.query.limit || 10}`;
 
     const cachedData = await redisClient.get(cacheKey);
