@@ -42,7 +42,7 @@ export const TraderEscrow = () => {
 
   // Top-Up Modal State
   const [isTopUpOpen, setIsTopUpOpen] = useState(false)
-  const [depositAmount, setDepositAmount] = useState('500000')
+  const [depositAmount, setDepositAmount] = useState('1000')
   const [paymentMethod, setPaymentMethod] = useState('netbanking') // 'netbanking' | 'neft'
 
   const loadEscrowOverview = async () => {
@@ -366,9 +366,10 @@ export const TraderEscrow = () => {
                     type="number"
                     required
                     min={100}
-                    step={1000}
+                    step="any"
                     value={depositAmount}
                     onChange={(e) => setDepositAmount(e.target.value)}
+                    placeholder="Enter deposit amount"
                     className="w-full h-12 pl-8 pr-4 rounded-2xl bg-background border-2 border-emerald-500/40 focus:border-emerald-500 text-lg font-mono font-black text-emerald-600 focus:outline-none"
                   />
                 </div>
@@ -376,7 +377,7 @@ export const TraderEscrow = () => {
 
               {/* Quick Amount Chips */}
               <div className="flex items-center gap-2">
-                {['10000', '50000', '100000', '500000'].map((amt) => (
+                {['1000', '5000', '10000', '50000', '100000'].map((amt) => (
                   <button
                     key={amt}
                     type="button"
