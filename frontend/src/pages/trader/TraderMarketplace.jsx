@@ -30,6 +30,8 @@ import {
   Loader2
 } from 'lucide-react'
 
+import { KARNATAKA_DISTRICTS } from '@/constants/locations'
+
 const CATEGORY_TABS = [
   { id: 'all', label: 'All Crops' },
   { id: 'vegetables', label: 'Vegetables' },
@@ -37,7 +39,7 @@ const CATEGORY_TABS = [
   { id: 'spices', label: 'Spices & Cash Crops' }
 ]
 
-const DISTRICT_OPTIONS = ['All Districts', 'Hassan', 'Mandya', 'Mysuru', 'Belagavi', 'Kolar', 'Bengaluru Rural', 'Hubballi / Dharwad', 'Davanagere', 'Ballari']
+const DISTRICT_OPTIONS = ['All Districts', ...KARNATAKA_DISTRICTS]
 
 export const TraderMarketplace = () => {
   const { user } = useAuth()
@@ -70,7 +72,7 @@ export const TraderMarketplace = () => {
           quantity: c.quantity || 100,
           unit: c.unit || 'Quintals',
           reservePrice: c.basePrice || 2000,
-          currentHighestBid: c.currentHighestBid || c.basePrice || 2000,
+          currentHighestBid: c.currentHighestBid || null,
           apmcBenchmark: Math.round((c.basePrice || 2000) * 1.12),
           instantBuyoutPrice: Math.round((c.basePrice || 2000) * 1.08),
           image: c.images?.[0] || 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=500&q=80',
@@ -113,7 +115,8 @@ export const TraderMarketplace = () => {
 
   const handleOpenBidModal = (lot) => {
     setSelectedLotForBid(lot)
-    setBidAmount(lot.currentHighestBid + 50)
+    const nextMin = lot.currentHighestBid ? (lot.currentHighestBid + 50) : lot.reservePrice
+    setBidAmount(String(nextMin))
   }
 
   const handleOpenBuyoutModal = (lot) => {
@@ -128,6 +131,11 @@ export const TraderMarketplace = () => {
       return
     }
 
+    if (selectedLotForBid?.currentHighestBid && parsed <= selectedLotForBid.currentHighestBid) {
+      toast.error(`Bid must exceed current highest bid of ₹${selectedLotForBid.currentHighestBid}/Qtl`)
+      return
+    }
+
     setIsSubmittingBid(true)
     try {
       await bidService.placeBid({
@@ -139,7 +147,7 @@ export const TraderMarketplace = () => {
       setLots((prev) =>
         prev.map((l) =>
           l._id === selectedLotForBid._id
-            ? { ...l, currentHighestBid: Math.max(l.currentHighestBid, parsed), bidsCount: (l.bidsCount || 0) + 1 }
+            ? { ...l, currentHighestBid: Math.max(l.currentHighestBid || 0, parsed), bidsCount: (l.bidsCount || 0) + 1 }
             : l
         )
       )
@@ -368,17 +376,31 @@ export const TraderMarketplace = () => {
                   {/* Price Matrix HUD */}
                   <div className="p-3.5 rounded-2xl bg-muted/40 border border-border/80 space-y-2">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground font-medium">Current Highest Bid:</span>
-                      <span className="text-base font-black text-amber-600 font-mono">
-                        ₹{lot.currentHighestBid.toLocaleString('en-IN')}/Qtl
+                      <span className="text-muted-foreground font-medium">
+                        {lot.currentHighestBid ? 'Current Highest Bid:' : 'Status:'}
+                      </span>
+                      <span className="text-sm sm:text-base font-black text-amber-600 font-mono">
+                        {lot.currentHighestBid ? (
+                          `₹${lot.currentHighestBid.toLocaleString('en-IN')}/Qtl`
+                        ) : (
+                          <span className="text-xs font-semibold text-muted-foreground bg-muted/80 px-2 py-0.5 rounded-lg border border-border">
+                            No bids yet
+                          </span>
+                        )}
                       </span>
                     </div>
 
                     <div className="flex items-center justify-between text-[11px] pt-1 border-t border-border/60 text-muted-foreground">
-                      <span>Reserve: <strong className="text-foreground font-mono">₹{lot.reservePrice}</strong></span>
-                      <span className="text-emerald-600 font-bold flex items-center gap-0.5">
-                        <TrendingDown className="w-3 h-3" /> {discountVsApmc}% below Mandi
-                      </span>
+                      <span>Reserve: <strong className="text-foreground font-mono">₹{lot.reservePrice}/Qtl</strong></span>
+                      {lot.bidsCount > 0 ? (
+                        <span className="text-amber-600 font-bold flex items-center gap-0.5">
+                          <Gavel className="w-3 h-3" /> {lot.bidsCount} {lot.bidsCount === 1 ? 'bid' : 'bids'}
+                        </span>
+                      ) : (
+                        <span className="text-emerald-600 font-bold flex items-center gap-0.5">
+                          Awaiting first bid
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -460,14 +482,20 @@ export const TraderMarketplace = () => {
             <form onSubmit={handleSubmitBid} className="space-y-4 text-xs">
               <div className="p-4 rounded-2xl bg-muted/40 border border-border/80 space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Current Highest Bid:</span>
+                  <span className="text-muted-foreground">
+                    {selectedLotForBid.currentHighestBid ? 'Current Highest Bid:' : 'Reserve Base Price:'}
+                  </span>
                   <span className="font-mono font-bold text-foreground">
-                    ₹{selectedLotForBid.currentHighestBid.toLocaleString('en-IN')}/Qtl
+                    ₹{(selectedLotForBid.currentHighestBid || selectedLotForBid.reservePrice).toLocaleString('en-IN')}/Qtl
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Minimum Incremental Step:</span>
-                  <span className="font-mono font-bold text-emerald-600">+₹50 / Quintal</span>
+                  <span className="text-muted-foreground">
+                    {selectedLotForBid.currentHighestBid ? 'Minimum Incremental Step:' : 'Minimum Starting Bid:'}
+                  </span>
+                  <span className="font-mono font-bold text-emerald-600">
+                    {selectedLotForBid.currentHighestBid ? '+₹50 / Quintal' : `₹${selectedLotForBid.reservePrice} / Quintal`}
+                  </span>
                 </div>
               </div>
 
@@ -478,7 +506,7 @@ export const TraderMarketplace = () => {
                   <input
                     type="number"
                     required
-                    min={selectedLotForBid.currentHighestBid + 10}
+                    min={selectedLotForBid.currentHighestBid ? selectedLotForBid.currentHighestBid + 10 : selectedLotForBid.reservePrice}
                     value={bidAmount}
                     onChange={(e) => setBidAmount(e.target.value)}
                     placeholder="Enter bid amount"

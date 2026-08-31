@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth'
 import cropService from '@/services/cropService'
 import { Button } from '@/components/ui/button'
 import toast from 'react-hot-toast'
+import TradeChatModal from '@/components/common/TradeChatModal'
 import { 
   Gavel, 
   TrendingUp, 
@@ -22,7 +23,8 @@ import {
   X, 
   AlertCircle,
   Truck,
-  Check
+  Check,
+  MessageSquare
 } from 'lucide-react'
 
 export const FarmerBids = () => {
@@ -38,6 +40,7 @@ export const FarmerBids = () => {
   const [counterBidModal, setCounterBidModal] = useState(null)
   const [counterPrice, setCounterPrice] = useState(0)
   const [actionLoading, setActionLoading] = useState(false)
+  const [selectedChatBid, setSelectedChatBid] = useState(null)
 
   const loadBids = async () => {
     setLoading(true)
@@ -368,6 +371,16 @@ export const FarmerBids = () => {
 
                   {/* Actions / Status Badges */}
                   <div className="flex items-center gap-2">
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => setSelectedChatBid(bid)}
+                      className="rounded-xl text-xs h-10 px-3 font-semibold text-purple-600 border-purple-500/30 hover:bg-purple-500/10 flex items-center gap-1.5"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span>Chat</span>
+                    </Button>
+
                     {isPending && (
                       <>
                         <Button 
@@ -375,7 +388,7 @@ export const FarmerBids = () => {
                           variant="outline"
                           onClick={() => {
                             setCounterBidModal(bid)
-                            setCounterPrice(bid.bidPrice + 100)
+                            setCounterPrice(offerRate + 100)
                           }}
                           className="rounded-xl text-xs h-10 px-3 font-semibold"
                         >
@@ -559,6 +572,26 @@ export const FarmerBids = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* 5. Real-Time Trade Negotiation Modal */}
+      {selectedChatBid && (
+        <TradeChatModal
+          isOpen={Boolean(selectedChatBid)}
+          onClose={() => setSelectedChatBid(null)}
+          recipientId={selectedChatBid.trader?._id || selectedChatBid.trader}
+          recipientName={selectedChatBid.trader?.name || selectedChatBid.trader?.companyName || 'Verified APMC Trader'}
+          recipientRole="Trader"
+          crop={{
+            _id: selectedChatBid.crop?._id || selectedChatBid.crop,
+            title: selectedChatBid.crop?.name || selectedChatBid.cropListing?.name || 'Produce Lot',
+            quantity: selectedChatBid.crop?.quantity || selectedChatBid.cropListing?.quantity || 100,
+            unit: selectedChatBid.crop?.unit || selectedChatBid.cropListing?.unit || 'Quintals',
+            price: Number(selectedChatBid.amount || selectedChatBid.bidPrice || 2000),
+            basePrice: Number(selectedChatBid.crop?.basePrice || 2000),
+            lotId: selectedChatBid.crop?._id ? `LOT-${selectedChatBid.crop._id.slice(-6)}` : 'LOT'
+          }}
+        />
       )}
     </div>
   )

@@ -48,11 +48,7 @@ const CROP_TYPES = [
   { name: 'Other Crops', category: 'vegetables', defaultPrice: 2000, defaultImg: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=600&auto=format&fit=crop' }
 ]
 
-const KARNATAKA_DISTRICTS = [
-  'Hassan', 'Kolar', 'Mandya', 'Belagavi', 'Hubballi / Dharwad', 
-  'Davanagere', 'Mysuru', 'Ballari', 'Shimoga', 'Tumakuru', 'Bagalkote',
-  'Raichur', 'Vijayapura', 'Udupi', 'Dakshina Kannada', 'Ramanagara', 'Chikkaballapura'
-]
+import { KARNATAKA_DISTRICTS } from '@/constants/locations'
 
 export const FarmerListings = () => {
   const { user } = useAuth()

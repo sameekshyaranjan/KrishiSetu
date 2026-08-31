@@ -62,8 +62,9 @@ export const TraderCropDetails = () => {
 
         if (fetchedCrop) {
           const rawBids = Array.isArray(fetchedBids) ? fetchedBids : []
-          const sortedBids = [...rawBids].sort((a, b) => (Number(b.amount) || 0) - (Number(a.amount) || 0))
-          const topBidAmount = sortedBids.length > 0 ? Number(sortedBids[0].amount) : Number(fetchedCrop.basePrice || 2000)
+          const activeBids = rawBids.filter(b => b.status === 'pending' || b.status === 'accepted')
+          const sortedBids = [...activeBids].sort((a, b) => (Number(b.amount) || 0) - (Number(a.amount) || 0))
+          const topBidAmount = sortedBids.length > 0 ? Number(sortedBids[0].amount) : null
 
           const formattedBids = sortedBids.map((b, idx) => ({
             id: b._id || `b-${idx}`,
@@ -95,6 +96,7 @@ export const TraderCropDetails = () => {
               coldStorageTolerant: 'Yes (Grade-A Compliant)'
             },
             farmer: {
+              _id: fetchedCrop.farmer?._id || fetchedCrop.farmer,
               name: fetchedCrop.farmer?.name || 'Verified Farmer',
               village: fetchedCrop.farmer?.village || 'APMC Yard',
               taluk: fetchedCrop.farmer?.district || 'Karnataka',
@@ -110,7 +112,7 @@ export const TraderCropDetails = () => {
 
           setLot(formatted)
           setCurrentHigh(topBidAmount)
-          setBidInput(String(topBidAmount + 50))
+          setBidInput(String(topBidAmount ? topBidAmount + 50 : (fetchedCrop.basePrice || 2000)))
           setBidsList(formattedBids)
         } else {
           setLot(null)
@@ -134,18 +136,23 @@ export const TraderCropDetails = () => {
   const estimatedFreight = 3200
   const totalEscrowRequired = grossLotValue + apmcCess + ruralCess + estimatedFreight
 
-  const savingsPerQtl = (lot?.apmcBenchmark || 2400) - currentHigh
+  const savingsPerQtl = (lot?.apmcBenchmark || 2400) - (currentHigh || lot?.reservePrice || 2000)
   const savingsPercentage = Math.round((savingsPerQtl / (lot?.apmcBenchmark || 2400)) * 100)
 
   const handleIncrement = (amount) => {
-    const nextVal = Math.max(currentHigh + 10, numericBid + amount)
+    const minBase = currentHigh ? currentHigh + 10 : (lot?.reservePrice || 1000)
+    const nextVal = Math.max(minBase, numericBid + amount)
     setBidInput(String(nextVal))
   }
 
   const handlePlaceBid = async (e) => {
     e?.preventDefault?.()
-    if (numericBid <= currentHigh) {
+    if (currentHigh && numericBid <= currentHigh) {
       toast.error(`Your bid must exceed current highest bid of ₹${currentHigh.toLocaleString('en-IN')}/Qtl`)
+      return
+    }
+    if (!currentHigh && numericBid < (lot?.reservePrice || 0)) {
+      toast.error(`Your bid must be at least the reserve floor price of ₹${lot?.reservePrice}/Qtl`)
       return
     }
 
@@ -161,7 +168,7 @@ export const TraderCropDetails = () => {
       
       const newBidEntry = {
         id: `b-${Date.now()}`,
-        bidder: user?.name || 'Karnataka Agro Traders Pvt Ltd (You)',
+        bidder: `${user?.name || 'Verified Trader'} (You)`,
         amount: numericBid,
         time: 'Just now',
         isHighest: true
@@ -390,9 +397,15 @@ export const TraderCropDetails = () => {
             <div className="p-4 rounded-2xl bg-muted/40 border border-border space-y-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Current Top Bid</span>
+                  <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+                    {currentHigh ? 'Current Top Bid' : 'Auction Status'}
+                  </span>
                   <div className="text-2xl font-black text-amber-600 font-mono">
-                    ₹{currentHigh.toLocaleString('en-IN')}<span className="text-xs font-medium text-muted-foreground">/Qtl</span>
+                    {currentHigh ? (
+                      <>₹{currentHigh.toLocaleString('en-IN')}<span className="text-xs font-medium text-muted-foreground">/Qtl</span></>
+                    ) : (
+                      <span className="text-base font-bold text-muted-foreground">No bids yet</span>
+                    )}
                   </div>
                 </div>
 
@@ -418,7 +431,9 @@ export const TraderCropDetails = () => {
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-foreground flex items-center justify-between">
                   <span>Enter Your Bid (₹ / Quintal)</span>
-                  <span className="text-[10px] text-muted-foreground">Min Step: +₹10/Qtl</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {currentHigh ? 'Min Step: +₹10/Qtl' : `Starting Floor: ₹${lot.reservePrice}/Qtl`}
+                  </span>
                 </label>
                 
                 <div className="relative">
@@ -426,7 +441,7 @@ export const TraderCropDetails = () => {
                   <input
                     type="number"
                     required
-                    min={currentHigh + 10}
+                    min={currentHigh ? currentHigh + 10 : lot.reservePrice}
                     value={bidInput}
                     onChange={(e) => setBidInput(e.target.value)}
                     className="w-full h-12 pl-8 pr-4 rounded-2xl bg-background border-2 border-amber-500/40 focus:border-amber-500 text-lg font-mono font-black text-amber-600 focus:outline-none"
@@ -557,11 +572,22 @@ export const TraderCropDetails = () => {
         lotData={lot}
       />
 
-      {/* 4. Multilingual Kannada / English Chat & Counter-Offer Modal (Stage 127) */}
+      {/* 4. Multilingual Kannada / English Chat & Counter-Offer Modal */}
       <TradeChatModal
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
-        lotData={lot}
+        recipientId={lot?.farmer?._id || lot?.farmer}
+        recipientName={lot?.farmer?.name || 'Verified Farmer'}
+        recipientRole="Farmer"
+        crop={{
+          _id: lot?._id,
+          title: lot?.cropName,
+          quantity: lot?.quantity,
+          unit: lot?.unit,
+          price: currentHigh || lot?.reservePrice,
+          basePrice: lot?.reservePrice,
+          lotId: `LOT-${lot?._id ? String(lot._id).slice(-6) : 'KA'}`
+        }}
       />
     </div>
   )

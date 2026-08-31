@@ -1,61 +1,28 @@
 import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
+import useSocket from '@/hooks/useSocket'
+import chatService from '@/services/chatService'
 import { Button } from '@/components/ui/button'
 import toast from 'react-hot-toast'
 import { 
   MessageSquare, 
   Send, 
-  Paperclip, 
   Sparkles, 
   X, 
-  Sprout, 
-  Briefcase, 
   ShieldCheck, 
-  DollarSign, 
   CheckCheck, 
   Clock, 
   Languages, 
   Gavel, 
-  ArrowRight,
-  Layers,
-  MapPin
+  Loader2,
+  MapPin,
+  RefreshCw
 } from 'lucide-react'
-
-const INITIAL_MESSAGES = [
-  {
-    id: 'm1',
-    sender: 'farmer',
-    senderName: 'Ramesh Gowda (Farmer)',
-    text: 'ನಮಸ್ಕಾರ, ನಮ್ಮ ಟೊಮ್ಯಾಟೊ ಲಾಟ್ (120 ಕ್ವಿಂಟಾಲ್) ಬೆಳಿಗ್ಗೆ ಕೊಯ್ಲು ಮಾಡಲಾಗಿದೆ. ಸಂಪೂರ್ಣ ಗ್ರೇಡ್-ಎ ಗುಣಮಟ್ಟ.',
-    translation: 'Hello, our tomato lot (120 Quintals) was harvested this morning. 100% Grade-A premium quality.',
-    time: '14:20 IST',
-    isCounterOffer: false
-  },
-  {
-    id: 'm2',
-    sender: 'trader',
-    senderName: 'Karnataka Agro Traders (You)',
-    text: 'Hello Ramesh ji, we inspected the lot via live video. Can you do ₹2,180/Qtl for immediate 100% lot buyout?',
-    translation: 'ನಮಸ್ತೆ ರಮೇಶ್ ಜಿ, ನಾವು ಲೈವ್ ವೀಡಿಯೊ ಮೂಲಕ ಪರಿಶೀಲಿಸಿದ್ದೇವೆ. ತಕ್ಷಣದ ಖರೀದಿಗೆ ₹2,180/ಕ್ವಿಂಟಾಲ್ ಸಾಧ್ಯವೇ?',
-    time: '14:25 IST',
-    isCounterOffer: true,
-    offerAmount: 2180
-  },
-  {
-    id: 'm3',
-    sender: 'farmer',
-    senderName: 'Ramesh Gowda (Farmer)',
-    text: 'ಖಂಡಿತ ಒಪ್ಪಿಗೆ ಇದೆ. ನಾಳೆ ಬೆಳಿಗ್ಗೆ 06:00 ಗಂಟೆಗೆ ಯಶವಂತಪುರ ಮಾರುಕಟ್ಟೆಗೆ ಲಾರಿ ಲೋಡಿಂಗ್ ಮಾಡಲು ಸಿದ್ಧವಿದೆ.',
-    translation: 'Agreed! We can load the truck for Yeshwanthpur APMC delivery by 06:00 AM tomorrow.',
-    time: '14:28 IST',
-    isCounterOffer: false
-  }
-]
 
 const QUICK_PROMPTS = [
   {
-    en: 'Can you do ₹2,180/Qtl for immediate full lot buyout?',
-    kn: 'ತಕ್ಷಣದ ಖರೀದಿಗೆ ₹2,180/ಕ್ವಿಂಟಾಲ್ ನೀಡಲು ಸಾಧ್ಯವೇ?'
+    en: 'Is the lot available for immediate dispatch?',
+    kn: 'ಲಾಟ್ ತಕ್ಷಣದ ರವಾನೆಗೆ ಲಭ್ಯವಿದೆಯೇ?'
   },
   {
     en: 'Packaging confirmed in 25kg standard plastic crates.',
@@ -74,71 +41,151 @@ const QUICK_PROMPTS = [
 export const TradeChatModal = ({ 
   isOpen, 
   onClose, 
+  recipientId,
+  recipientName = 'Trade Partner',
+  recipientRole = 'Trader',
   crop = {
-    title: 'Grade-A Fresh Hybrid Tomato',
-    farmerName: 'Ramesh Gowda',
-    location: 'Belur, Hassan',
-    quantity: '120 Quintals',
-    price: 2180,
-    lotId: 'LOT-KA-HSN-101'
-  },
-  onAcceptOffer
+    _id: '',
+    title: 'Grade-A Produce Lot',
+    quantity: 100,
+    unit: 'Quintals',
+    price: 2000,
+    lotId: 'LOT-KA'
+  }
 }) => {
   const { user } = useAuth()
-  const [messages, setMessages] = useState(INITIAL_MESSAGES)
+  const { on, off } = useSocket()
+  const [messages, setMessages] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [isSending, setIsSending] = useState(false)
+  const [conversationId, setConversationId] = useState(null)
   const [inputMessage, setInputMessage] = useState('')
   const [showKannadaTranslation, setShowKannadaTranslation] = useState(true)
-  const [counterRate, setCounterRate] = useState(String(crop.price || 2180))
+  const [counterRate, setCounterRate] = useState(String(crop.price || crop.basePrice || 2000))
   const [showCounterBox, setShowCounterBox] = useState(false)
   const messagesEndRef = useRef(null)
 
+  // 1. Fetch Real Conversation & Message History from MongoDB
+  const loadChatHistory = async () => {
+    if (!recipientId) return
+    setLoading(true)
+    try {
+      const data = await chatService.getConversationWithUser(recipientId)
+      if (data?.conversation) {
+        setConversationId(data.conversation._id)
+      }
+      setMessages(data?.messages || [])
+    } catch (err) {
+      console.warn('[TradeChatModal] Error loading messages:', err.message)
+      setMessages([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (isOpen && recipientId) {
+      loadChatHistory()
+    }
+  }, [isOpen, recipientId])
+
+  // 2. Real-Time Socket.io Listener for Inbound Messages
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handleNewMessage = (newMsg) => {
+      // Check if message belongs to this conversation or recipient
+      const isCurrentChat = 
+        newMsg.conversationId === conversationId || 
+        newMsg.sender === recipientId || 
+        newMsg.sender?._id === recipientId
+
+      if (isCurrentChat) {
+        setMessages((prev) => {
+          // Prevent duplicates
+          if (prev.some((m) => m._id === newMsg._id)) return prev
+          return [...prev, newMsg]
+        })
+      }
+    }
+
+    on('newMessage', handleNewMessage)
+    return () => {
+      off('newMessage', handleNewMessage)
+    }
+  }, [isOpen, conversationId, recipientId, on, off])
+
+  // Scroll to bottom on message update
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isOpen])
 
   if (!isOpen) return null
 
-  const handleSendMessage = (e) => {
+  // 3. Send Message Handler
+  const handleSendMessage = async (e) => {
     e?.preventDefault?.()
-    if (!inputMessage.trim()) return
+    if (!inputMessage.trim() || isSending || !recipientId) return
 
-    const newMsg = {
-      id: `m-${Date.now()}`,
-      sender: user?.role === 'farmer' ? 'farmer' : 'trader',
-      senderName: user?.name || (user?.role === 'farmer' ? 'Farmer' : 'Trader (You)'),
-      text: inputMessage,
-      translation: `[Kannada Translation]: ${inputMessage}`,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' IST',
-      isCounterOffer: false
-    }
-
-    setMessages((prev) => [...prev, newMsg])
+    const textToSend = inputMessage.trim()
     setInputMessage('')
-    toast.success('Message sent!')
+    setIsSending(true)
+
+    try {
+      const savedMsg = await chatService.sendMessage({
+        receiverId: recipientId,
+        receiverModel: recipientRole,
+        content: textToSend,
+        listingId: crop?._id || crop?.lotId || null
+      })
+
+      if (savedMsg) {
+        if (savedMsg.conversationId && !conversationId) {
+          setConversationId(savedMsg.conversationId)
+        }
+        setMessages((prev) => {
+          if (prev.some((m) => m._id === savedMsg._id)) return prev
+          return [...prev, savedMsg]
+        })
+      }
+    } catch (err) {
+      toast.error('Failed to send message. Please try again.')
+      setInputMessage(textToSend)
+    } finally {
+      setIsSending(false)
+    }
   }
 
-  const handleSendCounterOffer = (e) => {
+  // 4. Send Counter-Offer Message
+  const handleSendCounterOffer = async (e) => {
     e?.preventDefault?.()
     const rate = Number(counterRate)
-    if (!rate || rate <= 0) {
+    if (!rate || rate <= 0 || !recipientId) {
       toast.error('Please enter a valid counter-offer price')
       return
     }
 
-    const newOfferMsg = {
-      id: `m-offer-${Date.now()}`,
-      sender: user?.role === 'farmer' ? 'farmer' : 'trader',
-      senderName: user?.name || 'Trader (You)',
-      text: `Formal Price Negotiation: Proposed ₹${rate.toLocaleString('en-IN')}/Qtl for ${crop.quantity}.`,
-      translation: `ಔಪಚಾರಿಕ ಬೆಲೆ ಸಂಧಾನ: ${crop.quantity} ಗೆ ₹${rate.toLocaleString('en-IN')}/ಕ್ವಿಂಟಾಲ್ ಪ್ರಸ್ತಾಪಿಸಲಾಗಿದೆ.`,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' IST',
-      isCounterOffer: true,
-      offerAmount: rate
-    }
-
-    setMessages((prev) => [...prev, newOfferMsg])
+    const offerText = `[FORMAL COUNTER-OFFER]: Proposed ₹${rate.toLocaleString('en-IN')}/Qtl for ${crop.quantity || 100} ${crop.unit || 'Quintals'}.`
     setShowCounterBox(false)
-    toast.success(`Formal Counter-Offer of ₹${rate.toLocaleString('en-IN')}/Qtl submitted! 🤝`)
+    setIsSending(true)
+
+    try {
+      const savedMsg = await chatService.sendMessage({
+        receiverId: recipientId,
+        receiverModel: recipientRole,
+        content: offerText,
+        listingId: crop?._id || null
+      })
+
+      if (savedMsg) {
+        setMessages((prev) => [...prev, savedMsg])
+        toast.success(`Formal Counter-Offer of ₹${rate.toLocaleString('en-IN')}/Qtl submitted! 🤝`)
+      }
+    } catch (err) {
+      toast.error('Failed to submit counter offer.')
+    } finally {
+      setIsSending(false)
+    }
   }
 
   const handleQuickPromptClick = (prompt) => {
@@ -158,17 +205,16 @@ export const TradeChatModal = ({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-extrabold text-sm sm:text-base text-foreground">
-                  Direct Trade Negotiation Channel
+                  Direct Trade Negotiation: {recipientName}
                 </h3>
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 text-[10px] font-bold border border-emerald-500/20">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Live Chat
+                  {recipientRole} Channel
                 </span>
               </div>
               <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
-                <span>{crop.title}</span> • 
-                <span className="font-mono text-purple-600 font-bold">{crop.lotId}</span> • 
-                <span>{crop.farmerName} ({crop.location})</span>
+                <span>{crop.title || crop.name || 'Crop Produce Lot'}</span> • 
+                <span className="font-mono text-purple-600 font-bold">Lot #{crop._id ? crop._id.slice(-6) : crop.lotId || 'LOT'}</span>
               </p>
             </div>
           </div>
@@ -201,26 +247,43 @@ export const TradeChatModal = ({
           
           {/* Trust Safeguard Banner */}
           <div className="p-3 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-center space-y-0.5">
-            <p className="text-[11px] font-bold text-purple-800 flex items-center justify-center gap-1.5">
+            <p className="text-[11px] font-bold text-purple-800 dark:text-purple-300 flex items-center justify-center gap-1.5">
               <ShieldCheck className="w-3.5 h-3.5 text-purple-600" />
-              KrishiSetu Escrow Protection Active
+              KrishiSetu Escrow & Trade Protection Active
             </p>
-            <span className="text-[10px] text-purple-900/80">
-              All agreed prices can be locked directly into smart escrow from this chat.
+            <span className="text-[10px] text-muted-foreground">
+              All agreed prices can be locked directly into smart escrow contracts.
             </span>
           </div>
 
-          {/* Messages */}
-          {messages.map((m) => {
-            const isMe = m.sender === (user?.role === 'farmer' ? 'farmer' : 'trader')
+          {loading && (
+            <div className="p-8 text-center space-y-2">
+              <Loader2 className="w-6 h-6 animate-spin text-purple-600 mx-auto" />
+              <p className="text-xs text-muted-foreground">Loading verified chat history from MongoDB...</p>
+            </div>
+          )}
+
+          {!loading && messages.length === 0 && (
+            <div className="p-8 text-center space-y-2 rounded-2xl bg-muted/20 border border-dashed border-border">
+              <MessageSquare className="w-8 h-8 text-muted-foreground mx-auto opacity-50" />
+              <p className="text-xs font-bold text-foreground">No prior messages with {recipientName}</p>
+              <p className="text-[11px] text-muted-foreground">Send a direct message or propose a price offer to start negotiating!</p>
+            </div>
+          )}
+
+          {/* Messages Feed */}
+          {messages.map((m, idx) => {
+            const senderId = typeof m.sender === 'object' ? m.sender?._id : m.sender
+            const isMe = senderId === user?._id || m.senderModel?.toLowerCase() === user?.role
+            const isOffer = m.content?.includes('[FORMAL COUNTER-OFFER]')
 
             return (
               <div
-                key={m.id}
+                key={m._id || idx}
                 className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} space-y-1`}
               >
                 <span className="text-[10px] font-bold text-muted-foreground px-1">
-                  {m.senderName}
+                  {isMe ? 'You' : recipientName}
                 </span>
 
                 <div
@@ -230,37 +293,22 @@ export const TradeChatModal = ({
                       : 'bg-muted border border-border text-foreground rounded-bl-none'
                   }`}
                 >
-                  {/* If Counter-Offer Card */}
-                  {m.isCounterOffer && (
+                  {/* Counter Offer Highlight */}
+                  {isOffer && (
                     <div className="p-2.5 rounded-xl bg-black/20 border border-white/20 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1">
-                          <Gavel className="w-3 h-3" /> FORMAL COUNTER-OFFER
-                        </span>
-                        <span className="font-mono font-black text-xs text-white">
-                          ₹{m.offerAmount?.toLocaleString('en-IN')}/Qtl
+                      <div className="flex items-center justify-between text-amber-300 font-bold text-[10px]">
+                        <span className="flex items-center gap-1">
+                          <Gavel className="w-3 h-3" /> FORMAL BINDING COUNTER-OFFER
                         </span>
                       </div>
-                      <p className="text-[10px] opacity-90">
-                        Total Escrow Value: ₹{((m.offerAmount || 0) * 120).toLocaleString('en-IN')} (120 Qtl)
-                      </p>
                     </div>
                   )}
 
                   {/* Message Text */}
-                  <p className="text-xs leading-relaxed">{m.text}</p>
-
-                  {/* Auto-Translation Subtext */}
-                  {showKannadaTranslation && m.translation && (
-                    <div className={`pt-1 border-t text-[11px] ${
-                      isMe ? 'border-white/20 text-purple-100 font-sans' : 'border-border text-muted-foreground font-sans'
-                    }`}>
-                      {m.translation}
-                    </div>
-                  )}
+                  <p className="text-xs leading-relaxed">{m.content}</p>
 
                   <div className="flex items-center justify-end gap-1 text-[9px] opacity-70 pt-0.5">
-                    <span>{m.time}</span>
+                    <span>{m.createdAt ? new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}</span>
                     <CheckCheck className="w-3 h-3" />
                   </div>
                 </div>
@@ -293,7 +341,7 @@ export const TradeChatModal = ({
           {showCounterBox && (
             <form onSubmit={handleSendCounterOffer} className="p-3.5 rounded-2xl bg-purple-500/10 border border-purple-500/20 space-y-2">
               <div className="flex items-center justify-between text-xs font-bold text-foreground">
-                <span className="flex items-center gap-1.5 text-purple-700">
+                <span className="flex items-center gap-1.5 text-purple-700 dark:text-purple-300">
                   <Gavel className="w-4 h-4" /> Propose Binding Counter-Offer:
                 </span>
                 <button 
@@ -320,9 +368,10 @@ export const TradeChatModal = ({
                 <Button
                   type="submit"
                   size="sm"
+                  disabled={isSending}
                   className="h-9 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white px-4 shrink-0 shadow-sm"
                 >
-                  Submit Offer 🤝
+                  {isSending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Submit Offer 🤝'}
                 </Button>
               </div>
             </form>
@@ -344,16 +393,17 @@ export const TradeChatModal = ({
               type="text"
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
-              placeholder="Type message in English or Kannada..."
+              placeholder={`Type message to ${recipientName}...`}
               className="flex-1 h-10 px-4 rounded-xl bg-muted/40 border border-border text-xs focus:outline-none focus:ring-2 focus:ring-purple-500/40"
             />
 
             <Button
               type="submit"
               size="sm"
-              className="rounded-xl h-10 px-4 bg-purple-600 hover:bg-purple-700 text-white shadow-md shrink-0"
+              disabled={isSending || !inputMessage.trim()}
+              className="rounded-xl h-10 px-4 bg-purple-600 hover:bg-purple-700 text-white shadow-md shrink-0 flex items-center justify-center"
             >
-              <Send className="w-4 h-4" />
+              {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             </Button>
           </form>
         </div>

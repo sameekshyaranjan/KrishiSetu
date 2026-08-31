@@ -20,7 +20,7 @@ const farmerSchema = new mongoose.Schema({
     type: String,
     required: true,
     index: true,
-    enum: ['Bengaluru Urban', 'Bengaluru Rural', 'Mysuru', 'Hubballi', 'Dharwad', 'Belagavi', 'Mangaluru', 'Tumakuru', 'Mandya', 'Hassan', 'Kalaburagi', 'Raichur', 'Ballari']
+    enum: require('../utils/karnatakaLocations').KARNATAKA_DISTRICTS
   },
   state: {
     type: String,

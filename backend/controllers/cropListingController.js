@@ -24,9 +24,18 @@ const createCropListing = async (req, res, next) => {
     }
 
     const finalName = name || title || (cropType ? `${cropType} Lot` : 'Produce Lot');
-    const finalCategory = category || 'vegetables';
+    let finalCategory = (category || 'vegetables').toLowerCase().trim();
+    if (!['vegetables', 'fruits', 'grains', 'spices', 'pulses', 'other'].includes(finalCategory)) {
+      finalCategory = 'vegetables';
+    }
     const finalQuantity = Number(quantity) || 50;
-    const finalUnit = unit || 'quintal';
+    
+    let finalUnit = (unit || 'quintal').toLowerCase().trim();
+    if (finalUnit === 'quintals') finalUnit = 'quintal';
+    if (finalUnit === 'tonnes' || finalUnit === 'tons' || finalUnit === 'ton') finalUnit = 'tonne';
+    if (finalUnit === 'kgs' || finalUnit === 'kilogram' || finalUnit === 'kilograms') finalUnit = 'kg';
+    if (!['kg', 'quintal', 'tonne'].includes(finalUnit)) finalUnit = 'quintal';
+
     const finalBasePrice = Number(basePrice) || 2000;
     const finalDistrict = district || farmer.district || 'Hassan';
 
@@ -54,7 +63,23 @@ const createCropListing = async (req, res, next) => {
 const getMyListings = async (req, res, next) => {
   try {
     const listings = await Crop.find({ farmer: req.user.id }).sort({ createdAt: -1 });
-    res.status(200).json(listings);
+    const Bid = require('../models/Bid');
+
+    const listingsWithBids = await Promise.all(
+      listings.map(async (cropDoc) => {
+        const cropObj = cropDoc.toObject();
+        const activeBids = await Bid.find({
+          crop: cropObj._id,
+          status: { $in: ['pending', 'accepted'] }
+        }).sort({ amount: -1 });
+
+        cropObj.bidsCount = activeBids.length;
+        cropObj.currentHighestBid = activeBids.length > 0 ? activeBids[0].amount : null;
+        return cropObj;
+      })
+    );
+
+    res.status(200).json(listingsWithBids);
   } catch (error) {
     next(error);
   }
@@ -86,6 +111,23 @@ const getAllListings = async (req, res, next) => {
       { path: 'farmer', select: 'name village district state mobile' }
     );
 
+    const Bid = require('../models/Bid');
+    const cropsWithBids = await Promise.all(
+      (result.data || []).map(async (cropDoc) => {
+        const cropObj = cropDoc.toObject ? cropDoc.toObject() : cropDoc;
+        const activeBids = await Bid.find({
+          crop: cropObj._id,
+          status: { $in: ['pending', 'accepted'] }
+        }).sort({ amount: -1 });
+
+        cropObj.bidsCount = activeBids.length;
+        cropObj.currentHighestBid = activeBids.length > 0 ? activeBids[0].amount : null;
+        return cropObj;
+      })
+    );
+
+    result.data = cropsWithBids;
+
     await redisClient.setex(cacheKey, 300, JSON.stringify(result));
 
     res.status(200).json({
@@ -106,7 +148,17 @@ const getListingById = async (req, res, next) => {
       return res.status(404).json({ message: 'Listing not found' });
     }
 
-    res.status(200).json(listing);
+    const Bid = require('../models/Bid');
+    const activeBids = await Bid.find({
+      crop: listing._id,
+      status: { $in: ['pending', 'accepted'] }
+    }).sort({ amount: -1 });
+
+    const listingObj = listing.toObject();
+    listingObj.bidsCount = activeBids.length;
+    listingObj.currentHighestBid = activeBids.length > 0 ? activeBids[0].amount : null;
+
+    res.status(200).json(listingObj);
   } catch (error) {
     next(error);
   }
