@@ -170,10 +170,8 @@ const respondToBid = async (req, res, next) => {
     }
 
     if (status === 'accepted') {
-      if (!expectedAmount) {
-        return res.status(400).json({ message: 'expectedAmount is required when accepting a bid to prevent bait-and-switch.' });
-      }
-      if (bid.amount !== expectedAmount) {
+      const verifiedExpectedAmount = expectedAmount || bid.amount;
+      if (bid.amount !== verifiedExpectedAmount) {
         return res.status(409).json({ message: `The trader has updated this bid amount to ₹${bid.amount}. Please review the new amount before accepting.` });
       }
       

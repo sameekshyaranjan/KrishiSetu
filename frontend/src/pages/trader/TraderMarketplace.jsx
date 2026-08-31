@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import cropService from '@/services/cropService'
+import bidService from '@/services/bidService'
 import { Button } from '@/components/ui/button'
 import toast from 'react-hot-toast'
 import { 
@@ -22,13 +23,12 @@ import {
   Layers, 
   RefreshCw, 
   ChevronRight, 
-  Star,
-  Info,
-  X,
-  Camera
+  Star, 
+  Info, 
+  X, 
+  Camera,
+  Loader2
 } from 'lucide-react'
-
-
 
 const CATEGORY_TABS = [
   { id: 'all', label: 'All Crops' },
@@ -53,6 +53,7 @@ export const TraderMarketplace = () => {
   const [selectedLotForBid, setSelectedLotForBid] = useState(null)
   const [bidAmount, setBidAmount] = useState('')
   const [selectedLotForBuyout, setSelectedLotForBuyout] = useState(null)
+  const [isSubmittingBid, setIsSubmittingBid] = useState(false)
 
   const loadMarketplaceLots = async () => {
     setLoading(true)
@@ -119,24 +120,38 @@ export const TraderMarketplace = () => {
     setSelectedLotForBuyout(lot)
   }
 
-  const handleSubmitBid = (e) => {
+  const handleSubmitBid = async (e) => {
     e.preventDefault()
     const parsed = Number(bidAmount)
-    if (!parsed || parsed <= (selectedLotForBid?.currentHighestBid || 0)) {
-      toast.error(`Bid must exceed current highest bid of ₹${selectedLotForBid?.currentHighestBid}/Qtl`)
+    if (!parsed || parsed < (selectedLotForBid?.reservePrice || 0)) {
+      toast.error(`Bid must be at least the reserve price of ₹${selectedLotForBid?.reservePrice || 0}/Qtl`)
       return
     }
 
-    setLots((prev) =>
-      prev.map((l) =>
-        l._id === selectedLotForBid._id
-          ? { ...l, currentHighestBid: parsed, bidsCount: l.bidsCount + 1 }
-          : l
-      )
-    )
+    setIsSubmittingBid(true)
+    try {
+      await bidService.placeBid({
+        cropId: selectedLotForBid._id,
+        amount: parsed,
+        message: `Spot marketplace bid of ₹${parsed}/Qtl from ${user?.name || 'Verified Trader'}`
+      })
 
-    toast.success(`Bid of ₹${parsed.toLocaleString('en-IN')}/Qtl placed successfully on Lot #${selectedLotForBid._id}! 🔨`)
-    setSelectedLotForBid(null)
+      setLots((prev) =>
+        prev.map((l) =>
+          l._id === selectedLotForBid._id
+            ? { ...l, currentHighestBid: Math.max(l.currentHighestBid, parsed), bidsCount: (l.bidsCount || 0) + 1 }
+            : l
+        )
+      )
+
+      toast.success(`Bid of ₹${parsed.toLocaleString('en-IN')}/Qtl placed successfully on Lot #${selectedLotForBid._id}! 🔨`)
+      setSelectedLotForBid(null)
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'Failed to place bid. Please try again.'
+      toast.error(msg)
+    } finally {
+      setIsSubmittingBid(false)
+    }
   }
 
   const handleConfirmBuyout = () => {
@@ -489,6 +504,7 @@ export const TraderMarketplace = () => {
                 <Button
                   type="button"
                   variant="outline"
+                  disabled={isSubmittingBid}
                   onClick={() => setSelectedLotForBid(null)}
                   className="rounded-xl text-xs h-10 px-4"
                 >
@@ -496,9 +512,17 @@ export const TraderMarketplace = () => {
                 </Button>
                 <Button
                   type="submit"
-                  className="rounded-xl text-xs font-bold h-10 px-6 bg-amber-600 hover:bg-amber-700 text-white shadow-md"
+                  disabled={isSubmittingBid}
+                  className="rounded-xl text-xs font-bold h-10 px-6 bg-amber-600 hover:bg-amber-700 text-white shadow-md flex items-center gap-2"
                 >
-                  Confirm & Transmit Bid 🔨
+                  {isSubmittingBid ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Transmitting Bid...</span>
+                    </>
+                  ) : (
+                    <span>Confirm & Transmit Bid 🔨</span>
+                  )}
                 </Button>
               </div>
             </form>
