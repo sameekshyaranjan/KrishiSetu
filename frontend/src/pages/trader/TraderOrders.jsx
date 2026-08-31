@@ -166,7 +166,7 @@ export const TraderOrders = () => {
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-sm text-foreground">{order._id}</span>
+                      <span className="font-mono font-bold text-sm text-foreground">KS-ORD-{String(order._id).slice(-6).toUpperCase()}</span>
                       <span className="text-xs text-muted-foreground">• Ordered on {order.createdAt || order.orderDate || '28 Aug 2026'}</span>
                     </div>
                     <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">

@@ -270,7 +270,7 @@ export const TraderEscrow = () => {
               <div className="space-y-1">
                 <div className="flex items-center gap-2.5">
                   <span className="font-mono font-bold text-xs text-foreground bg-muted px-2 py-0.5 rounded-md">
-                    {tx._id}
+                    KS-ESC-{String(tx._id).slice(-6).toUpperCase()}
                   </span>
                   <span className="font-bold text-sm text-foreground">
                     {tx.cropName}

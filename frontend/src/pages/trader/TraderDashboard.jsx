@@ -407,7 +407,7 @@ export const TraderDashboard = () => {
                   {orders.map((order) => (
                     <tr key={order._id} className="hover:bg-muted/30 transition-colors">
                       <td className="p-4">
-                        <span className="font-mono font-bold text-[11px] text-primary block">{order.orderId || order._id}</span>
+                        <span className="font-mono font-bold text-[11px] text-primary block">KS-ORD-{String(order._id).slice(-6).toUpperCase()}</span>
                         <span className="font-extrabold text-foreground">{order.cropName}</span>
                         <span className="text-[11px] text-muted-foreground block">{order.quantity} {order.unit || 'Quintals'}</span>
                       </td>
