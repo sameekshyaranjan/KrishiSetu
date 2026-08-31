@@ -359,7 +359,7 @@ export const FarmerChats = () => {
                         )}
 
                         <p className="text-xs text-muted-foreground truncate mt-1.5 font-normal">
-                          {conv.lastMessage || 'Conversation opened'}
+                          {conv.lastMessage || 'No messages yet'}
                         </p>
                       </div>
 
