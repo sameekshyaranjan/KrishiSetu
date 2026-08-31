@@ -291,9 +291,13 @@ export const FarmerOrders = () => {
                 <div className="flex items-center gap-3.5">
                   <div className="w-16 h-16 rounded-2xl bg-muted overflow-hidden shrink-0 border border-border">
                     <img 
-                      src={order.crop.image} 
+                      src={order.crop.image || 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=400&auto=format&fit=crop'} 
                       alt={order.crop.name}
                       className="w-full h-full object-cover" 
+                      onError={(e) => {
+                        e.target.onerror = null
+                        e.target.src = 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=400&auto=format&fit=crop'
+                      }}
                     />
                   </div>
                   <div className="space-y-1">

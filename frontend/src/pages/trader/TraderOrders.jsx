@@ -198,8 +198,16 @@ export const TraderOrders = () => {
                 
                 {/* Crop item info */}
                 <div className="flex items-center gap-3.5">
-                  <div className="w-16 h-16 rounded-2xl bg-muted overflow-hidden shrink-0 border border-border">
-                    <img src={order.image} alt={order.cropName} className="w-full h-full object-cover" />
+                  <div className="w-16 h-16 rounded-2xl bg-muted overflow-hidden shrink-0 border border-border shadow-xs">
+                    <img 
+                      src={order.image || order.images?.[0] || 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=400&auto=format&fit=crop'} 
+                      alt={order.cropName} 
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.target.onerror = null
+                        e.target.src = 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=400&auto=format&fit=crop'
+                      }}
+                    />
                   </div>
                   <div className="space-y-0.5">
                     <h4 className="font-extrabold text-sm text-foreground">{order.cropName}</h4>

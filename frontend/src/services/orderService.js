@@ -76,23 +76,47 @@ export const orderService = {
         : []
 
       if (Array.isArray(data)) {
-        return data.map(tx => ({
-          _id: tx._id,
-          cropName: tx.cropListing?.name || tx.cropListing?.title || 'Crop Lot',
-          quantity: tx.cropListing?.quantity || 100,
-          unit: tx.cropListing?.unit || 'Quintals',
-          agreedRate: tx.amount ? Math.round(tx.amount / (tx.cropListing?.quantity || 100)) : tx.amount,
-          grossEscrow: tx.amount || 0,
-          statutoryCess: Math.round((tx.amount || 0) * 0.015),
-          totalEscrowLocked: tx.amount || 0,
-          status: tx.paymentStatus === 'payout_released' || tx.paymentStatus === 'completed' ? 'dbt_released' : 'in_transit',
-          currentStage: tx.logisticsStatus === 'delivered' ? 4 : tx.logisticsStatus === 'in_transit' ? 2 : 1,
-          farmer: {
-            name: tx.farmer?.name || 'Verified Farmer',
-            mobile: tx.farmer?.mobile || '',
-            district: tx.farmer?.district || 'Karnataka'
+        return data.map(tx => {
+          const defaultCropImg = 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=400&auto=format&fit=crop'
+          const cropImg = tx.cropListing?.images?.[0] || defaultCropImg
+          const cropQty = tx.cropListing?.quantity || 100
+          const cropUnit = tx.cropListing?.unit || 'Quintals'
+          const ratePerUnit = tx.amount ? Math.round(tx.amount / cropQty) : tx.amount || 2000
+          const districtName = tx.cropListing?.district || tx.farmer?.district || 'Karnataka'
+
+          return {
+            _id: tx._id,
+            cropName: tx.cropListing?.name || tx.cropListing?.title || 'Crop Lot',
+            variety: tx.cropListing?.category ? `${tx.cropListing.category.toUpperCase()} • Grade-A FAQ` : 'Grade-A Standard Quality',
+            quantity: cropQty,
+            unit: cropUnit,
+            agreedRate: ratePerUnit,
+            grossEscrow: tx.amount || 0,
+            statutoryCess: Math.round((tx.amount || 0) * 0.015),
+            totalEscrowLocked: tx.amount || 0,
+            status: tx.paymentStatus === 'payout_released' || tx.paymentStatus === 'completed' ? 'dbt_released' : 'in_transit',
+            currentStage: tx.logisticsStatus === 'delivered' ? 4 : tx.logisticsStatus === 'in_transit' ? 2 : 1,
+            image: cropImg,
+            images: tx.cropListing?.images?.length ? tx.cropListing.images : [cropImg],
+            farmer: {
+              name: tx.farmer?.name || 'Verified Farmer',
+              mobile: tx.farmer?.mobile || '',
+              district: districtName
+            },
+            transporter: {
+              agency: 'Karnataka State APMC Fleet',
+              vehicleNumber: 'KA-04-E-8821',
+              currentLocation: `${districtName} APMC Yard`,
+              eta: 'Tomorrow, 08:30 AM'
+            },
+            weighment: {
+              isVerified: tx.logisticsStatus === 'delivered' || tx.logisticsStatus === 'arrived_mandi',
+              grossWeight: cropQty * 100,
+              tareWeight: 250,
+              netWeight: (cropQty * 100) - 250
+            }
           }
-        }))
+        })
       }
       return []
     } catch (err) {
