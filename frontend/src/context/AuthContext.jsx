@@ -108,19 +108,7 @@ export const AuthProvider = ({ children }) => {
       setUser(data.user)
       return { success: true, user: data.user, data }
     } catch (error) {
-      console.warn('Backend API login notice, checking demo fallback:', error.message)
-
-      // Graceful fallback for standard demo accounts if backend is unreachable or undergoing restart
-      if (DEMO_FALLBACK_USERS[cleanEmail] && (password === 'password123' || password === 'admin123' || password === 'password')) {
-        const demoUser = DEMO_FALLBACK_USERS[cleanEmail]
-        const demoToken = `mock_jwt_token_${demoUser.role}_${Date.now()}`
-        authService.setAuthSession(demoToken, null, demoUser)
-        setToken(demoToken)
-        setUser(demoUser)
-        return { success: true, user: demoUser, data: { token: demoToken, user: demoUser } }
-      }
-
-      const message = error.response?.data?.message || error.message || 'Login failed'
+      const message = error.response?.data?.message || error.message || 'Login failed. Please check your credentials.'
       return { success: false, error: message }
     } finally {
       setLoading(false)

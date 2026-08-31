@@ -13,9 +13,15 @@ export const api = axios.create({
 // Request Interceptor: Inject JWT Bearer Token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token') || localStorage.getItem('krishisetu_token')
+    const token = localStorage.getItem('krishisetu_token') || localStorage.getItem('token')
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`
+      if (config.headers && typeof config.headers.set === 'function') {
+        config.headers.set('Authorization', `Bearer ${token}`)
+      } else {
+        config.headers = config.headers || {}
+        config.headers.Authorization = `Bearer ${token}`
+        config.headers['Authorization'] = `Bearer ${token}`
+      }
     }
     return config
   },
@@ -28,13 +34,17 @@ api.interceptors.response.use(
   (error) => {
     const status = error.response?.status
     const message = error.response?.data?.message || error.message || 'API request failed'
+    const isLoginEndpoint = error.config?.url?.includes('/auth/login') || error.config?.url?.includes('/auth/admin/login')
 
-    if (status === 401) {
+    if (status === 401 && !isLoginEndpoint) {
       console.warn('Session expired or unauthorized. Clearing stored auth tokens.')
       localStorage.removeItem('token')
       localStorage.removeItem('krishisetu_token')
       localStorage.removeItem('user')
       localStorage.removeItem('krishisetu_user')
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('krishisetu_auth_expired'))
+      }
     }
 
     const customError = new Error(message)
