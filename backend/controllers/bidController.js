@@ -2,6 +2,7 @@ const Bid = require('../models/Bid');
 const Crop = require('../models/Crop');
 const { createNotification } = require('../utils/createNotification');
 const { paginate } = require('../utils/paginate');
+const redisClient = require('../config/redis');
 
 const placeBid = async (req, res, next) => {
   try {
@@ -204,6 +205,8 @@ const respondToBid = async (req, res, next) => {
           );
         }
       }
+
+      await redisClient.incr('crops_feed_version');
     }
 
     bid.status = status;

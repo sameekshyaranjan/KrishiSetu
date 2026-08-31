@@ -59,8 +59,8 @@ export const cropService = {
   getListingById: async (id) => {
     try {
       const res = await api.get(`/crops/${id}`)
-      const payload = res?.data
-      return payload?.data || payload || null
+      if (res && (res._id || res.id || res.name)) return res
+      return res?.data?.data || res?.data || res || null
     } catch (err) {
       console.warn('[cropService] Listing not found:', id, err.message)
       return null

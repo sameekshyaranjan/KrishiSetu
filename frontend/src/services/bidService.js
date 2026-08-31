@@ -21,10 +21,10 @@ export const bidService = {
   getMyBids: async () => {
     try {
       const res = await api.get('/bids/my')
-      const payload = res?.data
-      if (Array.isArray(payload)) return payload
-      if (Array.isArray(payload?.data)) return payload.data
-      if (Array.isArray(payload?.docs)) return payload.docs
+      if (Array.isArray(res)) return res
+      if (Array.isArray(res?.data)) return res.data
+      if (Array.isArray(res?.docs)) return res.docs
+      if (Array.isArray(res?.data?.data)) return res.data.data
       return []
     } catch (err) {
       console.warn('[bidService] Failed to load my bids:', err.message)
@@ -38,10 +38,10 @@ export const bidService = {
   getBidsForListing: async (cropId) => {
     try {
       const res = await api.get(`/bids/listing/${cropId}`)
-      const payload = res?.data
-      if (Array.isArray(payload)) return payload
-      if (Array.isArray(payload?.data)) return payload.data
-      if (Array.isArray(payload?.docs)) return payload.docs
+      if (Array.isArray(res)) return res
+      if (Array.isArray(res?.data)) return res.data
+      if (Array.isArray(res?.docs)) return res.docs
+      if (Array.isArray(res?.data?.data)) return res.data.data
       return []
     } catch (err) {
       console.warn('[bidService] Failed to load listing bids:', err.message)

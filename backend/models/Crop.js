@@ -30,6 +30,9 @@ const cropSchema = new mongoose.Schema({
     required: [true, 'Please provide a base price (minimum expected price)'],
     min: 0
   },
+  district: {
+    type: String
+  },
   description: {
     type: String
   },
