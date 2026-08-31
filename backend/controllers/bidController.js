@@ -65,11 +65,11 @@ const getMyBids = async (req, res, next) => {
     const filter = isFarmer ? { farmer: req.user.id } : { trader: req.user.id };
     const populatePaths = isFarmer 
       ? [
-          { path: 'crop', select: 'name category basePrice status quantity unit' },
+          { path: 'crop', select: 'name category basePrice status quantity unit images district description' },
           { path: 'trader', select: 'name mobile companyName district' }
         ]
       : [
-          { path: 'crop', select: 'name category basePrice status quantity unit' },
+          { path: 'crop', select: 'name category basePrice status quantity unit images district description' },
           { path: 'farmer', select: 'name village district mobile' }
         ];
 

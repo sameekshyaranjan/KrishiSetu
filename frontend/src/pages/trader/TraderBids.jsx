@@ -58,9 +58,11 @@ export const TraderBids = () => {
         const formatted = data.map(b => {
           const crop = b.crop || b.cropListing || {}
           const rate = Number(b.amount || b.bidPrice || 0)
+          const cropImg = crop.images?.[0] || crop.image || 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=500&q=80'
           return {
             _id: b._id,
             lotId: `LOT-${b._id?.slice(-6)}`,
+            cropId: crop._id || b.crop?._id,
             cropName: crop.name || 'Crop Produce Lot',
             variety: crop.category || 'Standard',
             category: crop.category || 'Agricultural',
@@ -74,7 +76,8 @@ export const TraderBids = () => {
             status: b.status === 'accepted' ? 'won' : b.status === 'rejected' ? 'outbid' : 'winning',
             closingIn: 'Live Bidding',
             bidsCount: 1,
-            image: crop.images?.[0] || 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=500&q=80',
+            image: cropImg,
+            images: crop.images || (cropImg ? [cropImg] : []),
             farmer: {
               name: b.farmer?.name || 'Verified Farmer',
               village: b.farmer?.village || 'Karnataka',
@@ -325,9 +328,13 @@ export const TraderBids = () => {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-start gap-4">
                   <img
-                    src={bid.image}
+                    src={bid.image || 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=500&q=80'}
                     alt={bid.cropName}
                     className="w-16 h-16 rounded-2xl object-cover border border-border shrink-0 shadow-sm"
+                    onError={(e) => {
+                      e.target.onerror = null
+                      e.target.src = 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=500&q=80'
+                    }}
                   />
 
                   <div className="space-y-1">
@@ -340,7 +347,7 @@ export const TraderBids = () => {
                       </span>
                     </div>
 
-                    <Link to={`/trader/crops/${bid.lotId}`} className="block hover:text-amber-600 transition-colors">
+                    <Link to={`/trader/crops/${bid.cropId || bid._id}`} className="block hover:text-amber-600 transition-colors">
                       <h3 className="text-base font-extrabold text-foreground leading-snug">
                         {bid.cropName}
                       </h3>
