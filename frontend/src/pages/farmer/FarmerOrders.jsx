@@ -57,8 +57,22 @@ export const FarmerOrders = () => {
   const handleAdvanceStage = async (orderId, currentStage) => {
     const nextStage = Math.min(4, currentStage + 1)
     try {
-      const updatedList = await orderService.advanceFarmerOrderStage(orderId, nextStage)
-      setOrders(updatedList)
+      await orderService.advanceFarmerOrderStage(orderId, nextStage)
+      setOrders((prev) =>
+        prev.map((o) =>
+          o._id === orderId
+            ? { 
+                ...o, 
+                stage: nextStage, 
+                paymentStatus: nextStage === 4 ? 'disbursed' : o.paymentStatus,
+                logistics: {
+                  ...o.logistics,
+                  status: nextStage === 4 ? 'Delivered' : nextStage === 3 ? 'Arrived at Mandi' : 'In Transit'
+                }
+              }
+            : o
+        )
+      )
       const stageMessages = {
         2: 'APMC Electronic Gate Pass Issued & Vehicle Dispatched! 🚚',
         3: 'Produce Reached Mandi & Destination Weighbridge Verified! ⚖️',

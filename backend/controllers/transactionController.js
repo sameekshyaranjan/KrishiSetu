@@ -151,9 +151,9 @@ const getMyTransactions = async (req, res, next) => {
       req.query.page,
       req.query.limit,
       [
-        { path: 'cropListing', select: 'title variety quantity expectedPrice' },
+        { path: 'cropListing', select: 'name category quantity unit basePrice images district description' },
         { path: 'farmer', select: 'name district state mobile' },
-        { path: 'trader', select: 'name companyName mobile' }
+        { path: 'trader', select: 'name companyName mobile district' }
       ],
       { transactionDate: -1 }
     );
@@ -167,9 +167,9 @@ const getMyTransactions = async (req, res, next) => {
 const getTransactionById = async (req, res, next) => {
   try {
     const transaction = await Transaction.findById(req.params.id)
-      .populate('cropListing', 'title variety quantity expectedPrice')
+      .populate('cropListing', 'name category quantity unit basePrice images district description')
       .populate('farmer', 'name district state mobile')
-      .populate('trader', 'name companyName mobile');
+      .populate('trader', 'name companyName mobile district');
 
     if (!transaction) {
       return res.status(404).json({ message: 'Transaction not found' });
@@ -188,9 +188,9 @@ const getTransactionById = async (req, res, next) => {
 
 const updateLogisticsStatus = async (req, res, next) => {
   try {
-    const { status } = req.body;
+    const status = req.body.status || req.body.logisticsStatus;
     
-    if (!['pending', 'in_transit', 'delivered'].includes(status)) {
+    if (!['pending', 'in_transit', 'arrived_mandi', 'delivered'].includes(status)) {
       return res.status(400).json({ message: 'Invalid logistics status' });
     }
 

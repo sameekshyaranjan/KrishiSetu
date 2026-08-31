@@ -69,8 +69,12 @@ export const TraderOrders = () => {
 
   const handleAuthorizeWeighment = async (orderId) => {
     try {
-      const updated = await orderService.advanceTraderOrderStage(orderId, 4)
-      setOrders(updated)
+      await orderService.advanceTraderOrderStage(orderId, 4)
+      setOrders((prev) =>
+        prev.map((o) =>
+          o._id === orderId ? { ...o, currentStage: 4, stage: 4, status: 'dbt_released' } : o
+        )
+      )
       toast.success('APMC Weighment Verified! Escrow funds released directly to the farmer via DBT! 💸')
       setSelectedOrderForWeighment(null)
     } catch (err) {

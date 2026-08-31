@@ -204,6 +204,26 @@ const respondToBid = async (req, res, next) => {
         }
       }
 
+      // Automatically instantiate Escrow Procurement Transaction for Farmer & Trader orders portal
+      const Transaction = require('../models/Transaction');
+      const totalLotAmount = (Number(bid.amount) || 0) * (Number(updatedCrop.quantity) || 1);
+      
+      await Transaction.findOneAndUpdate(
+        { bid: bid._id },
+        {
+          farmer: bid.farmer,
+          trader: bid.trader,
+          cropListing: bid.crop,
+          bid: bid._id,
+          amount: totalLotAmount,
+          paymentStatus: 'pending',
+          logisticsStatus: 'pending',
+          paymentMethod: 'manual',
+          transactionDate: new Date()
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+
       await redisClient.incr('crops_feed_version');
     }
 

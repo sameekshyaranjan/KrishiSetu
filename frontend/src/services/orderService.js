@@ -13,7 +13,16 @@ export const orderService = {
   getFarmerOrders: async () => {
     try {
       const res = await api.get('/transactions/my-transactions')
-      const data = res?.data?.docs || res?.data || res
+      const data = Array.isArray(res?.data?.data)
+        ? res.data.data
+        : Array.isArray(res?.data)
+        ? res.data
+        : Array.isArray(res?.docs)
+        ? res.docs
+        : Array.isArray(res)
+        ? res
+        : []
+
       if (Array.isArray(data)) {
         return data.map(tx => ({
           _id: tx._id,
@@ -34,9 +43,9 @@ export const orderService = {
           escrowAmount: tx.amount || 0,
           mandiCess: Math.round((tx.amount || 0) * 0.015),
           netFarmerPayout: Math.round((tx.amount || 0) * 0.985),
-          paymentStatus: tx.paymentStatus === 'completed' ? 'disbursed' : 'escrow_locked',
+          paymentStatus: tx.paymentStatus === 'payout_released' || tx.paymentStatus === 'completed' ? 'disbursed' : 'escrow_locked',
           stage: tx.logisticsStatus === 'delivered' ? 4 : tx.logisticsStatus === 'in_transit' ? 2 : 1,
-          utrNumber: tx.razorpayPaymentId || `ESC-${tx._id?.slice(-8)}`,
+          utrNumber: tx.paymentGatewayId || `ESC-${tx._id?.slice(-8)}`,
           logistics: {
             transporter: 'Kisan Express Agri-Logistics',
             status: tx.logisticsStatus || 'Pending Pickup'
@@ -56,7 +65,16 @@ export const orderService = {
   getTraderOrders: async () => {
     try {
       const res = await api.get('/transactions/my-transactions')
-      const data = res?.data?.docs || res?.data || res
+      const data = Array.isArray(res?.data?.data)
+        ? res.data.data
+        : Array.isArray(res?.data)
+        ? res.data
+        : Array.isArray(res?.docs)
+        ? res.docs
+        : Array.isArray(res)
+        ? res
+        : []
+
       if (Array.isArray(data)) {
         return data.map(tx => ({
           _id: tx._id,
@@ -67,7 +85,7 @@ export const orderService = {
           grossEscrow: tx.amount || 0,
           statutoryCess: Math.round((tx.amount || 0) * 0.015),
           totalEscrowLocked: tx.amount || 0,
-          status: tx.paymentStatus === 'completed' ? 'dbt_released' : 'in_transit',
+          status: tx.paymentStatus === 'payout_released' || tx.paymentStatus === 'completed' ? 'dbt_released' : 'in_transit',
           currentStage: tx.logisticsStatus === 'delivered' ? 4 : tx.logisticsStatus === 'in_transit' ? 2 : 1,
           farmer: {
             name: tx.farmer?.name || 'Verified Farmer',
@@ -89,8 +107,10 @@ export const orderService = {
   advanceFarmerOrderStage: async (orderId, newStage) => {
     try {
       const statusMap = { 2: 'in_transit', 3: 'arrived_mandi', 4: 'delivered' }
+      const newStatus = statusMap[newStage] || 'in_transit'
       const res = await api.put(`/transactions/${orderId}/logistics`, {
-        logisticsStatus: statusMap[newStage] || 'in_transit'
+        status: newStatus,
+        logisticsStatus: newStatus
       })
       return res?.data || res
     } catch (err) {
@@ -105,8 +125,10 @@ export const orderService = {
   advanceTraderOrderStage: async (orderId, newStage) => {
     try {
       const statusMap = { 2: 'in_transit', 3: 'arrived_mandi', 4: 'delivered' }
+      const newStatus = statusMap[newStage] || 'in_transit'
       const res = await api.put(`/transactions/${orderId}/logistics`, {
-        logisticsStatus: statusMap[newStage] || 'in_transit'
+        status: newStatus,
+        logisticsStatus: newStatus
       })
       return res?.data || res
     } catch (err) {
