@@ -26,7 +26,8 @@ import {
   Sparkles,
   Info,
   CheckCircle2,
-  Zap
+  Zap,
+  Loader2
 } from 'lucide-react'
 
 export const TraderEscrow = () => {
@@ -86,14 +87,17 @@ export const TraderEscrow = () => {
     toast.success(`${label} copied to clipboard!`)
   }
 
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
   const handleConfirmTopUp = async (e) => {
     e.preventDefault()
     const parsed = Number(depositAmount)
-    if (!parsed || parsed < 10000) {
-      toast.error('Minimum corporate escrow deposit is ₹10,000')
+    if (!parsed || parsed < 100) {
+      toast.error('Minimum escrow deposit is ₹100')
       return
     }
 
+    setIsSubmitting(true)
     try {
       const updated = await escrowService.depositFunds(
         parsed, 
@@ -101,11 +105,16 @@ export const TraderEscrow = () => {
       )
 
       setAvailableBalance(updated.availableBalance)
+      setLockedBalance(updated.lockedEscrow)
+      setTotalDisbursed(updated.totalDisbursed)
       setTransactions(updated.transactions)
       toast.success(`₹${parsed.toLocaleString('en-IN')} credited to Escrow Wallet instantly! 🎉`)
       setIsTopUpOpen(false)
     } catch (err) {
-      toast.error('Top-up transaction failed.')
+      const errMsg = err.response?.data?.message || err.message || 'Top-up transaction failed.'
+      toast.error(errMsg)
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -356,8 +365,8 @@ export const TraderEscrow = () => {
                   <input
                     type="number"
                     required
-                    min={10000}
-                    step={5000}
+                    min={100}
+                    step={1000}
                     value={depositAmount}
                     onChange={(e) => setDepositAmount(e.target.value)}
                     className="w-full h-12 pl-8 pr-4 rounded-2xl bg-background border-2 border-emerald-500/40 focus:border-emerald-500 text-lg font-mono font-black text-emerald-600 focus:outline-none"
@@ -367,14 +376,14 @@ export const TraderEscrow = () => {
 
               {/* Quick Amount Chips */}
               <div className="flex items-center gap-2">
-                {['100000', '250000', '500000', '1000000'].map((amt) => (
+                {['10000', '50000', '100000', '500000'].map((amt) => (
                   <button
                     key={amt}
                     type="button"
                     onClick={() => setDepositAmount(amt)}
                     className="flex-1 py-1.5 rounded-xl bg-muted/60 hover:bg-muted border border-border text-xs font-mono font-bold text-foreground transition-colors"
                   >
-                    ₹{(Number(amt) / 100000).toFixed(0)}L
+                    ₹{Number(amt) >= 100000 ? `${(Number(amt) / 100000).toFixed(0)}L` : `${(Number(amt) / 1000).toFixed(0)}K`}
                   </button>
                 ))}
               </div>
@@ -393,7 +402,7 @@ export const TraderEscrow = () => {
                   >
                     <CreditCard className="w-4 h-4 text-emerald-600 mb-1" />
                     <p className="font-bold text-xs text-foreground">Instant NetBanking / UPI</p>
-                    <span className="text-[10px] text-muted-foreground">Immediate balance credit</span>
+                    <span className="text-[10px] text-muted-foreground">Immediate sandbox balance credit</span>
                   </button>
 
                   <button
@@ -407,7 +416,7 @@ export const TraderEscrow = () => {
                   >
                     <Building2 className="w-4 h-4 text-emerald-600 mb-1" />
                     <p className="font-bold text-xs text-foreground">RTGS / NEFT Transfer</p>
-                    <span className="text-[10px] text-muted-foreground">Virtual Account #{user?.id || 'VIRT-8891'}</span>
+                    <span className="text-[10px] text-muted-foreground">Virtual Account #{user?.id ? user.id.slice(-6).toUpperCase() : 'VIRT-8891'}</span>
                   </button>
                 </div>
               </div>
@@ -423,6 +432,7 @@ export const TraderEscrow = () => {
                 <Button
                   type="button"
                   variant="outline"
+                  disabled={isSubmitting}
                   onClick={() => setIsTopUpOpen(false)}
                   className="rounded-xl text-xs h-10 px-4"
                 >
@@ -430,9 +440,17 @@ export const TraderEscrow = () => {
                 </Button>
                 <Button
                   type="submit"
-                  className="rounded-xl text-xs font-bold h-10 px-6 bg-emerald-600 hover:bg-emerald-700 text-white shadow-md"
+                  disabled={isSubmitting}
+                  className="rounded-xl text-xs font-bold h-10 px-6 bg-emerald-600 hover:bg-emerald-700 text-white shadow-md flex items-center gap-2"
                 >
-                  Authorize Deposit 🔒
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Processing Deposit...</span>
+                    </>
+                  ) : (
+                    <span>Authorize Deposit 🔒</span>
+                  )}
                 </Button>
               </div>
             </form>

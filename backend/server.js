@@ -22,6 +22,7 @@ const transactionRoutes = require('./routes/transactionRoutes');
 const storageRoutes = require('./routes/storageRoutes');
 const messageRoutes = require('./routes/messageRoutes');
 const exportRoutes = require('./routes/exportRoutes');
+const walletRoutes = require('./routes/walletRoutes');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');
 const { initCronJobs } = require('./jobs/cronJobs');
@@ -192,6 +193,7 @@ const registerRoutes = (prefix) => {
   app.use(`${prefix}/storage`, storageRoutes);
   app.use(`${prefix}/messages`, messageRoutes);
   app.use(`${prefix}/export`, exportRoutes);
+  app.use(`${prefix}/wallet`, walletRoutes);
 };
 
 registerRoutes('/api/v1');
