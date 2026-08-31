@@ -199,7 +199,7 @@ export const TraderDashboard = () => {
             </div>
           </div>
           <p className="text-2xl font-black text-emerald-600">
-            ₹{orders.filter(o => o.paymentStatus === 'escrow_locked' || o.paymentStatus === 'dispatched').reduce((sum, o) => sum + (Number(o.escrowAmount) || 0), 0).toLocaleString('en-IN')}
+            ₹{orders.filter(o => o.currentStage < 4).reduce((sum, o) => sum + (Number(o.grossEscrow) || Number(o.totalEscrowLocked) || Number(o.escrowAmount) || 0), 0).toLocaleString('en-IN')}
           </p>
           <span className="text-[11px] text-muted-foreground">100% Capital Protected</span>
         </div>
@@ -213,10 +213,10 @@ export const TraderDashboard = () => {
             </div>
           </div>
           <p className="text-2xl font-black text-sky-600">
-            {orders.filter(o => o.deliveryStatus === 'in_transit' || o.deliveryStatus === 'dispatched').length} Consignments
+            {orders.filter(o => o.currentStage === 2 || o.currentStage === 3 || o.status === 'in_transit').length} Consignments
           </p>
           <span className="text-[11px] text-muted-foreground">
-            {orders.filter(o => o.deliveryStatus === 'in_transit' || o.deliveryStatus === 'dispatched').reduce((sum, o) => sum + (Number(o.quantity) || 0), 0)} Quintals moving
+            {orders.filter(o => o.currentStage === 2 || o.currentStage === 3 || o.status === 'in_transit').reduce((sum, o) => sum + (Number(o.quantity) || 0), 0)} Quintals moving
           </span>
         </div>
 
@@ -409,22 +409,31 @@ export const TraderDashboard = () => {
                       <td className="p-4">
                         <span className="font-mono font-bold text-[11px] text-primary block">{order.orderId || order._id}</span>
                         <span className="font-extrabold text-foreground">{order.cropName}</span>
-                        <span className="text-[11px] text-muted-foreground block">{order.quantity}</span>
+                        <span className="text-[11px] text-muted-foreground block">{order.quantity} {order.unit || 'Quintals'}</span>
                       </td>
 
                       <td className="p-4 font-medium text-foreground">
-                        {order.farmerName || 'Verified Farmer'}
+                        {order.farmer?.name || order.farmerName || 'Verified Farmer'}
+                        <span className="text-[11px] text-muted-foreground block">{order.farmer?.district || 'Karnataka'}</span>
                       </td>
 
                       <td className="p-4 text-right font-extrabold text-foreground">
-                        ₹{(Number(order.totalPayout) || Number(order.escrowAmount) || 0).toLocaleString('en-IN')}
-                        <span className="block text-[10px] font-semibold text-emerald-600">{order.escrowStatus || 'Escrow Locked'}</span>
+                        ₹{(Number(order.grossEscrow) || Number(order.totalEscrowLocked) || Number(order.totalPayout) || Number(order.escrowAmount) || 0).toLocaleString('en-IN')}
+                        <span className="block text-[10px] font-semibold text-emerald-600">
+                          {order.currentStage === 4 ? 'Disbursed to Bank 💸' : 'Escrow Secured 🔒'}
+                        </span>
                       </td>
 
                       <td className="p-4">
-                        <span className="font-semibold text-foreground block">{order.transitStage || 'In-Transit'}</span>
-                        <span className="text-[11px] text-muted-foreground block">{order.transporter || 'APMC Assigned Fleet'}</span>
-                        <span className="text-[10px] text-sky-600 font-bold">ETA: {order.eta || 'Standard APMC Transit'}</span>
+                        <span className="font-semibold text-foreground block">
+                          {order.currentStage === 4 ? 'Delivered & Settled' : 'In-Transit 🚚'}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground block">
+                          {typeof order.transporter === 'object' ? order.transporter?.agency : (order.transporter || 'APMC Assigned Fleet')}
+                        </span>
+                        <span className="text-[10px] text-sky-600 font-bold">
+                          ETA: {typeof order.transporter === 'object' ? order.transporter?.eta : (order.eta || 'Standard APMC Transit')}
+                        </span>
                       </td>
 
                       <td className="p-4 text-right">
