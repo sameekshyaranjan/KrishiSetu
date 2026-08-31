@@ -3,144 +3,24 @@ import api from './api'
 /**
  * KrishiSetu APMC Live Mandi Rates & Trends Service
  * 100% Authentic Government Data (agmarknet.gov.in / data.gov.in)
+ * Strict Karnataka Mandi Scoping — Zero Mock/Fallback Data Contamination
  */
-
-const DEFAULT_KARNATAKA_PRICES = [
-  {
-    _id: 'PRC-PAD-01',
-    commodity: 'Paddy(Common)',
-    category: 'Grains & Cereals',
-    district: 'Mandya',
-    market: 'Mandya APMC Yard',
-    variety: 'Medium',
-    grade: 'FAQ',
-    minPrice: 2000,
-    maxPrice: 2800,
-    modalPrice: 2321.52,
-    unit: 'Quintal',
-    change24h: '+0.5%',
-    trend: 'stable',
-    arrivals: '640 Qtl',
-    lastUpdated: '28 Aug 2026'
-  },
-  {
-    _id: 'PRC-RAG-02',
-    commodity: 'Ragi(Finger Millet)',
-    category: 'Grains & Cereals',
-    district: 'Haveri',
-    market: 'Ranebennur APMC Yard',
-    variety: 'Local',
-    grade: 'FAQ',
-    minPrice: 3200,
-    maxPrice: 3800,
-    modalPrice: 3593,
-    unit: 'Quintal',
-    change24h: '+1.2%',
-    trend: 'up',
-    arrivals: '320 Qtl',
-    lastUpdated: '28 Aug 2026'
-  },
-  {
-    _id: 'PRC-WHT-03',
-    commodity: 'Wheat',
-    category: 'Grains & Cereals',
-    district: 'Kalaburagi',
-    market: 'Kalaburagi APMC Market Yard',
-    variety: 'Sharbati',
-    grade: 'FAQ',
-    minPrice: 2500,
-    maxPrice: 2800,
-    modalPrice: 2650,
-    unit: 'Quintal',
-    change24h: '+0.8%',
-    trend: 'stable',
-    arrivals: '510 Qtl',
-    lastUpdated: '28 Aug 2026'
-  },
-  {
-    _id: 'PRC-COC-04',
-    commodity: 'Tender Coconut',
-    category: 'Spices & Cash Crops',
-    district: 'Mandya',
-    market: 'Mandya APMC Yard',
-    variety: 'Tender Coconut',
-    grade: 'FAQ',
-    minPrice: 20,
-    maxPrice: 30,
-    modalPrice: 25,
-    unit: 'Piece',
-    change24h: '0.0%',
-    trend: 'stable',
-    arrivals: '12,000 Pcs',
-    lastUpdated: '28 Aug 2026'
-  },
-  {
-    _id: 'PRC-TOM-05',
-    commodity: 'Tomato',
-    category: 'Vegetables',
-    district: 'Kolar',
-    market: 'Srinivasapur APMC Yard',
-    variety: 'Tomato',
-    grade: 'FAQ',
-    minPrice: 400,
-    maxPrice: 700,
-    modalPrice: 533,
-    unit: 'Quintal',
-    change24h: '-4.2%',
-    trend: 'down',
-    arrivals: '1,450 Qtl',
-    lastUpdated: '28 Aug 2026'
-  },
-  {
-    _id: 'PRC-ONI-06',
-    commodity: 'Onion',
-    category: 'Vegetables',
-    district: 'Bengaluru',
-    market: 'Bengaluru APMC Yard',
-    variety: 'Bangalore-Samall',
-    grade: 'FAQ',
-    minPrice: 2000,
-    maxPrice: 3000,
-    modalPrice: 2500,
-    unit: 'Quintal',
-    change24h: '+2.1%',
-    trend: 'up',
-    arrivals: '890 Qtl',
-    lastUpdated: '28 Aug 2026'
-  },
-  {
-    _id: 'PRC-POT-07',
-    commodity: 'Potato',
-    category: 'Vegetables',
-    district: 'Kolar',
-    market: 'Bangarpet APMC Yard',
-    variety: 'Local',
-    grade: 'FAQ',
-    minPrice: 1200,
-    maxPrice: 1800,
-    modalPrice: 1500,
-    unit: 'Quintal',
-    change24h: '-1.0%',
-    trend: 'stable',
-    arrivals: '420 Qtl',
-    lastUpdated: '28 Aug 2026'
-  }
-]
 
 export const priceService = {
   /**
-   * Get live mandi prices with optional query filters
+   * Get live Karnataka mandi prices with optional query filters
    */
   getLivePrices: async (params = {}) => {
     try {
       const res = await api.get('/prices', { params })
       const data = res?.data || res
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         return data
       }
-      return DEFAULT_KARNATAKA_PRICES
-    } catch {
-      return DEFAULT_KARNATAKA_PRICES
+      return []
+    } catch (err) {
+      console.warn('[priceService] Error fetching live prices:', err.message)
+      return []
     }
   },
 
@@ -151,30 +31,31 @@ export const priceService = {
     try {
       const res = await api.post('/prices/sync')
       return res?.data || res
-    } catch {
-      return { success: true, count: 1017, isLive: true }
+    } catch (err) {
+      console.warn('[priceService] Sync failed:', err.message)
+      return { success: false, count: 0, isLive: false, error: err.message }
     }
   },
 
   /**
-   * Get 7-day to 30-day price trend history
+   * Get historical price trend from MongoDB aggregation
    */
-  getPriceTrend: async (commodity, district = '', days = 7) => {
+  getPriceTrend: async (commodity, district = '', days = 30) => {
     try {
       const res = await api.get('/prices/trend', {
         params: { commodity, district, days }
       })
-      return res?.data || res || []
-    } catch {
-      return [
-        { date: '22 Aug', price: 2310 },
-        { date: '23 Aug', price: 2315 },
-        { date: '24 Aug', price: 2320 },
-        { date: '25 Aug', price: 2318 },
-        { date: '26 Aug', price: 2320 },
-        { date: '27 Aug', price: 2321 },
-        { date: '28 Aug', price: 2321.52 }
-      ]
+      const data = res?.data || res
+      if (data?.data && Array.isArray(data.data)) {
+        return data.data
+      }
+      if (Array.isArray(data)) {
+        return data
+      }
+      return []
+    } catch (err) {
+      console.warn('[priceService] Error fetching price trend:', err.message)
+      return []
     }
   },
 
@@ -190,8 +71,8 @@ export const priceService = {
         district
       })
       return res?.data || res
-    } catch {
-      return { success: true, message: 'Price alert registered successfully!' }
+    } catch (err) {
+      throw err
     }
   }
 }

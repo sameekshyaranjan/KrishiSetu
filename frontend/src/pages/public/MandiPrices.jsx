@@ -120,12 +120,15 @@ export const MandiPrices = () => {
   // Filtered price list
   const filteredPrices = useMemo(() => {
     return prices.filter((item) => {
+      // Secondary defense-in-depth: enforce Karnataka only
+      const stateClean = (item.state || '').trim().toLowerCase()
+      if (stateClean !== 'karnataka') return false
+
       const q = searchQuery.toLowerCase()
       const matchesSearch = 
         (item.commodity || '').toLowerCase().includes(q) ||
         (item.market || '').toLowerCase().includes(q) ||
         (item.district || '').toLowerCase().includes(q) ||
-        (item.state || '').toLowerCase().includes(q) ||
         (item.variety || '').toLowerCase().includes(q)
 
       const matchesDistrict = selectedDistrict === 'All' || item.district === selectedDistrict
@@ -142,8 +145,8 @@ export const MandiPrices = () => {
     const uniqueCommodities = new Set(prices.map((p) => p.commodity)).size
     
     return {
-      markets: uniqueMarkets || 18,
-      commodities: uniqueCommodities || 32,
+      markets: uniqueMarkets || 0,
+      commodities: uniqueCommodities || 0,
       highestModal: prices.reduce((max, p) => (p.modalPrice > max ? p.modalPrice : max), 0)
     }
   }, [prices])
@@ -157,42 +160,65 @@ export const MandiPrices = () => {
     const paddy = findItem('paddy') || findItem('rice')
     const ragi = findItem('ragi')
     const wheat = findItem('wheat')
-    const coconut = findItem('coconut') || findItem('copra')
+    const special = findItem('copra') || findItem('coconut') || findItem('garlic') || findItem('chilli')
 
-    return [
-      {
+    const highlights = []
+    if (paddy) {
+      highlights.push({
         query: 'Paddy',
-        name: paddy ? paddy.commodity : 'Paddy(Common)',
-        mandi: paddy ? `${paddy.market} (${paddy.district})` : 'Mandya APMC',
-        rate: paddy ? paddy.modalPrice : 2321,
-        variety: paddy?.variety || 'Medium',
+        name: paddy.commodity,
+        mandi: `${paddy.market} (${paddy.district})`,
+        rate: paddy.modalPrice,
+        variety: paddy.variety || 'Medium',
         icon: '🌾'
-      },
-      {
+      })
+    }
+    if (ragi) {
+      highlights.push({
         query: 'Ragi',
-        name: ragi ? ragi.commodity : 'Ragi(Finger Millet)',
-        mandi: ragi ? `${ragi.market} (${ragi.district})` : 'Kolar APMC',
-        rate: ragi ? ragi.modalPrice : 3250,
-        variety: ragi?.variety || 'Local',
+        name: ragi.commodity,
+        mandi: `${ragi.market} (${ragi.district})`,
+        rate: ragi.modalPrice,
+        variety: ragi.variety || 'Local',
         icon: '🌾'
-      },
-      {
+      })
+    }
+    if (wheat) {
+      highlights.push({
         query: 'Wheat',
-        name: wheat ? wheat.commodity : 'Wheat',
-        mandi: wheat ? `${wheat.market} (${wheat.district})` : 'Kalaburagi APMC',
-        rate: wheat ? wheat.modalPrice : 2650,
-        variety: wheat?.variety || 'Sharbati',
+        name: wheat.commodity,
+        mandi: `${wheat.market} (${wheat.district})`,
+        rate: wheat.modalPrice,
+        variety: wheat.variety || 'Sharbati',
         icon: '🌾'
-      },
-      {
-        query: 'Coconut',
-        name: coconut ? coconut.commodity : 'Coconut / Copra',
-        mandi: coconut ? `${coconut.market} (${coconut.district})` : 'Mandya APMC',
-        rate: coconut ? coconut.modalPrice : 25000,
-        variety: coconut?.variety || 'Standard',
+      })
+    }
+    if (special) {
+      highlights.push({
+        query: special.commodity,
+        name: special.commodity,
+        mandi: `${special.market} (${special.district})`,
+        rate: special.modalPrice,
+        variety: special.variety || 'Standard',
         icon: '🥥'
+      })
+    }
+
+    for (const p of prices) {
+      if (highlights.length >= 4) break
+      if (!highlights.some(h => h.name === p.commodity)) {
+        highlights.push({
+          query: p.commodity,
+          name: p.commodity,
+          mandi: `${p.market} (${p.district})`,
+          rate: p.modalPrice,
+          variety: p.variety || 'Standard',
+          icon: '🌱'
+        })
       }
-    ]
+    }
+
+    return highlights
   }, [prices])
 
   return (

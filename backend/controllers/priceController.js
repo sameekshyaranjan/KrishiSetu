@@ -1,28 +1,52 @@
 const MandiPrice = require('../models/MandiPrice');
 const { fetchAgmarknetPrices } = require('../services/priceService');
 
+/**
+ * Get Karnataka Mandi Prices with optional search & filters
+ */
 const getPrices = async (req, res, next) => {
   try {
-    const filter = {};
-    if (req.query.commodity) filter.$text = { $search: req.query.commodity };
-    if (req.query.district) filter.district = { $regex: req.query.district, $options: 'i' };
-    if (req.query.market) filter.market = { $regex: req.query.market, $options: 'i' };
+    // 1. Authoritative Server-Side Filter: strictly Karnataka only
+    const filter = { state: { $regex: /^karnataka$/i } };
 
-    const prices = await MandiPrice.find(filter).sort({ fetchedAt: -1, arrivalDate: -1 });
+    if (req.query.commodity && req.query.commodity.trim()) {
+      filter.$or = [
+        { commodity: { $regex: req.query.commodity.trim(), $options: 'i' } },
+        { variety: { $regex: req.query.commodity.trim(), $options: 'i' } }
+      ];
+    }
+
+    if (req.query.district && req.query.district !== 'All' && req.query.district !== 'All Districts') {
+      filter.district = { $regex: req.query.district.trim(), $options: 'i' };
+    }
+
+    if (req.query.market && req.query.market !== 'All') {
+      filter.market = { $regex: req.query.market.trim(), $options: 'i' };
+    }
+
+    const prices = await MandiPrice.find(filter).sort({ arrivalDate: -1, fetchedAt: -1 });
     res.status(200).json(prices);
   } catch (error) {
     next(error);
   }
 };
 
+/**
+ * Get Karnataka Mandi Prices for a specific commodity
+ */
 const getPricesByCommodity = async (req, res, next) => {
   try {
+    const commodityName = req.params.commodity || '';
     const prices = await MandiPrice.find({
-      $text: { $search: req.params.commodity }
+      state: { $regex: /^karnataka$/i },
+      $or: [
+        { commodity: { $regex: commodityName, $options: 'i' } },
+        { variety: { $regex: commodityName, $options: 'i' } }
+      ]
     }).sort({ arrivalDate: -1 });
 
     if (!prices.length) {
-      return res.status(404).json({ message: 'No prices found for this commodity' });
+      return res.status(404).json({ message: 'No live Karnataka mandi prices found for this commodity' });
     }
 
     res.status(200).json(prices);
@@ -31,6 +55,9 @@ const getPricesByCommodity = async (req, res, next) => {
   }
 };
 
+/**
+ * Get Price Trends for a Karnataka commodity across days
+ */
 const getPriceTrend = async (req, res, next) => {
   try {
     const { commodity, district, days = 30 } = req.query;
@@ -43,11 +70,12 @@ const getPriceTrend = async (req, res, next) => {
     pastDate.setDate(pastDate.getDate() - parseInt(days, 10));
 
     const matchFilter = {
+      state: { $regex: /^karnataka$/i },
       commodity: { $regex: new RegExp(`^${commodity}$`, 'i') },
       arrivalDate: { $gte: pastDate }
     };
 
-    if (district) {
+    if (district && district !== 'All' && district !== 'All Districts') {
       matchFilter.district = { $regex: new RegExp(district, 'i') };
     }
 
@@ -94,6 +122,9 @@ const getPriceTrend = async (req, res, next) => {
   }
 };
 
+/**
+ * Trigger On-Demand Agmarknet Sync for Karnataka
+ */
 const syncPrices = async (req, res, next) => {
   try {
     const result = await fetchAgmarknetPrices();
