@@ -102,22 +102,41 @@ io.use((socket, next) => {
 });
 
 io.on('connection', (socket) => {
-  const userId = socket.user.id;
+  const userId = socket.user?.id;
   
   if (userId) {
-    socket.join(userId);
-    logger.info(`[Socket] Secure user connected and joined room: ${userId}`);
+    socket.join(userId.toString());
+    logger.info(`[Socket] Secure user connected and joined user room: ${userId}`);
   }
 
-  socket.on('join_conversation', (conversationId) => {
-    if (conversationId) {
+  socket.on('join_conversation', async (conversationId) => {
+    try {
+      if (!conversationId) return;
+      const Conversation = require('./models/Conversation');
+      const conv = await Conversation.findById(conversationId).select('participants');
+      if (!conv) {
+        socket.emit('socket_error', { message: 'Conversation not found' });
+        return;
+      }
+      const isParticipant = conv.participants?.some(
+        p => p.user && p.user.toString() === userId?.toString()
+      );
+      if (!isParticipant) {
+        logger.warn(`[Socket Security] Unauthorized room join attempt by user ${userId} for conversation ${conversationId}`);
+        socket.emit('socket_error', { message: 'Forbidden: You are not a participant in this conversation' });
+        return;
+      }
       socket.join(conversationId.toString());
+      logger.info(`[Socket] User ${userId} verified & joined conversation room: ${conversationId}`);
+    } catch (err) {
+      logger.error(`[Socket] Error joining conversation: ${err.message}`);
     }
   });
 
   socket.on('leave_conversation', (conversationId) => {
     if (conversationId) {
       socket.leave(conversationId.toString());
+      logger.info(`[Socket] User ${userId} left conversation room: ${conversationId}`);
     }
   });
 
