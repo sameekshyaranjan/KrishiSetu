@@ -21,7 +21,8 @@ import {
   ShieldCheck, 
   RefreshCw,
   Landmark,
-  Package
+  Package,
+  Sparkles
 } from 'lucide-react'
 
 export const FarmerDashboard = () => {
