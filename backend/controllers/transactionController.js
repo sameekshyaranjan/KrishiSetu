@@ -189,7 +189,15 @@ const getTransactionById = async (req, res, next) => {
 const updateLogisticsStatus = async (req, res, next) => {
   try {
     const status = req.body.status || req.body.logisticsStatus;
-    
+
+    if (status === 'in_transit') {
+      return dispatchLot(req, res, next);
+    }
+
+    if (status === 'delivered') {
+      return confirmDelivery(req, res, next);
+    }
+
     if (!['pending', 'in_transit', 'arrived_mandi', 'delivered'].includes(status)) {
       return res.status(400).json({ message: 'Invalid logistics status' });
     }
@@ -202,34 +210,197 @@ const updateLogisticsStatus = async (req, res, next) => {
     }
 
     tx.logisticsStatus = status;
-
-    if (status === 'delivered') {
-      tx.paymentStatus = 'payout_released';
-      logger.info(`\n[PAYOUT SIMULATION] Releasing ₹${tx.amount} from Escrow to Farmer: ${tx.farmer.name}\n`);
-
-      createNotification(
-        tx.farmer._id,
-        'Farmer',
-        'Payout Released',
-        `Crop delivery confirmed! ₹${tx.amount} has been released from escrow to your bank account.`
-      );
-      createNotification(
-        tx.trader._id,
-        'Trader',
-        'Delivery Confirmed',
-        `Delivery of ${tx.cropListing.name} confirmed. Thank you for using KrishiSetu.`
-      );
-    } else if (status === 'in_transit') {
-      createNotification(
-        tx.trader._id,
-        'Trader',
-        'Crop In Transit',
-        `Your crop ${tx.cropListing.name} is now in transit.`
-      );
-    }
-
     await tx.save();
     res.status(200).json({ message: 'Logistics status updated', transaction: tx });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const submitVehicleDetails = async (req, res, next) => {
+  try {
+    const { vehicleNumber, vehicleType, driverName, driverContact, vehiclePhoto, additionalNotes } = req.body;
+
+    const tx = await Transaction.findById(req.params.id).populate('farmer trader cropListing');
+    if (!tx) return res.status(404).json({ message: 'Transaction not found' });
+
+    // Authorization: only the trader who bought the lot can submit vehicle details
+    if (tx.trader._id.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Only the assigned trader can upload vehicle details' });
+    }
+
+    if (tx.logisticsStatus === 'in_transit' || tx.logisticsStatus === 'delivered') {
+      return res.status(400).json({ message: 'Cannot update vehicle details for lots already dispatched or delivered' });
+    }
+
+    // Validation
+    if (!vehicleNumber || vehicleNumber.trim().length < 4) {
+      return res.status(400).json({ message: 'Please provide a valid vehicle registration number (e.g. KA-04-E-8821)' });
+    }
+
+    if (!driverName || driverName.trim().length < 2) {
+      return res.status(400).json({ message: 'Please provide driver full name' });
+    }
+
+    if (!driverContact || !/^\d{10}$/.test(driverContact.trim())) {
+      return res.status(400).json({ message: 'Please provide a valid 10-digit driver contact number' });
+    }
+
+    let photoUrl = vehiclePhoto;
+    if (req.file) {
+      photoUrl = req.file.path;
+    }
+    if (!photoUrl) {
+      photoUrl = 'https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?w=600&auto=format&fit=crop';
+    }
+
+    tx.vehicleDetails = {
+      vehicleNumber: vehicleNumber.trim().toUpperCase(),
+      vehicleType: vehicleType ? vehicleType.trim() : 'APMC Standard Freight Fleet',
+      driverName: driverName.trim(),
+      driverContact: driverContact.trim(),
+      vehiclePhoto: photoUrl,
+      additionalNotes: additionalNotes ? additionalNotes.trim() : '',
+      submittedAt: new Date()
+    };
+
+    await tx.save();
+
+    createNotification(
+      tx.farmer._id,
+      'Farmer',
+      'Vehicle Details Submitted',
+      `Trader has assigned vehicle ${tx.vehicleDetails.vehicleNumber} (Driver: ${tx.vehicleDetails.driverName}) for ${tx.cropListing?.name || 'crop lot'}. Ready for dispatch.`
+    );
+
+    createNotification(
+      tx.trader._id,
+      'Trader',
+      'Vehicle Assigned',
+      `Vehicle ${tx.vehicleDetails.vehicleNumber} registered for ${tx.cropListing?.name || 'crop lot'}. Awaiting farmer dispatch.`
+    );
+
+    res.status(200).json({
+      message: 'Vehicle details uploaded successfully. Farmer notified for lot dispatch.',
+      transaction: tx
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const dispatchLot = async (req, res, next) => {
+  try {
+    const tx = await Transaction.findById(req.params.id).populate('farmer trader cropListing');
+    if (!tx) return res.status(404).json({ message: 'Transaction not found' });
+
+    // Authorization: only the farmer can dispatch
+    if (tx.farmer._id.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Only the farmer can dispatch this crop lot' });
+    }
+
+    // Must have vehicle details
+    if (!tx.vehicleDetails || !tx.vehicleDetails.vehicleNumber) {
+      return res.status(400).json({ message: 'Vehicle details must be submitted by trader before lot can be dispatched' });
+    }
+
+    if (tx.logisticsStatus !== 'pending') {
+      return res.status(400).json({ message: `Lot is already ${tx.logisticsStatus}` });
+    }
+
+    tx.logisticsStatus = 'in_transit';
+    tx.dispatchedAt = new Date();
+    await tx.save();
+
+    createNotification(
+      tx.trader._id,
+      'Trader',
+      'Crop Lot Dispatched',
+      `Farmer has dispatched your crop lot for ${tx.cropListing?.name || 'produce'} via vehicle ${tx.vehicleDetails.vehicleNumber}. Logistics is now in transit.`
+    );
+
+    createNotification(
+      tx.farmer._id,
+      'Farmer',
+      'Lot Dispatched',
+      `Crop lot ${tx.cropListing?.name || ''} marked as dispatched to ${tx.trader?.name || 'trader'}.`
+    );
+
+    res.status(200).json({ message: 'Lot dispatched successfully and transporter in transit', transaction: tx });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const confirmDelivery = async (req, res, next) => {
+  try {
+    const tx = await Transaction.findById(req.params.id).populate('farmer trader cropListing');
+    if (!tx) return res.status(404).json({ message: 'Transaction not found' });
+
+    // Authorization: only the receiving trader can confirm delivery
+    if (tx.trader._id.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Only the receiving trader can confirm delivery' });
+    }
+
+    if (tx.logisticsStatus === 'pending') {
+      return res.status(400).json({ message: 'Delivery cannot be confirmed before the lot is dispatched by the farmer' });
+    }
+
+    if (tx.logisticsStatus === 'delivered' || tx.paymentStatus === 'payout_released') {
+      return res.status(400).json({ message: 'Delivery and payout have already been confirmed for this transaction' });
+    }
+
+    const payoutAmount = tx.amount;
+    const Wallet = require('../models/Wallet');
+    const WalletLedger = require('../models/WalletLedger');
+
+    // Release escrow: decrement lockedBalance and increment totalDisbursed
+    const updatedTraderWallet = await Wallet.findOneAndUpdate(
+      { trader: tx.trader._id, lockedBalance: { $gte: payoutAmount } },
+      {
+        $inc: { lockedBalance: -payoutAmount, totalDisbursed: payoutAmount },
+        $set: { updatedAt: Date.now() }
+      },
+      { new: true }
+    );
+
+    // Create immutable WalletLedger PAYOUT_DISBURSED record
+    await WalletLedger.create({
+      trader: tx.trader._id,
+      wallet: updatedTraderWallet ? updatedTraderWallet._id : null,
+      type: 'PAYOUT_DISBURSED',
+      amount: payoutAmount,
+      balanceAfter: updatedTraderWallet ? updatedTraderWallet.availableBalance : 0,
+      status: 'completed',
+      source: 'DEVELOPMENT_SANDBOX',
+      paymentMethod: 'Direct Benefit Transfer (DBT)',
+      description: `Escrow payout released to farmer for ${tx.cropListing?.name || 'Crop Lot'}`,
+      referenceId: String(tx._id)
+    });
+
+    tx.logisticsStatus = 'delivered';
+    tx.paymentStatus = 'payout_released';
+    tx.deliveredAt = new Date();
+    await tx.save();
+
+    createNotification(
+      tx.farmer._id,
+      'Farmer',
+      'Escrow Payout Released 💸',
+      `Crop delivery confirmed! ₹${payoutAmount.toLocaleString('en-IN')} has been released from escrow directly to your account.`
+    );
+
+    createNotification(
+      tx.trader._id,
+      'Trader',
+      'Delivery Confirmed & Disbursed',
+      `Delivery of ${tx.cropListing?.name || 'crop lot'} confirmed. ₹${payoutAmount.toLocaleString('en-IN')} escrow has been disbursed to ${tx.farmer?.name || 'farmer'}.`
+    );
+
+    res.status(200).json({
+      message: `Delivery confirmed! ₹${payoutAmount.toLocaleString('en-IN')} released from escrow to farmer.`,
+      transaction: tx
+    });
   } catch (error) {
     next(error);
   }
@@ -276,5 +447,8 @@ module.exports = {
   getMyTransactions,
   getTransactionById,
   updateLogisticsStatus,
+  submitVehicleDetails,
+  dispatchLot,
+  confirmDelivery,
   disputeTransaction
 };

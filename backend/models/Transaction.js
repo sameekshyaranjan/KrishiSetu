@@ -29,8 +29,23 @@ const transactionSchema = new mongoose.Schema({
   },
   logisticsStatus: {
     type: String,
-    enum: ['pending', 'in_transit', 'delivered', 'disputed', 'resolved'],
+    enum: ['pending', 'in_transit', 'arrived_mandi', 'delivered', 'disputed', 'resolved'],
     default: 'pending'
+  },
+  vehicleDetails: {
+    vehicleNumber: { type: String, trim: true },
+    vehicleType: { type: String, trim: true },
+    driverName: { type: String, trim: true },
+    driverContact: { type: String, trim: true },
+    vehiclePhoto: { type: String, trim: true },
+    additionalNotes: { type: String, trim: true },
+    submittedAt: { type: Date }
+  },
+  dispatchedAt: {
+    type: Date
+  },
+  deliveredAt: {
+    type: Date
   },
   paymentMethod: {
     type: String,

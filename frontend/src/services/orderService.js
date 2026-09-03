@@ -24,33 +24,47 @@ export const orderService = {
         : []
 
       if (Array.isArray(data)) {
-        return data.map(tx => ({
-          _id: tx._id,
-          date: tx.transactionDate ? new Date(tx.transactionDate).toLocaleDateString('en-IN') : 'Recent',
-          crop: {
-            name: tx.cropListing?.name || tx.cropListing?.title || 'Agricultural Lot',
-            quantity: tx.cropListing?.quantity || 100,
-            unit: tx.cropListing?.unit || 'Quintals',
-            rate: tx.amount ? Math.round(tx.amount / (tx.cropListing?.quantity || 100)) : tx.amount,
-            image: tx.cropListing?.images?.[0] || 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=400&auto=format&fit=crop'
-          },
-          trader: {
-            name: tx.trader?.name || 'Verified APMC Trader',
-            apmcLicense: tx.trader?.companyName || 'APMC Registered',
-            mobile: tx.trader?.mobile || '',
-            district: tx.trader?.district || 'Karnataka'
-          },
-          escrowAmount: tx.amount || 0,
-          mandiCess: Math.round((tx.amount || 0) * 0.015),
-          netFarmerPayout: Math.round((tx.amount || 0) * 0.985),
-          paymentStatus: tx.paymentStatus === 'payout_released' || tx.paymentStatus === 'completed' ? 'disbursed' : 'escrow_locked',
-          stage: tx.logisticsStatus === 'delivered' ? 4 : tx.logisticsStatus === 'in_transit' ? 2 : 1,
-          utrNumber: tx.paymentGatewayId || `ESC-${tx._id?.slice(-8)}`,
-          logistics: {
-            transporter: 'Kisan Express Agri-Logistics',
-            status: tx.logisticsStatus || 'Pending Pickup'
+        return data.map(tx => {
+          const cropQty = tx.cropListing?.quantity || 100
+          const totalAmount = tx.amount || 0
+          const ratePerUnit = cropQty > 0 ? Math.round(totalAmount / cropQty) : totalAmount
+          const hasVehicle = Boolean(tx.vehicleDetails && tx.vehicleDetails.vehicleNumber)
+
+          return {
+            _id: tx._id,
+            orderCode: `KS-ORD-${String(tx._id).slice(-6).toUpperCase()}`,
+            date: tx.transactionDate ? new Date(tx.transactionDate).toLocaleDateString('en-IN') : 'Recent',
+            crop: {
+              name: tx.cropListing?.name || tx.cropListing?.title || 'Agricultural Lot',
+              quantity: cropQty,
+              unit: tx.cropListing?.unit || 'Quintals',
+              rate: ratePerUnit,
+              image: tx.cropListing?.images?.[0] || 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=400&auto=format&fit=crop'
+            },
+            trader: {
+              name: tx.trader?.name || 'Verified APMC Trader',
+              companyName: tx.trader?.companyName || 'APMC Registered Trader',
+              mobile: tx.trader?.mobile || '',
+              district: tx.trader?.district || 'Karnataka'
+            },
+            escrowAmount: totalAmount,
+            mandiCess: Math.round(totalAmount * 0.015),
+            netFarmerPayout: Math.round(totalAmount * 0.985),
+            paymentStatus: tx.paymentStatus === 'payout_released' || tx.paymentStatus === 'completed' ? 'disbursed' : 'escrow_locked',
+            stage: tx.logisticsStatus === 'delivered' ? 4 : (tx.logisticsStatus === 'in_transit' || tx.logisticsStatus === 'arrived_mandi') ? 2 : 1,
+            logisticsStatus: tx.logisticsStatus || 'pending',
+            utrNumber: tx.paymentGatewayId || `ESC-${String(tx._id).slice(-8).toUpperCase()}`,
+            hasVehicleDetails: hasVehicle,
+            vehicleDetails: tx.vehicleDetails || null,
+            vehicleNumber: tx.vehicleDetails?.vehicleNumber || 'Awaiting Trader Assignment',
+            driverName: tx.vehicleDetails?.driverName || '',
+            driverContact: tx.vehicleDetails?.driverContact || '',
+            vehicleType: tx.vehicleDetails?.vehicleType || '',
+            vehiclePhoto: tx.vehicleDetails?.vehiclePhoto || '',
+            dispatchedAt: tx.dispatchedAt || null,
+            deliveredAt: tx.deliveredAt || null
           }
-        }))
+        })
       }
       return []
     } catch (err) {
@@ -81,21 +95,27 @@ export const orderService = {
           const cropImg = tx.cropListing?.images?.[0] || defaultCropImg
           const cropQty = tx.cropListing?.quantity || 100
           const cropUnit = tx.cropListing?.unit || 'Quintals'
-          const ratePerUnit = tx.amount ? Math.round(tx.amount / cropQty) : tx.amount || 2000
+          const totalAmount = tx.amount || 0
+          const ratePerUnit = cropQty > 0 ? Math.round(totalAmount / cropQty) : totalAmount
           const districtName = tx.cropListing?.district || tx.farmer?.district || 'Karnataka'
+          const hasVehicle = Boolean(tx.vehicleDetails && tx.vehicleDetails.vehicleNumber)
 
           return {
             _id: tx._id,
+            orderCode: `KS-ORD-${String(tx._id).slice(-6).toUpperCase()}`,
             cropName: tx.cropListing?.name || tx.cropListing?.title || 'Crop Lot',
-            variety: tx.cropListing?.category ? `${tx.cropListing.category.toUpperCase()} • Grade-A FAQ` : 'Grade-A Standard Quality',
+            variety: tx.cropListing?.category ? `${tx.cropListing.category.toUpperCase()} • Grade-A Standard` : 'Grade-A Standard Quality',
             quantity: cropQty,
             unit: cropUnit,
             agreedRate: ratePerUnit,
-            grossEscrow: tx.amount || 0,
-            statutoryCess: Math.round((tx.amount || 0) * 0.015),
-            totalEscrowLocked: tx.amount || 0,
+            grossEscrow: totalAmount,
+            statutoryCess: Math.round(totalAmount * 0.015),
+            totalEscrowLocked: totalAmount,
             status: tx.paymentStatus === 'payout_released' || tx.paymentStatus === 'completed' ? 'dbt_released' : 'in_transit',
-            currentStage: tx.logisticsStatus === 'delivered' ? 4 : tx.logisticsStatus === 'in_transit' ? 2 : 1,
+            paymentStatus: tx.paymentStatus || 'held_in_escrow',
+            logisticsStatus: tx.logisticsStatus || 'pending',
+            currentStage: tx.logisticsStatus === 'delivered' ? 4 : (tx.logisticsStatus === 'in_transit' || tx.logisticsStatus === 'arrived_mandi') ? 2 : 1,
+            stage: tx.logisticsStatus === 'delivered' ? 4 : (tx.logisticsStatus === 'in_transit' || tx.logisticsStatus === 'arrived_mandi') ? 2 : 1,
             image: cropImg,
             images: tx.cropListing?.images?.length ? tx.cropListing.images : [cropImg],
             farmer: {
@@ -103,14 +123,17 @@ export const orderService = {
               mobile: tx.farmer?.mobile || '',
               district: districtName
             },
-            transporter: {
-              agency: 'Karnataka State APMC Fleet',
-              vehicleNumber: 'KA-04-E-8821',
-              currentLocation: `${districtName} APMC Yard`,
-              eta: 'Tomorrow, 08:30 AM'
-            },
+            hasVehicleDetails: hasVehicle,
+            vehicleDetails: tx.vehicleDetails || null,
+            vehicleNumber: tx.vehicleDetails?.vehicleNumber || 'Unassigned',
+            driverName: tx.vehicleDetails?.driverName || '',
+            driverContact: tx.vehicleDetails?.driverContact || '',
+            vehicleType: tx.vehicleDetails?.vehicleType || '',
+            vehiclePhoto: tx.vehicleDetails?.vehiclePhoto || '',
+            dispatchedAt: tx.dispatchedAt || null,
+            deliveredAt: tx.deliveredAt || null,
             weighment: {
-              isVerified: tx.logisticsStatus === 'delivered' || tx.logisticsStatus === 'arrived_mandi',
+              isVerified: tx.logisticsStatus === 'delivered',
               grossWeight: cropQty * 100,
               tareWeight: 250,
               netWeight: (cropQty * 100) - 250
@@ -126,39 +149,53 @@ export const orderService = {
   },
 
   /**
-   * Advance Order Milestone
+   * Submit Vehicle Details for an Accepted Order (Trader action)
    */
-  advanceFarmerOrderStage: async (orderId, newStage) => {
-    try {
-      const statusMap = { 2: 'in_transit', 3: 'arrived_mandi', 4: 'delivered' }
-      const newStatus = statusMap[newStage] || 'in_transit'
-      const res = await api.put(`/transactions/${orderId}/logistics`, {
-        status: newStatus,
-        logisticsStatus: newStatus
-      })
-      return res?.data || res
-    } catch (err) {
-      console.warn('[orderService] Advance order notice:', err.message)
-      return null
-    }
+  submitVehicleDetails: async (orderId, vehicleData) => {
+    const res = await api.put(`/transactions/${orderId}/vehicle`, vehicleData)
+    return res?.data || res
   },
 
   /**
-   * Advance Trader Procurement Milestone
+   * Dispatch Crop Lot (Farmer action)
+   */
+  dispatchOrder: async (orderId) => {
+    const res = await api.put(`/transactions/${orderId}/dispatch`, {})
+    return res?.data || res
+  },
+
+  /**
+   * Confirm Delivery & Release Escrow / Payout (Trader action)
+   */
+  confirmDelivery: async (orderId) => {
+    const res = await api.put(`/transactions/${orderId}/confirm-delivery`, {})
+    return res?.data || res
+  },
+
+  /**
+   * Advance Order Milestone (Compatibility wrapper)
+   */
+  advanceFarmerOrderStage: async (orderId, newStage) => {
+    if (newStage === 2) {
+      return orderService.dispatchOrder(orderId)
+    }
+    const statusMap = { 2: 'in_transit', 3: 'arrived_mandi', 4: 'delivered' }
+    const newStatus = statusMap[newStage] || 'in_transit'
+    const res = await api.put(`/transactions/${orderId}/logistics`, { status: newStatus, logisticsStatus: newStatus })
+    return res?.data || res
+  },
+
+  /**
+   * Advance Trader Procurement Milestone (Compatibility wrapper)
    */
   advanceTraderOrderStage: async (orderId, newStage) => {
-    try {
-      const statusMap = { 2: 'in_transit', 3: 'arrived_mandi', 4: 'delivered' }
-      const newStatus = statusMap[newStage] || 'in_transit'
-      const res = await api.put(`/transactions/${orderId}/logistics`, {
-        status: newStatus,
-        logisticsStatus: newStatus
-      })
-      return res?.data || res
-    } catch (err) {
-      console.warn('[orderService] Advance trader order notice:', err.message)
-      return null
+    if (newStage === 4) {
+      return orderService.confirmDelivery(orderId)
     }
+    const statusMap = { 2: 'in_transit', 3: 'arrived_mandi', 4: 'delivered' }
+    const newStatus = statusMap[newStage] || 'in_transit'
+    const res = await api.put(`/transactions/${orderId}/logistics`, { status: newStatus, logisticsStatus: newStatus })
+    return res?.data || res
   }
 }
 

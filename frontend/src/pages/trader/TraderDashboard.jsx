@@ -64,7 +64,7 @@ export const TraderDashboard = () => {
           },
           myBidAmount: rate,
           highestBid: rate,
-          status: b.status === 'accepted' ? 'accepted' : b.status === 'rejected' ? 'outbid' : 'winning',
+          status: b.status === 'accepted' ? 'accepted' : (b.status === 'cancelled' || b.status === 'withdrawn') ? 'cancelled' : b.status === 'rejected' ? 'outbid' : 'winning',
           bidCount: 1,
           closingIn: 'Live',
           lastBidTime: new Date(b.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })

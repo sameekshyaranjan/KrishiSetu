@@ -7,9 +7,12 @@ const {
   getMyTransactions,
   getTransactionById,
   updateLogisticsStatus,
+  submitVehicleDetails,
+  dispatchLot,
+  confirmDelivery,
   disputeTransaction
 } = require('../controllers/transactionController');
-const { protect } = require('../middleware/authMiddleware');
+const { protect, authorize } = require('../middleware/authMiddleware');
 
 router.use(protect);
 
@@ -18,6 +21,16 @@ router.post('/razorpay/verify', verifyRazorpayPayment);
 router.post('/manual', recordManualTransaction);
 router.get('/my-transactions', getMyTransactions);
 router.get('/:id', getTransactionById);
+
+// Specific workflow transition endpoints
+router.put('/:id/vehicle', authorize('trader'), submitVehicleDetails);
+router.post('/:id/vehicle', authorize('trader'), submitVehicleDetails);
+router.put('/:id/dispatch', authorize('farmer'), dispatchLot);
+router.patch('/:id/dispatch', authorize('farmer'), dispatchLot);
+router.put('/:id/confirm-delivery', authorize('trader'), confirmDelivery);
+router.patch('/:id/confirm-delivery', authorize('trader'), confirmDelivery);
+
+// Generic/compatibility endpoints
 router.put('/:id/logistics', updateLogisticsStatus);
 router.put('/:id/dispute', disputeTransaction);
 

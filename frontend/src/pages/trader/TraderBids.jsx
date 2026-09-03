@@ -24,15 +24,17 @@ import {
   Sliders,
   Package,
   Layers,
-  Zap
+  Zap,
+  Truck,
+  XCircle
 } from 'lucide-react'
 
 const STATUS_TABS = [
   { id: 'all', label: 'All Bids' },
-  { id: 'winning', label: 'Winning' },
-  { id: 'outbid', label: 'Outbid' },
-  { id: 'countered', label: 'Counter Received' },
-  { id: 'won', label: 'Won / Escrow Pending' }
+  { id: 'winning', label: 'Active / Pending' },
+  { id: 'won', label: 'Accepted / Won' },
+  { id: 'cancelled', label: 'Cancelled' },
+  { id: 'outbid', label: 'Outbid / Declined' }
 ]
 
 export const TraderBids = () => {
@@ -73,7 +75,8 @@ export const TraderBids = () => {
             myBidAmount: rate,
             highestBid: rate,
             highestBidder: 'You (Top Bidder)',
-            status: b.status === 'accepted' ? 'won' : b.status === 'rejected' ? 'outbid' : 'winning',
+            rawStatus: b.status || 'pending',
+            status: b.status === 'accepted' ? 'won' : (b.status === 'cancelled' || b.status === 'withdrawn') ? 'cancelled' : b.status === 'rejected' ? 'outbid' : 'winning',
             closingIn: 'Live Bidding',
             bidsCount: 1,
             image: cropImg,
@@ -101,6 +104,21 @@ export const TraderBids = () => {
   useEffect(() => {
     loadTraderBids()
   }, [])
+
+  const handleCancelBid = async (bidId) => {
+    if (!window.confirm('Are you sure you want to cancel this bid? The farmer will no longer be able to accept it.')) {
+      return
+    }
+    try {
+      await bidService.cancelBid(bidId)
+      setBids((prev) =>
+        prev.map((b) => (b._id === bidId ? { ...b, rawStatus: 'cancelled', status: 'cancelled' } : b))
+      )
+      toast.success('Bid cancelled successfully! 🚫')
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to cancel bid.')
+    }
+  }
 
   const handleRefresh = async () => {
     setIsRefreshing(true)
@@ -481,8 +499,25 @@ export const TraderBids = () => {
                   {bid.status === 'won' && (
                     <Button asChild size="sm" className="rounded-xl text-xs font-bold h-9 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm">
                       <Link to="/trader/orders">
-                        Lock Escrow & Dispatch <ChevronRight className="w-3.5 h-3.5 ml-1" />
+                        <Truck className="w-3.5 h-3.5 mr-1" /> View Order & Vehicle <ChevronRight className="w-3.5 h-3.5 ml-1" />
                       </Link>
+                    </Button>
+                  )}
+
+                  {bid.status === 'cancelled' && (
+                    <span className="text-xs font-bold text-rose-600 bg-rose-500/10 px-3 py-1.5 rounded-xl border border-rose-500/20 flex items-center gap-1">
+                      <XCircle className="w-3.5 h-3.5" /> Cancelled
+                    </span>
+                  )}
+
+                  {bid.status !== 'won' && bid.status !== 'cancelled' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleCancelBid(bid._id)}
+                      className="rounded-xl text-xs font-bold h-9 border-rose-500/30 text-rose-600 hover:bg-rose-500/10"
+                    >
+                      <X className="w-3.5 h-3.5 mr-1" /> Cancel Bid
                     </Button>
                   )}
 

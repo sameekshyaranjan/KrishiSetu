@@ -125,24 +125,39 @@ const updateBid = async (req, res, next) => {
 
 const withdrawBid = async (req, res, next) => {
   try {
-    const bid = await Bid.findById(req.params.id);
+    const bid = await Bid.findById(req.params.id).populate('crop');
 
     if (!bid) {
       return res.status(404).json({ message: 'Bid not found' });
     }
 
     if (bid.trader.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'You are not authorized to withdraw this bid' });
+      return res.status(403).json({ message: 'You are not authorized to cancel this bid' });
+    }
+
+    if (bid.status === 'accepted') {
+      return res.status(400).json({ message: 'This bid has already been accepted and cannot be cancelled.' });
+    }
+
+    if (bid.status === 'cancelled' || bid.status === 'withdrawn') {
+      return res.status(400).json({ message: 'This bid has already been cancelled.' });
     }
 
     if (bid.status !== 'pending') {
-      return res.status(400).json({ message: 'Only pending bids can be withdrawn' });
+      return res.status(400).json({ message: 'Only active pending bids can be cancelled.' });
     }
 
-    bid.status = 'withdrawn';
+    bid.status = 'cancelled';
     await bid.save();
 
-    res.status(200).json({ message: 'Bid withdrawn successfully' });
+    createNotification(
+      bid.farmer,
+      'Farmer',
+      'Bid Cancelled',
+      `A trader has cancelled their bid of ₹${bid.amount} for your crop listing.`
+    );
+
+    res.status(200).json({ message: 'Bid cancelled successfully', bid });
   } catch (error) {
     next(error);
   }
@@ -165,8 +180,17 @@ const respondToBid = async (req, res, next) => {
       return res.status(403).json({ message: 'You are not authorized to respond to this bid' });
     }
 
+    // Strict validation: cannot accept cancelled or already accepted bids
+    if (bid.status === 'cancelled' || bid.status === 'withdrawn') {
+      return res.status(400).json({ message: 'This bid has already been cancelled by the trader and cannot be accepted.' });
+    }
+
+    if (bid.status === 'accepted') {
+      return res.status(400).json({ message: 'This bid has already been accepted.' });
+    }
+
     if (bid.status !== 'pending') {
-      return res.status(400).json({ message: 'Only pending bids can be responded to' });
+      return res.status(400).json({ message: 'Only pending bids can be responded to.' });
     }
 
     if (status === 'accepted') {
@@ -174,16 +198,67 @@ const respondToBid = async (req, res, next) => {
       if (bid.amount !== verifiedExpectedAmount) {
         return res.status(409).json({ message: `The trader has updated this bid amount to ₹${bid.amount}. Please review the new amount before accepting.` });
       }
-      
+
+      // Verify crop ownership and availability
+      const crop = await Crop.findById(bid.crop);
+      if (!crop || crop.farmer.toString() !== req.user.id) {
+        return res.status(403).json({ message: 'You are not authorized to accept bids for this crop.' });
+      }
+
+      const lockAmount = Number(bid.amount);
+      const Wallet = require('../models/Wallet');
+      const WalletLedger = require('../models/WalletLedger');
+
+      // Verify trader has sufficient available balance in escrow wallet
+      const traderWallet = await Wallet.findOne({ trader: bid.trader });
+      if (!traderWallet || traderWallet.availableBalance < lockAmount) {
+        return res.status(400).json({
+          message: `Insufficient available balance in trader escrow wallet (Available: ₹${traderWallet ? traderWallet.availableBalance.toLocaleString('en-IN') : 0}, Required: ₹${lockAmount.toLocaleString('en-IN')}) to secure this bid.`
+        });
+      }
+
+      // Atomically mark crop as sold (prevents race condition of double acceptance)
       const updatedCrop = await Crop.findOneAndUpdate(
-        { _id: bid.crop, status: 'available' },
+        { _id: bid.crop, status: 'available', farmer: req.user.id },
         { status: 'sold' },
         { new: true }
       );
 
       if (!updatedCrop) {
-        return res.status(400).json({ message: 'This crop is no longer available. It may have been sold to someone else.' });
+        return res.status(400).json({ message: 'This crop is no longer available. It may have already been sold or removed.' });
       }
+
+      // Atomically move trader capital: availableBalance -> lockedBalance
+      const updatedWallet = await Wallet.findOneAndUpdate(
+        { trader: bid.trader, availableBalance: { $gte: lockAmount } },
+        {
+          $inc: { availableBalance: -lockAmount, lockedBalance: lockAmount },
+          $set: { updatedAt: Date.now() }
+        },
+        { new: true }
+      );
+
+      if (!updatedWallet) {
+        // Rollback crop availability if lock fails
+        await Crop.findByIdAndUpdate(bid.crop, { status: 'available' });
+        return res.status(400).json({
+          message: `Insufficient available balance in trader escrow wallet to secure this bid.`
+        });
+      }
+
+      // Create immutable WalletLedger ESCROW_LOCK record
+      await WalletLedger.create({
+        trader: bid.trader,
+        wallet: updatedWallet._id,
+        type: 'ESCROW_LOCK',
+        amount: lockAmount,
+        balanceAfter: updatedWallet.availableBalance,
+        status: 'completed',
+        source: 'DEVELOPMENT_SANDBOX',
+        paymentMethod: 'Escrow Vault Lock',
+        description: `Escrow locked for accepted bid on ${updatedCrop.name}`,
+        referenceId: String(bid._id)
+      });
 
       // Reject all other pending bids for this crop
       const otherBids = await Bid.find({ crop: bid.crop, _id: { $ne: bid._id }, status: 'pending' });
@@ -199,14 +274,13 @@ const respondToBid = async (req, res, next) => {
             otherBid.trader,
             'Trader',
             'Bid Rejected',
-            'Your bid was rejected because the crop was sold to someone else.'
+            `Your bid for ${updatedCrop.name} was rejected because the crop was sold to another trader.`
           );
         }
       }
 
-      // Automatically instantiate Escrow Procurement Transaction for Farmer & Trader orders portal
+      // Instantiate/Update Transaction record with held_in_escrow and pending logistics
       const Transaction = require('../models/Transaction');
-      const totalLotAmount = (Number(bid.amount) || 0) * (Number(updatedCrop.quantity) || 1);
       
       await Transaction.findOneAndUpdate(
         { bid: bid._id },
@@ -215,8 +289,8 @@ const respondToBid = async (req, res, next) => {
           trader: bid.trader,
           cropListing: bid.crop,
           bid: bid._id,
-          amount: totalLotAmount,
-          paymentStatus: 'pending',
+          amount: lockAmount,
+          paymentStatus: 'held_in_escrow',
           logisticsStatus: 'pending',
           paymentMethod: 'manual',
           transactionDate: new Date()
@@ -225,16 +299,36 @@ const respondToBid = async (req, res, next) => {
       );
 
       await redisClient.incr('crops_feed_version');
+
+      bid.status = 'accepted';
+      await bid.save();
+
+      createNotification(
+        bid.trader,
+        'Trader',
+        'Bid Accepted & Escrow Locked',
+        `Your bid of ₹${lockAmount.toLocaleString('en-IN')} for ${updatedCrop.name} was accepted! ₹${lockAmount.toLocaleString('en-IN')} is locked in escrow. Please upload vehicle details for pickup.`
+      );
+
+      createNotification(
+        bid.farmer,
+        'Farmer',
+        'Bid Accepted & Escrow Secured',
+        `You accepted the bid of ₹${lockAmount.toLocaleString('en-IN')} for ${updatedCrop.name}. Escrow is locked. Awaiting trader vehicle details.`
+      );
+
+      return res.status(200).json({ message: 'Bid accepted successfully and escrow locked', bid });
     }
 
+    // If rejecting the bid
     bid.status = status;
     await bid.save();
 
     createNotification(
       bid.trader,
       'Trader',
-      `Bid ${status.charAt(0).toUpperCase() + status.slice(1)}`,
-      `Your bid has been ${status} by the farmer.`
+      'Bid Rejected',
+      `Your bid was declined by the farmer.`
     );
 
     res.status(200).json({ message: `Bid ${status} successfully`, bid });

@@ -50,10 +50,18 @@ export const bidService = {
   },
 
   /**
+   * Cancel an active / pending bid (Trader action)
+   */
+  cancelBid: async (bidId) => {
+    const res = await api.put(`/bids/${bidId}/cancel`)
+    return res?.data || res
+  },
+
+  /**
    * Withdraw an active bid
    */
   withdrawBid: async (bidId) => {
-    const res = await api.put(`/bids/${bidId}/withdraw`)
+    const res = await api.put(`/bids/${bidId}/cancel`)
     return res?.data || res
   },
 

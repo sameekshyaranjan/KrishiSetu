@@ -12,6 +12,9 @@ router.get('/crop/:cropId', authorize('farmer', 'trader', 'admin'), getBidsForLi
 router.post('/', authorize('trader'), placeBid);
 router.put('/:id', authorize('trader'), updateBid);
 router.put('/:id/withdraw', authorize('trader'), withdrawBid);
+router.put('/:id/cancel', authorize('trader'), withdrawBid);
+router.patch('/:id/cancel', authorize('trader'), withdrawBid);
+router.patch('/:id/withdraw', authorize('trader'), withdrawBid);
 router.put('/:id/respond', authorize('farmer'), respondToBid);
 router.put('/:id/accept', authorize('farmer'), (req, res, next) => {
   req.body.status = 'accepted';

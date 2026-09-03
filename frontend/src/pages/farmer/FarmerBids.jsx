@@ -68,10 +68,10 @@ export const FarmerBids = () => {
           b._id === bidId ? { ...b, status: 'accepted' } : b
         )
       )
-      toast.success('🎉 Bid Accepted! Escrow deposit initiated for this crop lot.')
+      toast.success('🎉 Bid Accepted! Escrow locked in database for this crop lot.')
       setSelectedBidForEscrow(null)
-    } catch {
-      toast.error('Failed to accept bid. Please try again.')
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to accept bid. Please try again.')
     } finally {
       setActionLoading(false)
     }
@@ -87,8 +87,8 @@ export const FarmerBids = () => {
         )
       )
       toast.success('Bid declined.')
-    } catch {
-      toast.error('Failed to decline bid.')
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to decline bid.')
     }
   }
 
@@ -285,6 +285,7 @@ export const FarmerBids = () => {
           const isPending = bid.status === 'pending'
           const isAccepted = bid.status === 'accepted'
           const isRejected = bid.status === 'rejected'
+          const isCancelled = bid.status === 'cancelled' || bid.status === 'withdrawn'
           const crop = bid.crop || bid.cropListing || {}
           const quantity = crop.quantity || 50
           const offerRate = Number(bid.amount || bid.bidPrice || 0)
@@ -415,7 +416,7 @@ export const FarmerBids = () => {
                     {isAccepted && (
                       <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 text-xs font-bold">
                         <CheckCircle2 className="w-4 h-4" />
-                        <span>Escrow Locked • Awaiting Logistics</span>
+                        <span>Escrow Locked • Awaiting Dispatch</span>
                       </div>
                     )}
 
@@ -423,6 +424,13 @@ export const FarmerBids = () => {
                       <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-muted text-muted-foreground text-xs font-medium">
                         <XCircle className="w-4 h-4" />
                         <span>Declined</span>
+                      </div>
+                    )}
+
+                    {isCancelled && (
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 text-xs font-bold">
+                        <XCircle className="w-4 h-4" />
+                        <span>Cancelled by Trader</span>
                       </div>
                     )}
                   </div>

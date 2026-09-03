@@ -15,6 +15,9 @@ const findUserByEmail = async (email) => {
   
   user = await Trader.findOne({ email }).select('+password');
   if (user) return { user, role: 'trader' };
+
+  user = await Admin.findOne({ email }).select('+password');
+  if (user) return { user, role: 'admin' };
   
   return { user: null, role: null };
 };

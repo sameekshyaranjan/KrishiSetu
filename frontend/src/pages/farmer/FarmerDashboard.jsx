@@ -59,11 +59,10 @@ export const FarmerDashboard = () => {
     try {
       await cropService.respondToBid(bidId, status)
       toast.success(status === 'accepted' ? 'Bid accepted! Funds locked in Escrow.' : 'Bid declined.')
-      // Optimistic update
       setBids(bids.map(b => b._id === bidId ? { ...b, status } : b))
-    } catch {
-      toast.success(status === 'accepted' ? 'Bid accepted! Escrow payment secured.' : 'Bid rejected.')
-      setBids(bids.map(b => b._id === bidId ? { ...b, status } : b))
+      await loadDashboardData()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to respond to bid.')
     } finally {
       setActionLoadingId(null)
     }

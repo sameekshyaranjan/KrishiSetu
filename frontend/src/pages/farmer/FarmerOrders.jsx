@@ -31,12 +31,13 @@ export const FarmerOrders = () => {
   const { user } = useAuth()
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
-  const [statusFilter, setStatusFilter] = useState('all') // 'all' | 'escrow_locked' | 'dispatched' | 'disbursed'
+  const [statusFilter, setStatusFilter] = useState('all') // 'all' | 'escrow_locked' | 'disbursed'
   const [searchQuery, setSearchQuery] = useState('')
-  
+
   // Modals state
   const [selectedOrderForInvoice, setSelectedOrderForInvoice] = useState(null)
   const [selectedOrderForLogistics, setSelectedOrderForLogistics] = useState(null)
+  const [dispatchingId, setDispatchingId] = useState(null)
 
   const loadOrders = async () => {
     setLoading(true)
@@ -44,7 +45,8 @@ export const FarmerOrders = () => {
       const data = await orderService.getFarmerOrders()
       setOrders(data || [])
     } catch (err) {
-      console.error('[FarmerOrders] Load error:', err)
+      console.error('[FarmerOrders] Failed to load orders:', err)
+      toast.error('Could not load order transactions.')
     } finally {
       setLoading(false)
     }
@@ -54,40 +56,24 @@ export const FarmerOrders = () => {
     loadOrders()
   }, [])
 
-  const handleAdvanceStage = async (orderId, currentStage) => {
-    const nextStage = Math.min(4, currentStage + 1)
+  // Phase 11: Farmer Dispatch Handler
+  const handleDispatch = async (orderId) => {
+    setDispatchingId(orderId)
     try {
-      await orderService.advanceFarmerOrderStage(orderId, nextStage)
-      setOrders((prev) =>
-        prev.map((o) =>
-          o._id === orderId
-            ? { 
-                ...o, 
-                stage: nextStage, 
-                paymentStatus: nextStage === 4 ? 'disbursed' : o.paymentStatus,
-                logistics: {
-                  ...o.logistics,
-                  status: nextStage === 4 ? 'Delivered' : nextStage === 3 ? 'Arrived at Mandi' : 'In Transit'
-                }
-              }
-            : o
-        )
-      )
-      const stageMessages = {
-        2: 'APMC Electronic Gate Pass Issued & Vehicle Dispatched! 🚚',
-        3: 'Produce Reached Mandi & Destination Weighbridge Verified! ⚖️',
-        4: 'Direct Bank Transfer (DBT) Payout Settled in your Bank! 💸'
-      }
-      toast.success(stageMessages[nextStage] || 'Order updated!')
+      await orderService.dispatchOrder(orderId)
+      toast.success('🎉 Crop Lot Dispatched! Transporter is now in transit to APMC yard. 🚚')
+      await loadOrders()
     } catch (err) {
-      toast.error('Failed to advance order milestone.')
+      toast.error(err.response?.data?.message || 'Failed to dispatch crop lot.')
+    } finally {
+      setDispatchingId(null)
     }
   }
 
   const filteredOrders = useMemo(() => {
     return orders.filter((o) => {
       const matchesSearch = 
-        (o._id || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (o.orderCode || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         (o.crop?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         (o.trader?.name || '').toLowerCase().includes(searchQuery.toLowerCase())
 
@@ -96,19 +82,19 @@ export const FarmerOrders = () => {
     })
   }, [orders, searchQuery, statusFilter])
 
-  // KPIs
+  // Real Database KPIs (Phase 14)
   const totalSettled = orders
-    .filter((o) => o.paymentStatus === 'disbursed')
-    .reduce((sum, o) => sum + (o.netFarmerPayout || 0), 0)
-
-  const activeEscrow = orders
-    .filter((o) => o.paymentStatus !== 'disbursed')
+    .filter((o) => o.stage === 4 || o.paymentStatus === 'disbursed')
     .reduce((sum, o) => sum + (o.escrowAmount || 0), 0)
 
-  const completedCount = orders.filter((o) => o.paymentStatus === 'disbursed').length
+  const activeEscrow = orders
+    .filter((o) => o.stage < 4 && o.paymentStatus !== 'disbursed')
+    .reduce((sum, o) => sum + (o.escrowAmount || 0), 0)
+
+  const completedCount = orders.filter((o) => o.stage === 4 || o.paymentStatus === 'disbursed').length
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 max-w-7xl mx-auto">
       
       {/* 1. Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
@@ -121,7 +107,7 @@ export const FarmerOrders = () => {
             Escrow Settlements & Orders
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-            Track lot fulfillment, monitor real-time vehicle dispatch, and download digital APMC tax invoices.
+            Track lot fulfillment, monitor transporter vehicle details, dispatch harvest produce, and inspect escrow DBT payouts.
           </p>
         </div>
 
@@ -144,7 +130,7 @@ export const FarmerOrders = () => {
         </div>
       </div>
 
-      {/* 2. KPI Financial Summary Cards */}
+      {/* 2. KPI Financial Summary Cards (Phase 14 Real Data) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         
         {/* Metric 1: Total Settled Payouts */}
@@ -153,9 +139,9 @@ export const FarmerOrders = () => {
             <CheckCircle2 className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-xs font-semibold text-muted-foreground">Disbursed to Bank</p>
+            <p className="text-xs font-semibold text-muted-foreground">Disbursed to Bank (DBT)</p>
             <h3 className="text-2xl font-black text-primary">₹{totalSettled.toLocaleString('en-IN')}</h3>
-            <span className="text-[11px] text-emerald-600 font-medium">{completedCount} Orders Completed</span>
+            <span className="text-[11px] text-emerald-600 font-medium">{completedCount} Orders Settled</span>
           </div>
         </div>
 
@@ -171,78 +157,59 @@ export const FarmerOrders = () => {
           </div>
         </div>
 
-        {/* Metric 3: Fulfillment Rate */}
+        {/* Metric 3: Total Orders */}
         <div className="p-5 rounded-3xl bg-card border border-border shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-bold shrink-0">
             <Truck className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-xs font-semibold text-muted-foreground">APMC Transit Rate</p>
-            <h3 className="text-2xl font-black text-foreground">100% On-Time</h3>
-            <span className="text-[11px] text-muted-foreground">Zero default rate</span>
+            <p className="text-xs font-semibold text-muted-foreground">Total Transactions</p>
+            <h3 className="text-2xl font-black text-foreground">{orders.length}</h3>
+            <span className="text-[11px] text-muted-foreground">All authenticated procurement lots</span>
           </div>
         </div>
       </div>
 
-      {/* 3. Search & Filter Bar */}
-      <div className="p-4 rounded-3xl bg-card border border-border shadow-sm space-y-4">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          
-          {/* Search Input */}
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-muted-foreground absolute left-3.5 top-3" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by Order ID, crop, or buyer name..."
-              className="w-full h-10 pl-10 pr-3 rounded-2xl bg-background border border-border text-xs focus:outline-none focus:ring-2 focus:ring-primary/40"
-            />
-          </div>
+      {/* 3. Filters & Search Bar */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="relative w-full sm:w-80">
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search by order ID, crop, or buyer..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full h-10 pl-10 pr-4 rounded-xl bg-card border border-border text-xs focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
+          />
+        </div>
 
-          {/* Status Tabs */}
-          <div className="flex items-center bg-muted/60 p-1 rounded-2xl border border-border text-xs font-semibold shrink-0">
+        <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
+          {[
+            { id: 'all', label: 'All Orders' },
+            { id: 'escrow_locked', label: 'Active Escrow 🔒' },
+            { id: 'disbursed', label: 'Disbursed / Completed 💸' }
+          ].map((tab) => (
             <button
-              onClick={() => setStatusFilter('all')}
-              className={`px-3 py-1.5 rounded-xl transition-all ${
-                statusFilter === 'all' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+              key={tab.id}
+              onClick={() => setStatusFilter(tab.id)}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
+                statusFilter === tab.id
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'bg-card border border-border text-muted-foreground hover:text-foreground'
               }`}
             >
-              All Orders ({orders.length})
+              {tab.label}
             </button>
-            <button
-              onClick={() => setStatusFilter('escrow_locked')}
-              className={`px-3 py-1.5 rounded-xl transition-all ${
-                statusFilter === 'escrow_locked' ? 'bg-card text-amber-600 shadow-sm' : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Escrow Locked
-            </button>
-            <button
-              onClick={() => setStatusFilter('dispatched')}
-              className={`px-3 py-1.5 rounded-xl transition-all ${
-                statusFilter === 'dispatched' ? 'bg-card text-primary shadow-sm' : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              In Transit
-            </button>
-            <button
-              onClick={() => setStatusFilter('disbursed')}
-              className={`px-3 py-1.5 rounded-xl transition-all ${
-                statusFilter === 'disbursed' ? 'bg-card text-emerald-600 shadow-sm' : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Settled
-            </button>
-          </div>
+          ))}
         </div>
       </div>
 
       {/* 4. Orders List Cards */}
       <div className="space-y-6">
         {filteredOrders.map((order) => {
-          const isDisbursed = order.paymentStatus === 'disbursed'
-          const isDispatched = order.paymentStatus === 'dispatched'
+          const isDelivered = order.stage === 4
+          const isInTransit = order.stage === 2 || order.stage === 3
+          const isPending = order.stage === 1
 
           return (
             <div 
@@ -257,7 +224,7 @@ export const FarmerOrders = () => {
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-sm text-foreground">KS-ORD-{String(order._id).slice(-6).toUpperCase()}</span>
+                      <span className="font-mono font-bold text-sm text-foreground">{order.orderCode}</span>
                       <span className="text-xs text-muted-foreground">• Booked on {order.date}</span>
                     </div>
                     <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
@@ -269,17 +236,25 @@ export const FarmerOrders = () => {
                 <div className="flex items-center justify-between sm:justify-end gap-4">
                   <div className="text-left sm:text-right">
                     <span className="text-[11px] font-semibold text-muted-foreground block">Net Farmer Payout</span>
-                    <span className="text-xl font-black text-primary">₹{order.netFarmerPayout.toLocaleString('en-IN')}</span>
+                    <span className="text-xl font-black text-primary">₹{order.escrowAmount?.toLocaleString('en-IN')}</span>
                   </div>
 
                   <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                    isDisbursed 
+                    isDelivered 
                       ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' 
-                      : isDispatched 
-                      ? 'bg-primary/10 text-primary border border-primary/20'
-                      : 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
+                      : isInTransit 
+                      ? 'bg-sky-500/10 text-sky-600 border border-sky-500/20'
+                      : order.hasVehicleDetails
+                      ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
+                      : 'bg-muted text-muted-foreground border border-border'
                   }`}>
-                    {isDisbursed ? 'Disbursed to Bank 💸' : isDispatched ? 'In Logistics Transit 🚚' : 'Escrow Secured 🔒'}
+                    {isDelivered 
+                      ? 'Disbursed to Bank 💸' 
+                      : isInTransit 
+                      ? 'In Logistics Transit 🚚' 
+                      : order.hasVehicleDetails
+                      ? 'Ready for Dispatch' 
+                      : 'Awaiting Vehicle Details 🔒'}
                   </span>
                 </div>
               </div>
@@ -306,7 +281,7 @@ export const FarmerOrders = () => {
                       Quantity: <span className="font-semibold text-foreground">{order.crop.quantity} {order.crop.unit}</span>
                     </p>
                     <p className="text-xs font-semibold text-primary">
-                      Rate: ₹{order.crop.rate.toLocaleString('en-IN')}/Qtl
+                      Rate: ₹{order.crop.rate?.toLocaleString('en-IN')}/Qtl
                     </p>
                   </div>
                 </div>
@@ -332,7 +307,7 @@ export const FarmerOrders = () => {
                       <div className="space-y-1">
                         <div className={`h-2 rounded-full ${order.stage >= 2 ? 'bg-primary' : 'bg-border'}`} />
                         <span className={`block font-semibold ${order.stage >= 2 ? 'text-primary' : 'text-muted-foreground'}`}>
-                          2. APMC Gate Pass
+                          2. APMC Dispatched
                         </span>
                       </div>
 
@@ -340,7 +315,7 @@ export const FarmerOrders = () => {
                       <div className="space-y-1">
                         <div className={`h-2 rounded-full ${order.stage >= 3 ? 'bg-primary' : 'bg-border'}`} />
                         <span className={`block font-semibold ${order.stage >= 3 ? 'text-primary' : 'text-muted-foreground'}`}>
-                          3. Weighbridge Pass
+                          3. Mandi Arrival
                         </span>
                       </div>
 
@@ -356,6 +331,92 @@ export const FarmerOrders = () => {
                 </div>
               </div>
 
+              {/* Phase 10: Transporter & Vehicle Details Box */}
+              <div className="p-4 rounded-2xl bg-muted/40 border border-border space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-foreground flex items-center gap-1.5">
+                    <Truck className="w-4 h-4 text-primary" /> Transporter Vehicle Details
+                  </span>
+                  <span className={`px-2.5 py-0.5 rounded-md font-mono text-xs font-bold ${
+                    order.hasVehicleDetails ? 'bg-sky-500/10 text-sky-600 border border-sky-500/20' : 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
+                  }`}>
+                    {order.hasVehicleDetails ? order.vehicleNumber : 'Pending Trader Assignment'}
+                  </span>
+                </div>
+
+                {order.hasVehicleDetails ? (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
+                    <div className="flex items-center gap-3">
+                      {order.vehiclePhoto && (
+                        <img
+                          src={order.vehiclePhoto}
+                          alt="Vehicle"
+                          className="w-12 h-12 rounded-xl object-cover border border-border shrink-0"
+                          onError={(e) => { e.target.style.display = 'none' }}
+                        />
+                      )}
+                      <div className="space-y-0.5">
+                        <p className="text-foreground font-bold">
+                          Driver: {order.driverName} <span className="font-normal text-muted-foreground">({order.vehicleType})</span>
+                        </p>
+                        <p className="text-muted-foreground font-mono">
+                          Contact: <strong className="text-primary">{order.driverContact}</strong>
+                        </p>
+                      </div>
+                    </div>
+
+                    {isPending && (
+                      <Button
+                        size="sm"
+                        disabled={dispatchingId === order._id}
+                        onClick={() => handleDispatch(order._id)}
+                        className="rounded-xl text-xs font-bold h-9 px-5 bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
+                      >
+                        <Truck className="w-3.5 h-3.5 mr-1.5" />
+                        {dispatchingId === order._id ? 'Dispatching...' : 'Dispatch Crop Lot 🚚'}
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1.5 pt-0.5">
+                    <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    Awaiting transporter vehicle registration from trader. You can dispatch the lot once vehicle details are received.
+                  </p>
+                )}
+              </div>
+
+              {/* Phase 14: Payout Received & Settled Banner (When Delivered) */}
+              {isDelivered && (
+                <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-extrabold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4" /> Payout Received & Settled 💸
+                    </span>
+                    <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
+                      Status: PAID / DISBURSED
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs pt-1">
+                    <div>
+                      <span className="text-[10px] text-muted-foreground block">Crop Lot</span>
+                      <span className="font-bold text-foreground">{order.crop?.name}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-muted-foreground block">Procuring Trader</span>
+                      <span className="font-bold text-foreground">{order.trader?.name}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-muted-foreground block">Net Payout Received</span>
+                      <span className="font-black text-emerald-600 text-sm">₹{order.escrowAmount?.toLocaleString('en-IN')}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-muted-foreground block">DBT Settlement Reference</span>
+                      <span className="font-mono font-bold text-foreground">{order.utrNumber}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Card Bottom: Logistics Details & Actions */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-border/80 text-xs">
                 
@@ -365,13 +426,17 @@ export const FarmerOrders = () => {
                     <Truck className="w-4 h-4" />
                   </div>
                   <div>
-                    <span className="font-semibold text-foreground block">{order.logistics.transporter} ({order.logistics.vehicleNumber})</span>
-                    <span className="text-muted-foreground">{order.logistics.status}</span>
+                    <span className="font-semibold text-foreground block">
+                      {order.hasVehicleDetails ? `${order.vehicleType} (${order.vehicleNumber})` : 'Transporter Unassigned'}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {isDelivered ? 'Delivered at APMC Mandi Yard' : isInTransit ? 'In-Transit on State Highway' : 'Awaiting Farm Gate Pickup'}
+                    </span>
                   </div>
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Button 
                     variant="outline" 
                     size="sm"
@@ -390,14 +455,35 @@ export const FarmerOrders = () => {
                     <FileText className="w-3.5 h-3.5 mr-1" /> APMC Invoice
                   </Button>
 
-                  {order.stage < 4 && (
+                  {/* Dispatch Button if pending */}
+                  {isPending && order.hasVehicleDetails && (
                     <Button 
                       size="sm"
-                      onClick={() => handleAdvanceStage(order._id, order.stage)}
+                      disabled={dispatchingId === order._id}
+                      onClick={() => handleDispatch(order._id)}
                       className="rounded-xl text-xs font-bold h-9 px-4 bg-primary text-primary-foreground shadow-sm"
                     >
-                      {order.stage === 1 ? 'Dispatch Lot 🚚' : order.stage === 2 ? 'Weighbridge Pass ⚖️' : 'Release DBT 💸'}
+                      <Truck className="w-3.5 h-3.5 mr-1" />
+                      {dispatchingId === order._id ? 'Dispatching...' : 'Dispatch Lot 🚚'}
                     </Button>
+                  )}
+
+                  {isPending && !order.hasVehicleDetails && (
+                    <span className="text-xs text-muted-foreground font-semibold bg-muted px-3 py-1.5 rounded-xl border border-border">
+                      Awaiting Trader Vehicle Details
+                    </span>
+                  )}
+
+                  {isInTransit && (
+                    <span className="text-xs font-bold text-sky-600 bg-sky-500/10 px-3 py-1.5 rounded-xl border border-sky-500/20 flex items-center gap-1">
+                      <Truck className="w-3.5 h-3.5" /> In Transit to APMC Yard
+                    </span>
+                  )}
+
+                  {isDelivered && (
+                    <span className="text-xs font-bold text-emerald-600 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/20 flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Payout Settled to Bank
+                    </span>
                   )}
                 </div>
               </div>
@@ -405,6 +491,20 @@ export const FarmerOrders = () => {
           )
         })}
       </div>
+
+      {/* Empty State */}
+      {filteredOrders.length === 0 && !loading && (
+        <div className="p-12 text-center rounded-3xl bg-card border border-border space-y-3">
+          <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary mx-auto flex items-center justify-center">
+            <Package className="w-6 h-6" />
+          </div>
+          <p className="text-base font-bold text-foreground">No Orders Found</p>
+          <p className="text-xs text-muted-foreground">Orders will appear here once you accept a trader's bid for your harvest crops.</p>
+          <Button asChild size="sm" className="rounded-xl">
+            <Link to="/farmer/bids">Check Inbound Bids</Link>
+          </Button>
+        </div>
+      )}
 
       {/* 5. APMC Tax Invoice / Gate Pass Modal */}
       {selectedOrderForInvoice && (
@@ -420,7 +520,7 @@ export const FarmerOrders = () => {
                     APMC Mandi Tax Invoice & Gate Pass
                   </h3>
                   <span className="text-[10px] font-mono text-muted-foreground">
-                    Order #{selectedOrderForInvoice._id}
+                    Order #{selectedOrderForInvoice.orderCode}
                   </span>
                 </div>
               </div>
@@ -446,28 +546,39 @@ export const FarmerOrders = () => {
                 <span className="font-bold text-foreground">{selectedOrderForInvoice.crop.name}</span>
               </div>
               <div className="flex justify-between">
+                <span className="text-muted-foreground">Assigned Vehicle:</span>
+                <span className="font-mono font-bold text-foreground">{selectedOrderForInvoice.vehicleNumber}</span>
+              </div>
+              <div className="flex justify-between">
                 <span className="text-muted-foreground">Gross Escrow Value:</span>
                 <span className="font-mono font-bold text-foreground">₹{selectedOrderForInvoice.escrowAmount.toLocaleString('en-IN')}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">APMC Market Cess (1.5%):</span>
-                <span className="font-mono text-foreground">₹{selectedOrderForInvoice.mandiCess.toLocaleString('en-IN')}</span>
+                <span className="text-muted-foreground">Net Payout to Farmer:</span>
+                <span className="font-mono font-bold text-emerald-600">₹{selectedOrderForInvoice.escrowAmount.toLocaleString('en-IN')}</span>
               </div>
-              <div className="flex justify-between pt-2 border-t border-border/80">
-                <span className="font-bold text-foreground">Net DBT Settlement:</span>
-                <span className="font-mono font-black text-sm text-primary">₹{selectedOrderForInvoice.netFarmerPayout.toLocaleString('en-IN')}</span>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">UTR Transaction Ref:</span>
+                <span className="font-mono text-foreground font-bold">{selectedOrderForInvoice.utrNumber}</span>
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-2 border-t border-border">
+            <div className="flex items-center gap-3">
               <Button 
                 onClick={() => {
                   window.print()
-                  toast.success('Invoice dispatched to printer!')
+                  toast.success('Invoice sent to printer')
                 }}
-                className="w-full rounded-xl text-xs font-bold h-10 bg-primary text-primary-foreground shadow-md"
+                className="flex-1 rounded-xl text-xs font-bold h-10 bg-primary text-primary-foreground"
               >
-                <Printer className="w-4 h-4 mr-1.5" /> Print Tax Invoice
+                <Printer className="w-3.5 h-3.5 mr-1.5" /> Print Tax Receipt
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => setSelectedOrderForInvoice(null)}
+                className="rounded-xl text-xs h-10 px-4"
+              >
+                Close
               </Button>
             </div>
           </div>
@@ -485,10 +596,10 @@ export const FarmerOrders = () => {
                 </div>
                 <div>
                   <h3 className="text-base font-black text-foreground">
-                    Live APMC Vehicle Tracking
+                    Farm-Gate Logistics Telemetry
                   </h3>
                   <span className="text-[10px] font-mono text-muted-foreground">
-                    {selectedOrderForLogistics.logistics.vehicleNumber}
+                    Order {selectedOrderForLogistics.orderCode}
                   </span>
                 </div>
               </div>
@@ -502,32 +613,35 @@ export const FarmerOrders = () => {
 
             <div className="p-4 rounded-2xl bg-muted/40 border border-border space-y-3 text-xs">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Transporter:</span>
-                <span className="font-bold text-foreground">{selectedOrderForLogistics.logistics.transporter}</span>
+                <span className="text-muted-foreground">Assigned Vehicle:</span>
+                <span className="font-mono font-bold text-foreground">{selectedOrderForLogistics.vehicleNumber}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Assigned Driver:</span>
-                <span className="font-bold text-foreground">{selectedOrderForLogistics.logistics.driverName}</span>
+                <span className="text-muted-foreground">Driver Name:</span>
+                <span className="font-bold text-foreground">{selectedOrderForLogistics.driverName || 'Designated Transporter'}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Driver Contact:</span>
-                <span className="font-mono font-bold text-primary">{selectedOrderForLogistics.logistics.driverPhone}</span>
+                <span className="text-muted-foreground">Driver Phone:</span>
+                <span className="font-mono font-bold text-primary">{selectedOrderForLogistics.driverContact || 'N/A'}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Current Status:</span>
-                <span className="font-semibold text-emerald-600">{selectedOrderForLogistics.logistics.status}</span>
+                <span className="text-muted-foreground">Current Transit Phase:</span>
+                <span className="font-bold text-emerald-600">
+                  {selectedOrderForLogistics.stage === 4 ? 'Delivered & Disbursed' : selectedOrderForLogistics.stage === 2 ? 'In-Transit on State Highway' : 'Awaiting Farm Gate Pickup'}
+                </span>
               </div>
             </div>
 
             <Button 
               onClick={() => setSelectedOrderForLogistics(null)}
-              className="w-full rounded-xl text-xs font-bold h-10"
+              className="w-full rounded-xl text-xs font-bold h-10 bg-primary text-primary-foreground"
             >
-              Close Tracking Console
+              Close Telemetry
             </Button>
           </div>
         </div>
       )}
+
     </div>
   )
 }

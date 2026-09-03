@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 
 const adminSchema = new mongoose.Schema({
   name: {
@@ -24,6 +25,10 @@ const adminSchema = new mongoose.Schema({
     default: Date.now
   }
 });
+
+adminSchema.methods.matchPassword = async function (enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.password);
+};
 
 const Admin = mongoose.model('Admin', adminSchema);
 

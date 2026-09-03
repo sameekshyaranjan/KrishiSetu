@@ -23,7 +23,7 @@ const bidSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'accepted', 'rejected', 'withdrawn'],
+    enum: ['pending', 'accepted', 'rejected', 'withdrawn', 'cancelled'],
     default: 'pending'
   },
   message: {
