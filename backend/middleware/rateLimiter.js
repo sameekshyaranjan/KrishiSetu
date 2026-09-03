@@ -5,7 +5,7 @@ const redisClient = require('../config/redis');
 // Create standard limiters with automatic memory fallback
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 100,
+  limit: process.env.NODE_ENV === 'development' ? 5000 : 100,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message: { message: 'Too many requests from this IP, please try again after 15 minutes.' }
