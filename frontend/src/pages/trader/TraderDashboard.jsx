@@ -63,8 +63,8 @@ export const TraderDashboard = () => {
             location: `${b.farmer?.village || 'APMC'}, ${b.farmer?.district || 'Karnataka'}`
           },
           myBidAmount: rate,
-          highestBid: rate,
-          status: b.status === 'accepted' ? 'accepted' : (b.status === 'cancelled' || b.status === 'withdrawn') ? 'cancelled' : b.status === 'rejected' ? 'outbid' : 'winning',
+          highestBid: b.status === 'countered' && b.counterAmount ? b.counterAmount : rate,
+          status: b.status === 'accepted' ? 'accepted' : (b.status === 'cancelled' || b.status === 'withdrawn') ? 'cancelled' : b.status === 'countered' ? 'countered' : b.status === 'rejected' ? 'outbid' : 'winning',
           bidCount: 1,
           closingIn: 'Live',
           lastBidTime: new Date(b.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -356,6 +356,14 @@ export const TraderDashboard = () => {
                         className="rounded-xl text-xs font-bold h-8 bg-rose-600 hover:bg-rose-700 text-white shadow-sm"
                       >
                         <ArrowUpRight className="w-3.5 h-3.5 mr-1" /> Raise Bid
+                      </Button>
+                    )}
+
+                    {bid.status === 'countered' && (
+                      <Button asChild size="sm" className="rounded-xl text-xs font-bold h-8 bg-amber-600 hover:bg-amber-700 text-white shadow-sm">
+                        <Link to="/trader/bids">
+                          <Sparkles className="w-3.5 h-3.5 mr-1" /> View Counter
+                        </Link>
                       </Button>
                     )}
 

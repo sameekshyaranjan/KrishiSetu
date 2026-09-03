@@ -21,9 +21,45 @@ const bidSchema = new mongoose.Schema({
     required: [true, 'Please provide the bid amount'],
     min: 0
   },
+  originalAmount: {
+    type: Number,
+    min: 0
+  },
+  counterAmount: {
+    type: Number,
+    min: 0
+  },
+  counterProposedBy: {
+    type: String,
+    enum: ['farmer', 'trader', null],
+    default: null
+  },
+  counterMessage: {
+    type: String
+  },
+  negotiationHistory: [
+    {
+      proposedBy: {
+        type: String,
+        enum: ['farmer', 'trader'],
+        required: true
+      },
+      amount: {
+        type: Number,
+        required: true
+      },
+      message: {
+        type: String
+      },
+      createdAt: {
+        type: Date,
+        default: Date.now
+      }
+    }
+  ],
   status: {
     type: String,
-    enum: ['pending', 'accepted', 'rejected', 'withdrawn', 'cancelled'],
+    enum: ['pending', 'countered', 'accepted', 'rejected', 'withdrawn', 'cancelled'],
     default: 'pending'
   },
   message: {

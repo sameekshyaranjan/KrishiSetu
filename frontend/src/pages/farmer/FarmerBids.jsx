@@ -27,11 +27,14 @@ import {
   MessageSquare
 } from 'lucide-react'
 
+import { useSocket } from '@/hooks/useSocket'
+
 export const FarmerBids = () => {
   const { user } = useAuth()
+  const { on, off } = useSocket()
   const [bids, setBids] = useState([])
   const [loading, setLoading] = useState(true)
-  const [statusFilter, setStatusFilter] = useState('all') // 'all' | 'pending' | 'accepted' | 'rejected'
+  const [statusFilter, setStatusFilter] = useState('all') // 'all' | 'pending' | 'countered' | 'accepted' | 'rejected'
   const [selectedCropFilter, setSelectedCropFilter] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -58,6 +61,23 @@ export const FarmerBids = () => {
     loadBids()
   }, [])
 
+  // Real-time socket event listeners for counter-bids and bid updates
+  useEffect(() => {
+    if (!on || !off) return
+
+    const handleBidChange = () => {
+      loadBids()
+    }
+
+    on('bid-updated', handleBidChange)
+    on('counter-bid', handleBidChange)
+
+    return () => {
+      off('bid-updated', handleBidChange)
+      off('counter-bid', handleBidChange)
+    }
+  }, [on, off])
+
   // 1. Accept Bid Handler (Direct or via Escrow Modal)
   const handleAcceptBid = async (bidId) => {
     setActionLoading(true)
@@ -70,6 +90,7 @@ export const FarmerBids = () => {
       )
       toast.success('🎉 Bid Accepted! Escrow locked in database for this crop lot.')
       setSelectedBidForEscrow(null)
+      await loadBids()
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to accept bid. Please try again.')
     } finally {
@@ -87,17 +108,31 @@ export const FarmerBids = () => {
         )
       )
       toast.success('Bid declined.')
+      await loadBids()
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to decline bid.')
     }
   }
 
-  // 3. Counter Offer Handler
-  const handleSendCounter = (e) => {
+  // 3. Counter Offer Handler (Persisted in MongoDB)
+  const handleSendCounter = async (e) => {
     e.preventDefault()
-    if (!counterPrice || counterPrice <= 0) return
-    toast.success(`Counter offer of ₹${counterPrice.toLocaleString('en-IN')}/Qtl sent to trader!`)
-    setCounterBidModal(null)
+    const parsed = Number(counterPrice)
+    if (!parsed || parsed <= 0) {
+      toast.error('Please enter a valid counter rate')
+      return
+    }
+    setActionLoading(true)
+    try {
+      await cropService.counterBid(counterBidModal._id, parsed)
+      toast.success(`🎉 Counter offer of ₹${parsed.toLocaleString('en-IN')}/Qtl sent to trader!`)
+      setCounterBidModal(null)
+      await loadBids()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to submit counter offer.')
+    } finally {
+      setActionLoading(false)
+    }
   }
 
   // Derived Unique Crops for Dropdown Filter
@@ -267,6 +302,14 @@ export const FarmerBids = () => {
                 Pending ({bids.filter(b => b.status === 'pending').length})
               </button>
               <button
+                onClick={() => setStatusFilter('countered')}
+                className={`px-3 py-1.5 rounded-xl transition-all ${
+                  statusFilter === 'countered' ? 'bg-card text-amber-600 shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Countered ({bids.filter(b => b.status === 'countered').length})
+              </button>
+              <button
                 onClick={() => setStatusFilter('accepted')}
                 className={`px-3 py-1.5 rounded-xl transition-all ${
                   statusFilter === 'accepted' ? 'bg-card text-emerald-600 shadow-sm' : 'text-muted-foreground hover:text-foreground'
@@ -286,6 +329,10 @@ export const FarmerBids = () => {
           const isAccepted = bid.status === 'accepted'
           const isRejected = bid.status === 'rejected'
           const isCancelled = bid.status === 'cancelled' || bid.status === 'withdrawn'
+          const isCountered = bid.status === 'countered'
+          const isFarmerCounter = isCountered && bid.counterProposedBy === 'farmer'
+          const isTraderCounter = isCountered && bid.counterProposedBy === 'trader'
+          
           const crop = bid.crop || bid.cropListing || {}
           const quantity = crop.quantity || 50
           const offerRate = Number(bid.amount || bid.bidPrice || 0)
@@ -299,6 +346,8 @@ export const FarmerBids = () => {
               className={`p-6 rounded-3xl bg-card border transition-all ${
                 isAccepted 
                   ? 'border-emerald-500/50 bg-emerald-500/[0.02]' 
+                  : isCountered
+                  ? 'border-amber-500/50 bg-amber-500/[0.02] shadow-sm'
                   : isRejected 
                   ? 'border-border/60 opacity-60' 
                   : 'border-border hover:border-primary/50 shadow-sm'
@@ -352,15 +401,24 @@ export const FarmerBids = () => {
                   {/* Financial Values */}
                   <div className="text-left lg:text-right space-y-1">
                     <div className="flex items-center lg:justify-end gap-2">
-                      <span className="text-xs font-semibold text-muted-foreground">Offer Rate:</span>
-                      <span className="text-2xl font-black text-primary">
-                        ₹{offerRate.toLocaleString('en-IN')}/Qtl
+                      <span className="text-xs font-semibold text-muted-foreground">
+                        {isTraderCounter ? 'Trader Counter Offer:' : isFarmerCounter ? 'Initial Trader Bid:' : 'Offer Rate:'}
+                      </span>
+                      <span className={`text-2xl font-black ${isTraderCounter ? 'text-amber-600' : 'text-primary'}`}>
+                        ₹{(isTraderCounter ? (bid.counterAmount || offerRate) : offerRate).toLocaleString('en-IN')}/Qtl
                       </span>
                     </div>
 
+                    {isFarmerCounter && (
+                      <div className="flex items-center lg:justify-end gap-1.5 text-xs text-amber-600 font-semibold">
+                        <span>Your Counter Offer:</span>
+                        <span className="font-extrabold font-mono text-sm">₹{bid.counterAmount?.toLocaleString('en-IN')}/Qtl</span>
+                      </div>
+                    )}
+
                     <div className="flex items-center lg:justify-end gap-2 text-xs">
                       <span className="font-bold text-foreground">
-                        Total: ₹{totalVal.toLocaleString('en-IN')}
+                        Total: ₹{(quantity * (isTraderCounter ? (bid.counterAmount || offerRate) : isFarmerCounter ? (bid.counterAmount || offerRate) : offerRate)).toLocaleString('en-IN')}
                       </span>
                       {reserveDiff > 0 && (
                         <span className="text-emerald-600 font-bold text-[11px] bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
@@ -382,6 +440,7 @@ export const FarmerBids = () => {
                       <span>Chat</span>
                     </Button>
 
+                    {/* Standard Pending Bid Actions */}
                     {isPending && (
                       <>
                         <Button 
@@ -391,9 +450,9 @@ export const FarmerBids = () => {
                             setCounterBidModal(bid)
                             setCounterPrice(offerRate + 100)
                           }}
-                          className="rounded-xl text-xs h-10 px-3 font-semibold"
+                          className="rounded-xl text-xs h-10 px-3 font-semibold border-amber-500/40 text-amber-700 hover:bg-amber-500/10"
                         >
-                          Counter
+                          Counter Offer
                         </Button>
                         <Button 
                           size="sm" 
@@ -411,6 +470,56 @@ export const FarmerBids = () => {
                           <Check className="w-4 h-4 mr-1.5" /> Accept Offer
                         </Button>
                       </>
+                    )}
+
+                    {/* Countered: Farmer proposed counter, awaiting trader */}
+                    {isFarmerCounter && (
+                      <div className="flex items-center gap-2">
+                        <span className="px-3.5 py-2 rounded-2xl bg-amber-500/10 text-amber-700 dark:text-amber-300 text-xs font-bold border border-amber-500/20 flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 animate-pulse text-amber-600" />
+                          <span>Counter Sent (₹{bid.counterAmount?.toLocaleString('en-IN')}/Qtl) • Awaiting Trader</span>
+                        </span>
+                        <Button 
+                          size="sm" 
+                          variant="ghost"
+                          onClick={() => handleRejectBid(bid._id)}
+                          className="rounded-xl text-xs h-10 px-3 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 font-semibold"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Countered: Trader proposed counter back, farmer can accept or counter again */}
+                    {isTraderCounter && (
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          size="sm" 
+                          onClick={() => handleAcceptBid(bid._id)}
+                          className="rounded-xl text-xs font-bold h-10 px-4 bg-primary text-primary-foreground shadow-md hover:bg-primary/90"
+                        >
+                          <Check className="w-4 h-4 mr-1.5" /> Accept (₹{bid.counterAmount?.toLocaleString('en-IN')}/Qtl)
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => {
+                            setCounterBidModal(bid)
+                            setCounterPrice((bid.counterAmount || offerRate) + 50)
+                          }}
+                          className="rounded-xl text-xs h-10 px-3 font-semibold text-amber-700 border-amber-500/40"
+                        >
+                          Counter Again
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="ghost"
+                          onClick={() => handleRejectBid(bid._id)}
+                          className="rounded-xl text-xs h-10 px-3 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 font-semibold"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
                     )}
 
                     {isAccepted && (

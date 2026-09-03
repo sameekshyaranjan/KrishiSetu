@@ -10,11 +10,7 @@ const Transaction = require('../models/Transaction');
 
 dotenv.config();
 
-const KARNATAKA_DISTRICTS = [
-  'Bengaluru Urban', 'Bengaluru Rural', 'Mysuru', 'Hubballi', 
-  'Dharwad', 'Belagavi', 'Mangaluru', 'Tumakuru', 'Mandya', 
-  'Hassan', 'Kalaburagi', 'Raichur', 'Ballari'
-];
+const { KARNATAKA_DISTRICTS } = require('./karnatakaLocations');
 
 const CROP_CATEGORIES = {
   vegetables: ['Tomato', 'Potato', 'Onion', 'Cabbage', 'Cauliflower', 'Carrot', 'Brinjal'],

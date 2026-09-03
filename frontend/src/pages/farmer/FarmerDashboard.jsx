@@ -71,7 +71,7 @@ export const FarmerDashboard = () => {
   // Calculated KPI stats
   const activeListings = listings.filter(l => l.status === 'available')
   const totalQuintals = activeListings.reduce((sum, l) => sum + (Number(l.quantity) || 0), 0)
-  const pendingBids = bids.filter(b => b.status === 'pending')
+  const pendingBids = bids.filter(b => b.status === 'pending' || b.status === 'countered')
 
   const completedOrders = orders.filter(o => o.paymentStatus === 'disbursed' || o.paymentStatus === 'completed')
   const realizedRevenue = completedOrders.reduce((sum, o) => sum + (Number(o.netFarmerPayout) || Number(o.escrowAmount) || 0), 0)
@@ -246,6 +246,7 @@ export const FarmerDashboard = () => {
               const isPending = bid.status === 'pending'
               const isAccepted = bid.status === 'accepted'
               const isRejected = bid.status === 'rejected'
+              const isCountered = bid.status === 'countered'
 
               return (
                 <div 
@@ -268,7 +269,7 @@ export const FarmerDashboard = () => {
 
                     <div className="text-right space-y-0.5">
                       <span className="text-xl font-black text-primary">
-                        ₹{bid.amount?.toLocaleString('en-IN')}
+                        ₹{(bid.status === 'countered' && bid.counterAmount ? bid.counterAmount : bid.amount)?.toLocaleString('en-IN')}
                       </span>
                       <span className="text-[10px] text-muted-foreground block">/ Quintal</span>
                     </div>
@@ -305,6 +306,14 @@ export const FarmerDashboard = () => {
                           <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Accept Offer
                         </Button>
                       </div>
+                    )}
+
+                    {isCountered && (
+                      <Button asChild size="sm" variant="outline" className="h-8 rounded-xl text-xs font-bold border-amber-500/40 text-amber-700 hover:bg-amber-500/10">
+                        <Link to="/farmer/bids">
+                          <Sparkles className="w-3.5 h-3.5 mr-1 text-amber-600" /> View Counter (₹{bid.counterAmount?.toLocaleString('en-IN')}/Qtl)
+                        </Link>
+                      </Button>
                     )}
 
                     {isAccepted && (

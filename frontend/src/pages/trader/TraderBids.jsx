@@ -26,11 +26,14 @@ import {
   Layers,
   Zap,
   Truck,
-  XCircle
+  XCircle,
+  Check
 } from 'lucide-react'
+import { useSocket } from '@/hooks/useSocket'
 
 const STATUS_TABS = [
   { id: 'all', label: 'All Bids' },
+  { id: 'countered', label: 'Farmer Counters 💬' },
   { id: 'winning', label: 'Active / Pending' },
   { id: 'won', label: 'Accepted / Won' },
   { id: 'cancelled', label: 'Cancelled' },
@@ -39,6 +42,7 @@ const STATUS_TABS = [
 
 export const TraderBids = () => {
   const { user } = useAuth()
+  const { on, off } = useSocket()
   const [bids, setBids] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeStatus, setActiveStatus] = useState('all')
@@ -60,6 +64,9 @@ export const TraderBids = () => {
         const formatted = data.map(b => {
           const crop = b.crop || b.cropListing || {}
           const rate = Number(b.amount || b.bidPrice || 0)
+          const origRate = Number(b.originalAmount || rate)
+          const counterRate = Number(b.counterAmount || 0)
+          const isCountered = b.status === 'countered'
           const cropImg = crop.images?.[0] || crop.image || 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=500&q=80'
           return {
             _id: b._id,
@@ -72,13 +79,27 @@ export const TraderBids = () => {
             quantity: Number(crop.quantity) || 50,
             unit: crop.unit || 'Quintals',
             reservePrice: Number(crop.basePrice) || 2000,
-            myBidAmount: rate,
-            highestBid: rate,
-            highestBidder: 'You (Top Bidder)',
+            myBidAmount: origRate,
+            highestBid: isCountered && b.counterProposedBy === 'farmer' ? counterRate : rate,
+            highestBidder: isCountered 
+              ? (b.counterProposedBy === 'farmer' ? 'Farmer Counter Offer' : 'You (Counter Proposal)') 
+              : 'You (Top Bidder)',
+            farmerCounterRate: counterRate,
+            counterProposedBy: b.counterProposedBy,
+            counterMessage: b.counterMessage,
+            negotiationHistory: b.negotiationHistory || [],
             rawStatus: b.status || 'pending',
-            status: b.status === 'accepted' ? 'won' : (b.status === 'cancelled' || b.status === 'withdrawn') ? 'cancelled' : b.status === 'rejected' ? 'outbid' : 'winning',
+            status: b.status === 'accepted' 
+              ? 'won' 
+              : (b.status === 'cancelled' || b.status === 'withdrawn') 
+              ? 'cancelled' 
+              : b.status === 'rejected' 
+              ? 'outbid' 
+              : b.status === 'countered' 
+              ? 'countered' 
+              : 'winning',
             closingIn: 'Live Bidding',
-            bidsCount: 1,
+            bidsCount: 1 + (b.negotiationHistory?.length || 0),
             image: cropImg,
             images: crop.images || (cropImg ? [cropImg] : []),
             farmer: {
@@ -105,6 +126,23 @@ export const TraderBids = () => {
     loadTraderBids()
   }, [])
 
+  // Socket.io real-time listener
+  useEffect(() => {
+    if (!on || !off) return
+
+    const handleBidChange = () => {
+      loadTraderBids()
+    }
+
+    on('bid-updated', handleBidChange)
+    on('counter-bid', handleBidChange)
+
+    return () => {
+      off('bid-updated', handleBidChange)
+      off('counter-bid', handleBidChange)
+    }
+  }, [on, off])
+
   const handleCancelBid = async (bidId) => {
     if (!window.confirm('Are you sure you want to cancel this bid? The farmer will no longer be able to accept it.')) {
       return
@@ -115,6 +153,7 @@ export const TraderBids = () => {
         prev.map((b) => (b._id === bidId ? { ...b, rawStatus: 'cancelled', status: 'cancelled' } : b))
       )
       toast.success('Bid cancelled successfully! 🚫')
+      await loadTraderBids()
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to cancel bid.')
     }
@@ -127,72 +166,66 @@ export const TraderBids = () => {
     toast.success('Live bidding console updated with state APMC bids!')
   }
 
-  const handleQuickRaise = (bidItem, increment = 50) => {
+  const handleQuickRaise = async (bidItem, increment = 50) => {
     const nextAmount = bidItem.highestBid + increment
-    setBids((prev) =>
-      prev.map((b) =>
-        b._id === bidItem._id
-          ? {
-              ...b,
-              myBidAmount: nextAmount,
-              highestBid: nextAmount,
-              highestBidder: 'You (Top Bidder)',
-              status: 'winning',
-              bidsCount: b.bidsCount + 1
-            }
-          : b
-      )
-    )
-    toast.success(`Counter-bid of ₹${nextAmount.toLocaleString('en-IN')}/Qtl placed! You are now the top bidder! 🎉`)
+    try {
+      await bidService.updateBid(bidItem._id, nextAmount)
+      toast.success(`Counter-bid of ₹${nextAmount.toLocaleString('en-IN')}/Qtl placed! You are now the top bidder! 🎉`)
+      await loadTraderBids()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to raise bid.')
+    }
   }
 
   const handleOpenRaiseModal = (bidItem) => {
     setRaiseBidLot(bidItem)
-    setCustomBidAmount(String(bidItem.highestBid + 50))
+    const currentRate = bidItem.status === 'countered' ? (bidItem.farmerCounterRate || bidItem.highestBid) : bidItem.highestBid
+    setCustomBidAmount(String(currentRate + 50))
   }
 
-  const handleConfirmCustomRaise = (e) => {
+  const handleConfirmCustomRaise = async (e) => {
     e.preventDefault()
     const parsed = Number(customBidAmount)
-    if (!parsed || parsed <= (raiseBidLot?.highestBid || 0)) {
-      toast.error(`Bid must exceed the highest bid of ₹${raiseBidLot?.highestBid}/Qtl`)
+    if (!parsed || parsed <= 0) {
+      toast.error(`Please enter a valid rate greater than 0`)
       return
     }
 
-    setBids((prev) =>
-      prev.map((b) =>
-        b._id === raiseBidLot._id
-          ? {
-              ...b,
-              myBidAmount: parsed,
-              highestBid: parsed,
-              highestBidder: 'You (Top Bidder)',
-              status: 'winning',
-              bidsCount: b.bidsCount + 1
-            }
-          : b
-      )
-    )
-    toast.success(`Custom bid of ₹${parsed.toLocaleString('en-IN')}/Qtl submitted successfully!`)
-    setRaiseBidLot(null)
+    try {
+      if (raiseBidLot?.status === 'countered') {
+        // Trader is proposing a revised counter offer to the farmer
+        await bidService.respondToCounter(raiseBidLot._id, 'counter', parsed)
+        toast.success(`🎉 Revised counter offer of ₹${parsed.toLocaleString('en-IN')}/Qtl submitted to farmer!`)
+      } else {
+        await bidService.updateBid(raiseBidLot._id, parsed)
+        toast.success(`Custom bid of ₹${parsed.toLocaleString('en-IN')}/Qtl submitted successfully!`)
+      }
+      setRaiseBidLot(null)
+      await loadTraderBids()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to submit rate.')
+    }
   }
 
-  const handleAcceptCounter = (bidItem) => {
+  const handleAcceptCounter = async (bidItem) => {
     const acceptedRate = bidItem.farmerCounterRate || bidItem.highestBid
-    setBids((prev) =>
-      prev.map((b) =>
-        b._id === bidItem._id
-          ? {
-              ...b,
-              myBidAmount: acceptedRate,
-              highestBid: acceptedRate,
-              highestBidder: 'You (Agreed Rate)',
-              status: 'won'
-            }
-          : b
-      )
-    )
-    toast.success(`Farmer counter-offer of ₹${acceptedRate}/Qtl accepted! Lot transitioned to Escrow Deposit.`)
+    try {
+      await bidService.respondToCounter(bidItem._id, 'accept')
+      toast.success(`🎉 Farmer counter-offer of ₹${acceptedRate.toLocaleString('en-IN')}/Qtl accepted! Lot transitioned to Escrow Deposit.`)
+      await loadTraderBids()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to accept counter offer.')
+    }
+  }
+
+  const handleRejectCounter = async (bidItem) => {
+    try {
+      await bidService.respondToCounter(bidItem._id, 'reject')
+      toast.success('Counter offer declined.')
+      await loadTraderBids()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to decline counter offer.')
+    }
   }
 
   const handleSetAutoBid = (e) => {
@@ -218,6 +251,7 @@ export const TraderBids = () => {
   const filteredBids = useMemo(() => {
     return bids.filter((b) => {
       if (activeStatus === 'all') return true
+      if (activeStatus === 'winning') return b.status === 'winning' || b.status === 'countered'
       return b.status === activeStatus
     })
   }, [bids, activeStatus])
@@ -449,10 +483,14 @@ export const TraderBids = () => {
                 <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs space-y-1">
                   <p className="font-extrabold text-amber-800 flex items-center gap-1.5">
                     <Sparkles className="w-4 h-4 text-amber-600" />
-                    Direct Settlement Counter: Farmer proposed ₹{bid.farmerCounterRate}/Qtl
+                    {bid.counterProposedBy === 'farmer' 
+                      ? `Direct Settlement Counter: Farmer proposed ₹${bid.farmerCounterRate}/Qtl`
+                      : `Your Revised Counter: You proposed ₹${bid.farmerCounterRate}/Qtl`}
                   </p>
                   <p className="text-[11px] text-muted-foreground">
-                    Accepting this price guarantees immediate lot assignment and dispatches farm-gate logistics.
+                    {bid.counterProposedBy === 'farmer'
+                      ? 'Accepting this price guarantees immediate lot assignment and secures funds in escrow.'
+                      : 'Waiting for the farmer to review and accept your revised counter offer.'}
                   </p>
                 </div>
               )}
@@ -486,14 +524,38 @@ export const TraderBids = () => {
                     </>
                   )}
 
-                  {bid.status === 'countered' && (
-                    <Button
-                      size="sm"
-                      onClick={() => handleAcceptCounter(bid)}
-                      className="rounded-xl text-xs font-bold h-9 bg-amber-600 hover:bg-amber-700 text-white shadow-sm"
-                    >
-                      Accept Counter (₹{bid.farmerCounterRate}/Qtl)
-                    </Button>
+                  {bid.status === 'countered' && bid.counterProposedBy === 'farmer' && (
+                    <>
+                      <Button
+                        size="sm"
+                        onClick={() => handleAcceptCounter(bid)}
+                        className="rounded-xl text-xs font-bold h-9 bg-amber-600 hover:bg-amber-700 text-white shadow-sm"
+                      >
+                        <Check className="w-3.5 h-3.5 mr-1" /> Accept Counter (₹{bid.farmerCounterRate}/Qtl)
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenRaiseModal(bid)}
+                        className="rounded-xl text-xs font-bold h-9 border-amber-500/40 text-amber-700 hover:bg-amber-500/10"
+                      >
+                        Re-Counter
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRejectCounter(bid)}
+                        className="rounded-xl text-xs font-bold h-9 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10"
+                      >
+                        <XCircle className="w-3.5 h-3.5 mr-1" /> Decline
+                      </Button>
+                    </>
+                  )}
+
+                  {bid.status === 'countered' && bid.counterProposedBy === 'trader' && (
+                    <span className="text-xs font-bold text-amber-700 bg-amber-500/10 px-3 py-1.5 rounded-xl border border-amber-500/20 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 animate-pulse text-amber-600" /> Counter Sent (₹{bid.farmerCounterRate}/Qtl) • Awaiting Farmer
+                    </span>
                   )}
 
                   {bid.status === 'won' && (

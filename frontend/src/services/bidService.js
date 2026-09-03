@@ -71,6 +71,16 @@ export const bidService = {
   updateBid: async (bidId, amount, message) => {
     const res = await api.put(`/bids/${bidId}`, { amount: Number(amount), message })
     return res?.data || res
+  },
+
+  /**
+   * Trader responds to Farmer's counter offer (accept, reject, or counter)
+   */
+  respondToCounter: async (bidId, action, counterAmount = null, message = '') => {
+    const payload = { action, message }
+    if (counterAmount) payload.counterAmount = Number(counterAmount)
+    const res = await api.put(`/bids/${bidId}/trader-respond`, payload)
+    return res?.data || res
   }
 }
 

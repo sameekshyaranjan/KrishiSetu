@@ -121,6 +121,14 @@ export const cropService = {
   },
 
   /**
+   * Submit a counter offer for an inbound bid (Farmer action)
+   */
+  counterBid: async (bidId, counterAmount, message = '') => {
+    const res = await api.put(`/bids/${bidId}/counter`, { counterAmount: Number(counterAmount), message })
+    return res?.data || res
+  },
+
+  /**
    * Create new harvest listing in MongoDB
    */
   createListing: async (formData) => {

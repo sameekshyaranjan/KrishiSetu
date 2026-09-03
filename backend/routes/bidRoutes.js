@@ -1,6 +1,16 @@
 const express = require('express');
 const router = express.Router();
-const { placeBid, getBidsForListing, getMyBids, updateBid, withdrawBid, respondToBid, undoAcceptBid } = require('../controllers/bidController');
+const { 
+  placeBid, 
+  getBidsForListing, 
+  getMyBids, 
+  updateBid, 
+  withdrawBid, 
+  respondToBid, 
+  undoAcceptBid,
+  counterBid,
+  traderRespondToCounter
+} = require('../controllers/bidController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
 router.use(protect);
@@ -15,6 +25,13 @@ router.put('/:id/withdraw', authorize('trader'), withdrawBid);
 router.put('/:id/cancel', authorize('trader'), withdrawBid);
 router.patch('/:id/cancel', authorize('trader'), withdrawBid);
 router.patch('/:id/withdraw', authorize('trader'), withdrawBid);
+
+// Counter-bid negotiation routes
+router.put('/:id/counter', authorize('farmer'), counterBid);
+router.post('/:id/counter', authorize('farmer'), counterBid);
+router.put('/:id/trader-respond', authorize('trader'), traderRespondToCounter);
+router.post('/:id/trader-respond', authorize('trader'), traderRespondToCounter);
+
 router.put('/:id/respond', authorize('farmer'), respondToBid);
 router.put('/:id/accept', authorize('farmer'), (req, res, next) => {
   req.body.status = 'accepted';

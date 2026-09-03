@@ -164,6 +164,18 @@ socketEmitter.on('newMessage', (message, receiverId, conversationId) => {
   }
 });
 
+socketEmitter.on('bid-updated', (bid, recipientId) => {
+  if (io && recipientId) {
+    io.to(recipientId.toString()).emit('bid-updated', bid);
+  }
+});
+
+socketEmitter.on('counter-bid', (counterData, recipientId) => {
+  if (io && recipientId) {
+    io.to(recipientId.toString()).emit('counter-bid', counterData);
+  }
+});
+
 // CORS Configuration with Credentials Support
 const allowedOrigins = [
   'http://localhost:5173',
