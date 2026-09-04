@@ -378,8 +378,6 @@ KrishiSetu/
 │   ├── tailwind.config.js           # APMC Emerald Palette & Design Tokens
 │   └── vite.config.js               # Vite Bundler Build Configuration
 │
-├── KRISHISETU_COMPLETE_ARCHITECTURE.md # Full 1,200-Line Engineering Specification
-├── KrishiSetu_Backend_Interview_Guide.md # Technical Viva Defense & Interview Q&A
 └── README.md                        # Master Project Documentation (This File)
 ```
 
@@ -576,6 +574,5 @@ Distributed under the **MIT License**. See `LICENSE` for complete terms and perm
 ### 👨‍💻 Project Maintainer & Contributors
 * **Lead Engineer**: Sameekshya Ranjan
 * **Repository**: [https://github.com/sameekshyaranjan/KrishiSetu](https://github.com/sameekshyaranjan/KrishiSetu)
-* **Architecture Reference**: See `KRISHISETU_COMPLETE_ARCHITECTURE.md` for exhaustive 1,200-line engineering blueprints and deep implementation details.
 
 *(c) 2026 KrishiSetu. Bridging Indian Agriculture with Modern Technology.*
