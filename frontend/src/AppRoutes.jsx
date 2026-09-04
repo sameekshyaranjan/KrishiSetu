@@ -20,6 +20,7 @@ import FarmerDashboard from '@/pages/farmer/FarmerDashboard'
 import FarmerListings from '@/pages/farmer/FarmerListings'
 import FarmerBids from '@/pages/farmer/FarmerBids'
 import FarmerOrders from '@/pages/farmer/FarmerOrders'
+import FarmerTransactions from '@/pages/farmer/FarmerTransactions'
 import FarmerWeather from '@/pages/farmer/FarmerWeather'
 import FarmerProfile from '@/pages/farmer/FarmerProfile'
 import FarmerNotifications from '@/pages/farmer/FarmerNotifications'
@@ -38,8 +39,6 @@ import AdminDashboard from '@/pages/admin/AdminDashboard'
 import AdminUsers from '@/pages/admin/AdminUsers'
 import AdminSchemes from '@/pages/admin/AdminSchemes'
 import AdminCessAudits from '@/pages/admin/AdminCessAudits'
-import AdminAuditLogs from '@/pages/admin/AdminAuditLogs'
-import AdminMandiMonitoring from '@/pages/admin/AdminMandiMonitoring'
 import AdminSettings from '@/pages/admin/AdminSettings'
 import AdminDisputes from '@/pages/admin/AdminDisputes'
 import AdminPriceIntelligence from '@/pages/admin/AdminPriceIntelligence'
@@ -72,6 +71,7 @@ export const AppRoutes = () => {
           <Route path="bids" element={<FarmerBids />} />
           <Route path="chats" element={<FarmerChats />} />
           <Route path="orders" element={<FarmerOrders />} />
+          <Route path="transactions" element={<FarmerTransactions />} />
           <Route path="weather" element={<FarmerWeather />} />
           <Route path="profile" element={<FarmerProfile />} />
           <Route path="notifications" element={<FarmerNotifications />} />
@@ -109,8 +109,6 @@ export const AppRoutes = () => {
           <Route path="cess-audits" element={<AdminCessAudits />} />
           <Route path="price-intelligence" element={<AdminPriceIntelligence />} />
           <Route path="disputes" element={<AdminDisputes />} />
-          <Route path="yard-monitoring" element={<AdminMandiMonitoring />} />
-          <Route path="audit-logs" element={<AdminAuditLogs />} />
           <Route path="settings" element={<AdminSettings />} />
         </Route>
       </Route>

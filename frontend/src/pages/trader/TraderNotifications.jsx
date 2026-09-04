@@ -59,20 +59,32 @@ export const TraderNotifications = () => {
   }
 
   const handleMarkAsRead = async (id) => {
-    const updated = await notificationService.markAsRead(id, 'trader')
-    setNotifications(updated)
+    try {
+      await notificationService.markAsRead(id, 'trader')
+      setNotifications((prev) => (Array.isArray(prev) ? prev.map((n) => n._id === id ? { ...n, isRead: true } : n) : []))
+    } catch (err) {
+      console.warn('Failed to mark notification as read:', err)
+    }
   }
 
   const handleMarkAllAsRead = async () => {
-    const updated = await notificationService.markAllAsRead('trader')
-    setNotifications(updated)
-    toast.success('All notifications marked as read! 🔔')
+    try {
+      await notificationService.markAllAsRead('trader')
+      setNotifications((prev) => (Array.isArray(prev) ? prev.map((n) => ({ ...n, isRead: true })) : []))
+      toast.success('All notifications marked as read! 🔔')
+    } catch (err) {
+      console.warn('Failed to mark all as read:', err)
+    }
   }
 
   const handleDeleteNotif = async (id) => {
-    const updated = await notificationService.deleteNotification(id, 'trader')
-    setNotifications(updated)
-    toast.success('Notification removed.')
+    try {
+      await notificationService.deleteNotification(id, 'trader')
+      setNotifications((prev) => (Array.isArray(prev) ? prev.filter((n) => n._id !== id) : []))
+      toast.success('Notification removed.')
+    } catch (err) {
+      console.warn('Failed to delete notification:', err)
+    }
   }
 
   const unreadCount = notifications.filter((n) => !n.isRead && n.read !== true).length
@@ -177,11 +189,10 @@ export const TraderNotifications = () => {
           return (
             <div
               key={notif._id}
-              onClick={() => handleMarkAsRead(notif._id)}
-              className={`group p-5 sm:p-6 rounded-3xl border transition-all duration-200 cursor-pointer flex flex-col sm:flex-row items-start justify-between gap-4 ${
+              className={`p-5 sm:p-6 rounded-3xl border transition-all flex flex-col sm:flex-row items-start justify-between gap-4 ${
                 isUnread
                   ? 'bg-amber-500/5 border-amber-500/30 shadow-sm'
-                  : 'bg-card border-border hover:border-border/80'
+                  : 'bg-card border-border'
               }`}
             >
               <div className="flex items-start gap-4">
@@ -191,7 +202,7 @@ export const TraderNotifications = () => {
 
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <h3 className="font-extrabold text-sm sm:text-base text-foreground group-hover:text-amber-600 transition-colors">
+                    <h3 className="font-extrabold text-sm sm:text-base text-foreground">
                       {notif.title}
                     </h3>
                     {isUnread && (
@@ -217,21 +228,30 @@ export const TraderNotifications = () => {
 
               {/* Action Buttons */}
               <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                {notif.actionLink || notif.actionUrl ? (
-                  <Button asChild size="sm" className="rounded-xl text-xs font-bold h-9 px-4 bg-amber-600 hover:bg-amber-700 text-white shadow-sm">
-                    <Link to={notif.actionLink || notif.actionUrl}>
-                      Open <ChevronRight className="w-3.5 h-3.5 ml-1" />
-                    </Link>
+                <Button asChild size="sm" className="rounded-xl text-xs font-bold h-9 px-4 bg-amber-600 hover:bg-amber-700 text-white shadow-sm">
+                  <Link to={notif.actionLink || notif.actionUrl || '/trader/orders'}>
+                    Open <ChevronRight className="w-3.5 h-3.5 ml-1" />
+                  </Link>
+                </Button>
+
+                {isUnread && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleMarkAsRead(notif._id)}
+                    title="Mark as read"
+                    className="rounded-xl text-xs h-9 px-2.5 text-muted-foreground hover:text-amber-600 hover:bg-amber-500/10 flex items-center gap-1"
+                  >
+                    <CheckCheck className="w-4 h-4" />
+                    <span className="hidden md:inline text-[11px]">Read</span>
                   </Button>
-                ) : null}
+                )}
 
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleDeleteNotif(notif._id)
-                  }}
+                  onClick={() => handleDeleteNotif(notif._id)}
+                  title="Delete notification"
                   className="rounded-xl text-xs h-9 px-2 text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10"
                 >
                   <Trash2 className="w-4 h-4" />

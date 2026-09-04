@@ -36,15 +36,58 @@ export const notificationService = {
       const res = await api.get('/notifications')
       const data = res?.data?.docs || res?.data || res
       if (Array.isArray(data)) {
-        return data.map(n => ({
-          _id: n._id,
-          title: n.title || 'Notification',
-          message: n.message,
-          category: n.category || 'system',
-          isRead: !!n.isRead,
-          timestamp: n.createdAt ? new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent',
-          actionLink: n.link || '/farmer/dashboard'
-        }))
+        return data.map(n => {
+          const text = `${n.title || ''} ${n.message || ''} ${n.category || ''}`.toLowerCase()
+          let destination = '/farmer/orders'
+
+          if (
+            text.includes('vehicle') ||
+            text.includes('truck') ||
+            text.includes('dispatch') ||
+            text.includes('shipment') ||
+            text.includes('delivery') ||
+            text.includes('deliver') ||
+            text.includes('order') ||
+            text.includes('escrow') ||
+            text.includes('payout') ||
+            text.includes('dbt') ||
+            text.includes('dispute') ||
+            text.includes('arbitration') ||
+            text.includes('cess') ||
+            text.includes('weighment') ||
+            text.includes('weighbridge')
+          ) {
+            destination = '/farmer/orders'
+          } else if (
+            text.includes('bid') ||
+            text.includes('counter') ||
+            text.includes('offer') ||
+            text.includes('auction')
+          ) {
+            destination = '/farmer/listings'
+          } else if (
+            text.includes('crop') ||
+            text.includes('listing') ||
+            text.includes('harvest') ||
+            text.includes('produce')
+          ) {
+            destination = '/farmer/listings'
+          } else if (text.includes('weather') || text.includes('rain') || text.includes('monsoon')) {
+            destination = '/farmer/weather'
+          } else if (text.includes('scheme') || text.includes('subsidy')) {
+            destination = '/farmer/schemes'
+          }
+
+          return {
+            _id: n._id,
+            title: n.title || 'Notification',
+            message: n.message,
+            category: n.category || 'system',
+            isRead: !!n.isRead,
+            timestamp: n.createdAt ? new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent',
+            actionLink: n.link || destination
+          }
+        })
       }
       return []
     } catch (err) {
@@ -61,15 +104,40 @@ export const notificationService = {
       const res = await api.get('/notifications')
       const data = res?.data?.docs || res?.data || res
       if (Array.isArray(data)) {
-        return data.map(n => ({
-          _id: n._id,
-          title: n.title || 'Notification',
-          message: n.message,
-          category: n.category || 'system',
-          isRead: !!n.isRead,
-          timestamp: n.createdAt ? new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent',
-          actionLink: n.link || '/trader/dashboard'
-        }))
+        return data.map(n => {
+          const text = `${n.title || ''} ${n.message || ''} ${n.category || ''}`.toLowerCase()
+          let destination = '/trader/orders'
+
+          if (
+            text.includes('accept') ||
+            text.includes('counter') ||
+            text.includes('truck') ||
+            text.includes('shipment') ||
+            text.includes('dispatch') ||
+            text.includes('deliver') ||
+            text.includes('order') ||
+            text.includes('procurement') ||
+            text.includes('payout') ||
+            text.includes('weighbridge') ||
+            text.includes('escrow')
+          ) {
+            destination = '/trader/orders'
+          } else if (text.includes('outbid') || text.includes('bid')) {
+            destination = '/trader/my-bids'
+          } else if (text.includes('crop') || text.includes('produce') || text.includes('harvest')) {
+            destination = '/trader/marketplace'
+          }
+
+          return {
+            _id: n._id,
+            title: n.title || 'Notification',
+            message: n.message,
+            category: n.category || 'system',
+            isRead: !!n.isRead,
+            timestamp: n.createdAt ? new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent',
+            actionLink: n.link || destination
+          }
+        })
       }
       return []
     } catch (err) {

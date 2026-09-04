@@ -188,11 +188,10 @@ export const FarmerNotifications = () => {
           return (
             <div
               key={notif._id}
-              onClick={() => handleMarkAsRead(notif._id)}
-              className={`group p-5 sm:p-6 rounded-3xl border transition-all duration-200 cursor-pointer flex flex-col sm:flex-row items-start justify-between gap-4 ${
+              className={`p-5 sm:p-6 rounded-3xl border transition-all flex flex-col sm:flex-row items-start justify-between gap-4 ${
                 isUnread
                   ? 'bg-primary/5 border-primary/30 shadow-sm'
-                  : 'bg-card border-border hover:border-border/80'
+                  : 'bg-card border-border'
               }`}
             >
               <div className="flex items-start gap-4">
@@ -202,7 +201,7 @@ export const FarmerNotifications = () => {
 
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <h3 className="font-extrabold text-sm sm:text-base text-foreground group-hover:text-primary transition-colors">
+                    <h3 className="font-extrabold text-sm sm:text-base text-foreground">
                       {notif.title}
                     </h3>
                     {isUnread && (
@@ -230,19 +229,32 @@ export const FarmerNotifications = () => {
               <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
                 {notif.actionLink || notif.actionUrl ? (
                   <Button asChild size="sm" className="rounded-xl text-xs font-bold h-9 px-4 bg-primary text-primary-foreground shadow-sm">
-                    <Link to={notif.actionLink || notif.actionUrl}>
+                    <Link 
+                      to={notif.actionLink || notif.actionUrl}
+                      onClick={() => handleMarkAsRead(notif._id)}
+                    >
                       Open Details <ChevronRight className="w-3.5 h-3.5 ml-1" />
                     </Link>
                   </Button>
                 ) : null}
 
+                {isUnread && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleMarkAsRead(notif._id)}
+                    title="Mark as Read"
+                    className="rounded-xl text-xs h-9 px-2 text-muted-foreground hover:text-primary hover:bg-primary/10"
+                  >
+                    <CheckCheck className="w-4 h-4" />
+                  </Button>
+                )}
+
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleDeleteNotif(notif._id)
-                  }}
+                  onClick={() => handleDeleteNotif(notif._id)}
+                  title="Delete Notification"
                   className="rounded-xl text-xs h-9 px-2 text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10"
                 >
                   <Trash2 className="w-4 h-4" />

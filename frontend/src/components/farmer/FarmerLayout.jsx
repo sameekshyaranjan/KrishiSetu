@@ -18,7 +18,8 @@ import {
   TrendingUp,
   BookOpen,
   Bell,
-  MessageSquare
+  MessageSquare,
+  Landmark
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -45,6 +46,7 @@ export const FarmerLayout = () => {
     { to: '/farmer/bids', label: 'Inbound Bids', icon: Gavel },
     { to: '/farmer/chats', label: 'Chats & Negotiations', icon: MessageSquare },
     { to: '/farmer/orders', label: 'Orders & Escrow', icon: FileText },
+    { to: '/farmer/transactions', label: 'Financial Transactions', icon: Landmark },
     { to: '/farmer/weather', label: 'Weather & Advisory', icon: CloudSun },
     { to: '/farmer/notifications', label: 'SMS & Alerts', icon: Bell },
     { to: '/mandi-prices', label: 'Live Mandi Rates', icon: TrendingUp },
