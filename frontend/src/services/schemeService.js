@@ -110,9 +110,9 @@ export const schemeService = {
   /**
    * Get all schemes including drafts for Admin Portal
    */
-  getAllSchemes: async () => {
+  getAllSchemes: async (status) => {
     try {
-      const res = await api.get('/schemes/all')
+      const res = await api.get('/schemes/all', { params: { status } })
       const data = res?.data || res
       if (Array.isArray(data) && data.length > 0) {
         return data
@@ -121,6 +121,30 @@ export const schemeService = {
     } catch {
       return DEFAULT_SCHEMES_CATALOG
     }
+  },
+
+  /**
+   * Publish Scheme (Admin Action)
+   */
+  publishScheme: async (schemeId) => {
+    const res = await api.put(`/schemes/${schemeId}/publish`, {})
+    return res?.data || res
+  },
+
+  /**
+   * Reject Scheme (Admin Action)
+   */
+  rejectScheme: async (schemeId) => {
+    const res = await api.put(`/schemes/${schemeId}/reject`, {})
+    return res?.data || res
+  },
+
+  /**
+   * Sync official government schemes from .gov.in and .nic.in portals
+   */
+  syncSchemes: async () => {
+    const res = await api.post('/schemes/sync', {})
+    return res?.data || res
   },
 
   /**
@@ -135,6 +159,7 @@ export const schemeService = {
         _id: `SCH-${Date.now()}`,
         ...schemeData,
         isPublished: true,
+        status: 'published',
         applicationCount: 0
       }
       return newScheme
