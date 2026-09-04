@@ -32,7 +32,8 @@ import {
   Video,
   MessageSquare,
   Camera,
-  RefreshCw
+  RefreshCw,
+  ArrowUpRight
 } from 'lucide-react'
 
 export const TraderCropDetails = () => {
@@ -45,86 +46,101 @@ export const TraderCropDetails = () => {
   const [bidInput, setBidInput] = useState('2000')
   const [bidsList, setBidsList] = useState([])
   const [currentHigh, setCurrentHigh] = useState(2000)
+  const [myBid, setMyBid] = useState(null)
   const [isPlacingBid, setIsPlacingBid] = useState(false)
   const [isInspectionOpen, setIsInspectionOpen] = useState(false)
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [loading, setLoading] = useState(true)
 
   // Load Lot Details & Bids dynamically from database
-  useEffect(() => {
-    const fetchLotData = async () => {
-      setLoading(true)
-      try {
-        const [fetchedCrop, fetchedBids] = await Promise.all([
-          cropService.getListingById(id),
-          bidService.getBidsForListing(id)
-        ])
+  const fetchLotData = async () => {
+    try {
+      const [fetchedCrop, fetchedBids] = await Promise.all([
+        cropService.getListingById(id),
+        bidService.getBidsForListing(id)
+      ])
 
-        if (fetchedCrop) {
-          const rawBids = Array.isArray(fetchedBids) ? fetchedBids : []
-          const activeBids = rawBids.filter(b => b.status === 'pending' || b.status === 'accepted')
-          const sortedBids = [...activeBids].sort((a, b) => (Number(b.amount) || 0) - (Number(a.amount) || 0))
-          const topBidAmount = sortedBids.length > 0 ? Number(sortedBids[0].amount) : null
+      if (fetchedCrop) {
+        const rawBids = Array.isArray(fetchedBids) ? fetchedBids : []
+        const activeBids = rawBids.filter(b => b.status === 'pending' || b.status === 'countered' || b.status === 'accepted')
+        const sortedBids = [...activeBids].sort((a, b) => (Number(b.amount) || 0) - (Number(a.amount) || 0))
+        const topBidAmount = sortedBids.length > 0 ? Number(sortedBids[0].amount) : null
 
-          const formattedBids = sortedBids.map((b, idx) => ({
+        const foundMyBid = fetchedCrop.myBid || activeBids.find(b => {
+          const tid = b.trader?._id || b.trader?.id || b.trader
+          return tid && (tid.toString() === user?._id?.toString() || tid.toString() === user?.id?.toString())
+        })
+        const userBidObj = foundMyBid ? { _id: foundMyBid._id, amount: Number(foundMyBid.amount), status: foundMyBid.status } : null
+        setMyBid(userBidObj)
+
+        const formattedBids = sortedBids.map((b, idx) => {
+          const tid = b.trader?._id || b.trader?.id || b.trader
+          const isMe = tid && (tid.toString() === user?._id?.toString() || tid.toString() === user?.id?.toString())
+          return {
             id: b._id || `b-${idx}`,
-            bidder: b.trader?.name ? `${b.trader.name}${b.trader?._id === user?._id ? ' (You)' : ''}` : 'Verified Bidder',
+            bidder: isMe ? `${b.trader?.name || user?.name || 'Verified Trader'} (You)` : (b.trader?.name || 'Verified Bidder'),
             amount: Number(b.amount) || 0,
             time: new Date(b.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             isHighest: idx === 0
-          }))
-
-          const formatted = {
-            _id: fetchedCrop._id || id,
-            cropName: fetchedCrop.name || fetchedCrop.cropType || 'Farm Fresh Commodity',
-            variety: fetchedCrop.description || fetchedCrop.variety || fetchedCrop.cropType || 'Graded Lot',
-            category: fetchedCrop.category || 'Vegetables',
-            grade: fetchedCrop.grade || 'Grade-A Premium',
-            quantity: Number(fetchedCrop.quantity) || 50,
-            unit: fetchedCrop.unit || 'Quintals',
-            reservePrice: Number(fetchedCrop.basePrice) || 2000,
-            currentHighestBid: topBidAmount,
-            apmcBenchmark: Math.round((Number(fetchedCrop.basePrice) || 2000) * 1.12),
-            instantBuyoutPrice: Math.round((Number(fetchedCrop.basePrice) || 2000) * 1.08),
-            harvestDate: new Date(fetchedCrop.createdAt || Date.now()).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
-            images: fetchedCrop.images?.length > 0 ? fetchedCrop.images : ['https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=800&q=80'],
-            qualityAssay: {
-              moisture: '11.8% (APMC Assayed)',
-              purity: '99.0% Purity Certified',
-              diameter: 'Standard Uniform Caliber',
-              packaging: `${fetchedCrop.unit || 'Quintal'} Standard Packaging`,
-              coldStorageTolerant: 'Yes (Grade-A Compliant)'
-            },
-            farmer: {
-              _id: fetchedCrop.farmer?._id || fetchedCrop.farmer,
-              name: fetchedCrop.farmer?.name || 'Verified Farmer',
-              village: fetchedCrop.farmer?.village || 'APMC Yard',
-              taluk: fetchedCrop.farmer?.district || 'Karnataka',
-              district: fetchedCrop.district || fetchedCrop.farmer?.district || 'Karnataka',
-              state: 'Karnataka',
-              rating: 4.9,
-              totalTrades: 1,
-              distanceToMandi: 'Local APMC Yard'
-            },
-            closingIn: 'Live Bidding',
-            bidsHistory: formattedBids
           }
+        })
 
-          setLot(formatted)
-          setCurrentHigh(topBidAmount)
-          setBidInput(String(topBidAmount ? topBidAmount + 50 : (fetchedCrop.basePrice || 2000)))
-          setBidsList(formattedBids)
-        } else {
-          setLot(null)
+        const formatted = {
+          _id: fetchedCrop._id || id,
+          cropName: fetchedCrop.name || fetchedCrop.cropType || 'Farm Fresh Commodity',
+          variety: fetchedCrop.description || fetchedCrop.variety || fetchedCrop.cropType || 'Graded Lot',
+          category: fetchedCrop.category || 'Vegetables',
+          grade: fetchedCrop.grade || 'Grade-A Premium',
+          quantity: Number(fetchedCrop.quantity) || 50,
+          unit: fetchedCrop.unit || 'Quintals',
+          reservePrice: Number(fetchedCrop.basePrice) || 2000,
+          currentHighestBid: topBidAmount,
+          apmcBenchmark: Math.round((Number(fetchedCrop.basePrice) || 2000) * 1.12),
+          harvestDate: new Date(fetchedCrop.createdAt || Date.now()).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+          images: fetchedCrop.images?.length > 0 ? fetchedCrop.images : ['https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=800&q=80'],
+          qualityAssay: {
+            moisture: '11.8% (APMC Assayed)',
+            purity: '99.0% Purity Certified',
+            diameter: 'Standard Uniform Caliber',
+            packaging: `${fetchedCrop.unit || 'Quintal'} Standard Packaging`,
+            coldStorageTolerant: 'Yes (Grade-A Compliant)'
+          },
+          farmer: {
+            _id: fetchedCrop.farmer?._id || fetchedCrop.farmer,
+            name: fetchedCrop.farmer?.name || 'Verified Farmer',
+            village: fetchedCrop.farmer?.village || 'APMC Yard',
+            taluk: fetchedCrop.farmer?.district || 'Karnataka',
+            district: fetchedCrop.district || fetchedCrop.farmer?.district || 'Karnataka',
+            state: 'Karnataka',
+            rating: 4.9,
+            totalTrades: 1,
+            distanceToMandi: 'Local APMC Yard'
+          },
+          closingIn: 'Live Bidding',
+          bidsHistory: formattedBids
         }
-      } catch (err) {
-        console.warn('Failed to load dynamic crop lot:', err)
-        setLot(null)
-      } finally {
-        setLoading(false)
-      }
-    }
 
+        setLot(formatted)
+        setCurrentHigh(topBidAmount)
+        if (userBidObj) {
+          setBidInput(String(userBidObj.amount + 50))
+        } else {
+          setBidInput(String(topBidAmount ? topBidAmount + 50 : (fetchedCrop.basePrice || 2000)))
+        }
+        setBidsList(formattedBids)
+      } else {
+        setLot(null)
+      }
+    } catch (err) {
+      console.warn('Failed to load dynamic crop lot:', err)
+      setLot(null)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    setLoading(true)
     fetchLotData()
   }, [id, user])
 
@@ -147,13 +163,17 @@ export const TraderCropDetails = () => {
 
   const handlePlaceBid = async (e) => {
     e?.preventDefault?.()
-    if (currentHigh && numericBid <= currentHigh) {
-      toast.error(`Your bid must exceed current highest bid of ₹${currentHigh.toLocaleString('en-IN')}/Qtl`)
-      return
-    }
-    if (!currentHigh && numericBid < (lot?.reservePrice || 0)) {
-      toast.error(`Your bid must be at least the reserve floor price of ₹${lot?.reservePrice}/Qtl`)
-      return
+
+    if (myBid) {
+      if (numericBid <= myBid.amount) {
+        toast.error(`Your new bid must be higher than your previous bid of ₹${myBid.amount.toLocaleString('en-IN')}/Qtl`)
+        return
+      }
+    } else {
+      if (numericBid < (lot?.reservePrice || 0)) {
+        toast.error(`Your bid must be at least the reserve floor price of ₹${lot?.reservePrice}/Qtl`)
+        return
+      }
     }
 
     setIsPlacingBid(true)
@@ -161,31 +181,24 @@ export const TraderCropDetails = () => {
       await bidService.placeBid({
         cropId: lot._id,
         amount: numericBid,
-        message: `Direct wholesale bid of ₹${numericBid}/Qtl placed with ₹${totalEscrowRequired.toLocaleString('en-IN')} escrow allocation.`
+        message: myBid
+          ? `Increased wholesale bid to ₹${numericBid}/Qtl placed with ₹${totalEscrowRequired.toLocaleString('en-IN')} escrow allocation.`
+          : `Direct wholesale bid of ₹${numericBid}/Qtl placed with ₹${totalEscrowRequired.toLocaleString('en-IN')} escrow allocation.`
       })
 
-      setCurrentHigh(numericBid)
-      
-      const newBidEntry = {
-        id: `b-${Date.now()}`,
-        bidder: `${user?.name || 'Verified Trader'} (You)`,
-        amount: numericBid,
-        time: 'Just now',
-        isHighest: true
-      }
+      toast.success(
+        myBid
+          ? `Bid increased successfully to ₹${numericBid.toLocaleString('en-IN')}/Qtl! 📈`
+          : `Binding Bid of ₹${numericBid.toLocaleString('en-IN')}/Qtl placed with Smart Escrow Lock! 🔨`
+      )
 
-      setBidsList([newBidEntry, ...bidsList.map((b) => ({ ...b, isHighest: false }))])
-      toast.success(`Binding Bid of ₹${numericBid.toLocaleString('en-IN')}/Qtl placed with Smart Escrow Lock! 🔨`)
+      await fetchLotData()
     } catch (err) {
-      toast.error('Failed to submit bid.')
+      const msg = err.response?.data?.message || err.message || 'Failed to submit bid.'
+      toast.error(msg)
     } finally {
       setIsPlacingBid(false)
     }
-  }
-
-  const handleInstantBuyout = () => {
-    toast.success(`Instant Buyout Confirmed at ₹${lot.instantBuyoutPrice.toLocaleString('en-IN')}/Qtl! Escrow locked. 🔒`)
-    navigate('/trader/orders')
   }
 
   if (loading) {
@@ -309,7 +322,7 @@ export const TraderCropDetails = () => {
             <div className="flex items-center justify-between border-b border-border pb-4">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-black text-lg">
-                  {lot.farmer.name[0]}
+                  {lot.farmer?.name?.[0] || 'F'}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
@@ -424,15 +437,28 @@ export const TraderCropDetails = () => {
                 <span className="text-muted-foreground">Farmer Reserve Floor:</span>
                 <span className="font-mono font-bold text-foreground">₹{lot.reservePrice}/Qtl</span>
               </div>
+
+              {myBid && (
+                <div className="flex items-center justify-between pt-2 border-t border-emerald-500/30 text-xs">
+                  <span className="text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Your Current Bid:
+                  </span>
+                  <span className="font-mono font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-lg border border-emerald-500/20">
+                    ₹{myBid.amount.toLocaleString('en-IN')}/Qtl
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Interactive Bidding Form */}
             <form onSubmit={handlePlaceBid} className="space-y-4 pt-2">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-foreground flex items-center justify-between">
-                  <span>Enter Your Bid (₹ / Quintal)</span>
+                  <span>{myBid ? 'Increase Your Bid (₹ / Quintal)' : 'Enter Your Bid (₹ / Quintal)'}</span>
                   <span className="text-[10px] text-muted-foreground">
-                    {currentHigh ? 'Min Step: +₹10/Qtl' : `Starting Floor: ₹${lot.reservePrice}/Qtl`}
+                    {myBid
+                      ? `Must exceed ₹${myBid.amount.toLocaleString('en-IN')}/Qtl`
+                      : (currentHigh ? 'Min Step: +₹10/Qtl' : `Starting Floor: ₹${lot.reservePrice}/Qtl`)}
                   </span>
                 </label>
                 
@@ -441,12 +467,17 @@ export const TraderCropDetails = () => {
                   <input
                     type="number"
                     required
-                    min={currentHigh ? currentHigh + 10 : lot.reservePrice}
+                    min={myBid ? myBid.amount + 1 : (currentHigh ? currentHigh + 10 : lot.reservePrice)}
                     value={bidInput}
                     onChange={(e) => setBidInput(e.target.value)}
                     className="w-full h-12 pl-8 pr-4 rounded-2xl bg-background border-2 border-amber-500/40 focus:border-amber-500 text-lg font-mono font-black text-amber-600 focus:outline-none"
                   />
                 </div>
+                {myBid && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Your new bid must be strictly higher than your previous bid of ₹{myBid.amount.toLocaleString('en-IN')}/Qtl.
+                  </p>
+                )}
               </div>
 
               {/* Quick Increment Chips */}
@@ -496,32 +527,18 @@ export const TraderCropDetails = () => {
                 </div>
               </div>
 
-              {/* Place Bid Button */}
+              {/* Place / Increase Bid Button */}
               <Button
                 type="submit"
                 disabled={isPlacingBid}
-                className="w-full h-12 rounded-2xl text-sm font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-lg flex items-center justify-center gap-2"
+                className={`w-full h-12 rounded-2xl text-sm font-bold text-white shadow-lg flex items-center justify-center gap-2 ${
+                  myBid ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-600 hover:bg-amber-700'
+                }`}
               >
-                <Gavel className="w-4 h-4" />
-                {isPlacingBid ? 'Locking Escrow & Transmitting Bid...' : 'Place Binding Bid 🔨'}
+                {myBid ? <ArrowUpRight className="w-4 h-4" /> : <Gavel className="w-4 h-4" />}
+                {isPlacingBid ? 'Locking Escrow & Transmitting Bid...' : (myBid ? 'Increase Bid 📈' : 'Place Binding Bid 🔨')}
               </Button>
             </form>
-
-            {/* Instant Buyout Alternative */}
-            <div className="pt-2 border-t border-border space-y-2">
-              <Button
-                type="button"
-                onClick={handleInstantBuyout}
-                variant="outline"
-                className="w-full h-11 rounded-2xl text-xs font-bold border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10 flex items-center justify-center gap-1.5"
-              >
-                <Zap className="w-4 h-4 text-emerald-600 fill-emerald-600" />
-                <span>Instant Buyout at ₹{lot.instantBuyoutPrice.toLocaleString('en-IN')}/Qtl ⚡</span>
-              </Button>
-              <p className="text-[10px] text-muted-foreground text-center">
-                Bypasses auction timer and immediately provisions APMC gate dispatch certificate.
-              </p>
-            </div>
           </div>
 
           {/* Bids Log History */}

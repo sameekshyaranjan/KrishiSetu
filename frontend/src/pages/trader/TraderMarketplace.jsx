@@ -54,7 +54,6 @@ export const TraderMarketplace = () => {
   // Modals State
   const [selectedLotForBid, setSelectedLotForBid] = useState(null)
   const [bidAmount, setBidAmount] = useState('')
-  const [selectedLotForBuyout, setSelectedLotForBuyout] = useState(null)
   const [isSubmittingBid, setIsSubmittingBid] = useState(false)
 
   const loadMarketplaceLots = async () => {
@@ -73,8 +72,9 @@ export const TraderMarketplace = () => {
           unit: c.unit || 'Quintals',
           reservePrice: c.basePrice || 2000,
           currentHighestBid: c.currentHighestBid || null,
+          bidsCount: c.bidsCount || 0,
+          myBid: c.myBid || null,
           apmcBenchmark: Math.round((c.basePrice || 2000) * 1.12),
-          instantBuyoutPrice: Math.round((c.basePrice || 2000) * 1.08),
           image: c.images?.[0] || 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=500&q=80',
           images: c.images || [],
           farmer: {
@@ -86,7 +86,6 @@ export const TraderMarketplace = () => {
             verified: true
           },
           closingIn: c.closingIn || 'Live Bidding',
-          bidsCount: c.bidsCount || 0,
           harvestDate: new Date(c.createdAt || Date.now()).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
         }))
 
@@ -115,25 +114,32 @@ export const TraderMarketplace = () => {
 
   const handleOpenBidModal = (lot) => {
     setSelectedLotForBid(lot)
-    const nextMin = lot.currentHighestBid ? (lot.currentHighestBid + 50) : lot.reservePrice
-    setBidAmount(String(nextMin))
-  }
-
-  const handleOpenBuyoutModal = (lot) => {
-    setSelectedLotForBuyout(lot)
+    if (lot.myBid) {
+      setBidAmount(String(lot.myBid.amount + 50))
+    } else {
+      const nextMin = lot.currentHighestBid ? (lot.currentHighestBid + 50) : lot.reservePrice
+      setBidAmount(String(nextMin))
+    }
   }
 
   const handleSubmitBid = async (e) => {
     e.preventDefault()
     const parsed = Number(bidAmount)
-    if (!parsed || parsed < (selectedLotForBid?.reservePrice || 0)) {
-      toast.error(`Bid must be at least the reserve price of ₹${selectedLotForBid?.reservePrice || 0}/Qtl`)
+    if (!parsed) {
+      toast.error('Please enter a valid numeric bid amount.')
       return
     }
 
-    if (selectedLotForBid?.currentHighestBid && parsed <= selectedLotForBid.currentHighestBid) {
-      toast.error(`Bid must exceed current highest bid of ₹${selectedLotForBid.currentHighestBid}/Qtl`)
-      return
+    if (selectedLotForBid?.myBid) {
+      if (parsed <= Number(selectedLotForBid.myBid.amount)) {
+        toast.error(`Your new bid must be higher than your previous bid of ₹${selectedLotForBid.myBid.amount.toLocaleString('en-IN')}/Qtl`)
+        return
+      }
+    } else {
+      if (parsed < (selectedLotForBid?.reservePrice || 0)) {
+        toast.error(`Bid must be at least the reserve floor price of ₹${selectedLotForBid?.reservePrice || 0}/Qtl`)
+        return
+      }
     }
 
     setIsSubmittingBid(true)
@@ -141,30 +147,24 @@ export const TraderMarketplace = () => {
       await bidService.placeBid({
         cropId: selectedLotForBid._id,
         amount: parsed,
-        message: `Spot marketplace bid of ₹${parsed}/Qtl from ${user?.name || 'Verified Trader'}`
+        message: selectedLotForBid.myBid
+          ? `Increased spot bid to ₹${parsed}/Qtl from ${user?.name || 'Verified Trader'}`
+          : `Spot marketplace bid of ₹${parsed}/Qtl from ${user?.name || 'Verified Trader'}`
       })
 
-      setLots((prev) =>
-        prev.map((l) =>
-          l._id === selectedLotForBid._id
-            ? { ...l, currentHighestBid: Math.max(l.currentHighestBid || 0, parsed), bidsCount: (l.bidsCount || 0) + 1 }
-            : l
-        )
+      toast.success(
+        selectedLotForBid.myBid
+          ? `Bid increased successfully to ₹${parsed.toLocaleString('en-IN')}/Qtl! 📈`
+          : `Bid of ₹${parsed.toLocaleString('en-IN')}/Qtl placed successfully on Lot #${selectedLotForBid._id}! 🔨`
       )
-
-      toast.success(`Bid of ₹${parsed.toLocaleString('en-IN')}/Qtl placed successfully on Lot #${selectedLotForBid._id}! 🔨`)
       setSelectedLotForBid(null)
+      await loadMarketplaceLots()
     } catch (err) {
       const msg = err.response?.data?.message || err.message || 'Failed to place bid. Please try again.'
       toast.error(msg)
     } finally {
       setIsSubmittingBid(false)
     }
-  }
-
-  const handleConfirmBuyout = () => {
-    toast.success(`Instant Buyout Confirmed at ₹${selectedLotForBuyout?.instantBuyoutPrice.toLocaleString('en-IN')}/Qtl! Escrow locked. 🔒`)
-    setSelectedLotForBuyout(null)
   }
 
   // Filtered & Sorted Lots
@@ -374,11 +374,9 @@ export const TraderMarketplace = () => {
                   </div>
 
                   {/* Price Matrix HUD */}
-                  <div className="p-3.5 rounded-2xl bg-muted/40 border border-border/80 space-y-2">
+                  <div className="p-3.5 rounded-2xl bg-muted/40 border border-border/80 space-y-2 mt-4">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground font-medium">
-                        {lot.currentHighestBid ? 'Current Highest Bid:' : 'Status:'}
-                      </span>
+                      <span className="text-muted-foreground font-medium">Highest Bid:</span>
                       <span className="text-sm sm:text-base font-black text-amber-600 font-mono">
                         {lot.currentHighestBid ? (
                           `₹${lot.currentHighestBid.toLocaleString('en-IN')}/Qtl`
@@ -390,11 +388,23 @@ export const TraderMarketplace = () => {
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between text-[11px] pt-1 border-t border-border/60 text-muted-foreground">
+                    {/* Personal Bid Indicator */}
+                    {lot.myBid && (
+                      <div className="flex items-center justify-between text-xs pt-1.5 border-t border-border/50">
+                        <span className="text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Your Bid:
+                        </span>
+                        <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/25">
+                          ₹{lot.myBid.amount.toLocaleString('en-IN')}/Qtl
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-border/60 text-muted-foreground">
                       <span>Reserve: <strong className="text-foreground font-mono">₹{lot.reservePrice}/Qtl</strong></span>
                       {lot.bidsCount > 0 ? (
                         <span className="text-amber-600 font-bold flex items-center gap-0.5">
-                          <Gavel className="w-3 h-3" /> {lot.bidsCount} {lot.bidsCount === 1 ? 'bid' : 'bids'}
+                          <Gavel className="w-3 h-3" /> {lot.bidsCount} {lot.bidsCount === 1 ? 'Bid' : 'Bids'}
                         </span>
                       ) : (
                         <span className="text-emerald-600 font-bold flex items-center gap-0.5">
@@ -408,13 +418,23 @@ export const TraderMarketplace = () => {
 
               {/* Card Bottom CTA Actions */}
               <div className="p-5 pt-0 border-t border-border/60 flex items-center gap-2">
-                <Button
-                  size="sm"
-                  onClick={() => handleOpenBidModal(lot)}
-                  className="flex-1 rounded-xl text-xs font-bold h-10 bg-amber-600 hover:bg-amber-700 text-white shadow-md flex items-center justify-center gap-1.5"
-                >
-                  <Gavel className="w-3.5 h-3.5" /> Place Bid
-                </Button>
+                {lot.myBid ? (
+                  <Button
+                    size="sm"
+                    onClick={() => handleOpenBidModal(lot)}
+                    className="flex-1 rounded-xl text-xs font-bold h-10 bg-emerald-600 hover:bg-emerald-700 text-white shadow-md flex items-center justify-center gap-1.5"
+                  >
+                    <ArrowUpRight className="w-3.5 h-3.5" /> Increase Bid
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    onClick={() => handleOpenBidModal(lot)}
+                    className="flex-1 rounded-xl text-xs font-bold h-10 bg-amber-600 hover:bg-amber-700 text-white shadow-md flex items-center justify-center gap-1.5"
+                  >
+                    <Gavel className="w-3.5 h-3.5" /> Place Bid
+                  </Button>
+                )}
 
                 <Button
                   asChild
@@ -434,14 +454,21 @@ export const TraderMarketplace = () => {
 
       {/* 4. Empty State */}
       {filteredLots.length === 0 && !loading && (
-        <div className="p-12 text-center rounded-3xl bg-card border border-border space-y-3">
-          <ShoppingCart className="w-12 h-12 text-muted-foreground mx-auto stroke-1" />
-          <p className="text-base font-bold text-foreground">No commodity lots found matching your filter</p>
-          <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-            Try adjusting your search query, changing the district filter, or switching commodity categories.
-          </p>
+        <div className="p-12 text-center rounded-3xl bg-card border border-border space-y-4 max-w-md mx-auto my-8">
+          <div className="w-16 h-16 rounded-full bg-amber-500/10 text-amber-600 flex items-center justify-center mx-auto">
+            <ShoppingCart className="w-8 h-8" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-base font-bold text-foreground">No Crop Lots Available</h3>
+            <p className="text-xs text-muted-foreground">
+              {searchQuery || selectedCategory !== 'all' || selectedDistrict !== 'All Districts'
+                ? 'No arrivals match your current filters. Try changing category or clearing search.'
+                : 'There are currently no active crop lots posted on the APMC exchange.'}
+            </p>
+          </div>
           <Button
             size="sm"
+            variant="outline"
             onClick={() => {
               setSelectedCategory('all')
               setSelectedDistrict('All Districts')
@@ -454,9 +481,9 @@ export const TraderMarketplace = () => {
         </div>
       )}
 
-      {/* 5. Live Place Bid Drawer Modal */}
+      {/* 5. Bid Placement / Increase Modal */}
       {selectedLotForBid && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in">
           <div className="relative w-full max-w-lg bg-card border border-border rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
             
             <button
@@ -467,12 +494,18 @@ export const TraderMarketplace = () => {
             </button>
 
             <div className="space-y-1">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 text-amber-600 text-xs font-semibold border border-amber-500/20 mb-1">
-                <Gavel className="w-3.5 h-3.5" />
-                <span>Binding Auction Offer</span>
+              <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold border mb-1 ${
+                selectedLotForBid.myBid
+                  ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                  : 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+              }`}>
+                {selectedLotForBid.myBid ? <ArrowUpRight className="w-3.5 h-3.5" /> : <Gavel className="w-3.5 h-3.5" />}
+                <span>{selectedLotForBid.myBid ? 'Increase Your Active Bid' : 'Binding Auction Offer'}</span>
               </div>
               <h2 className="text-xl font-extrabold text-foreground">
-                Place Inbound Bid on Lot #{selectedLotForBid._id}
+                {selectedLotForBid.myBid
+                  ? `Increase Bid on Lot #${selectedLotForBid._id}`
+                  : `Place Inbound Bid on Lot #${selectedLotForBid._id}`}
               </h2>
               <p className="text-xs text-muted-foreground">
                 {selectedLotForBid.cropName} • {selectedLotForBid.quantity} {selectedLotForBid.unit}
@@ -482,37 +515,54 @@ export const TraderMarketplace = () => {
             <form onSubmit={handleSubmitBid} className="space-y-4 text-xs">
               <div className="p-4 rounded-2xl bg-muted/40 border border-border/80 space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">
-                    {selectedLotForBid.currentHighestBid ? 'Current Highest Bid:' : 'Reserve Base Price:'}
-                  </span>
+                  <span className="text-muted-foreground">Highest Bid Across Traders:</span>
                   <span className="font-mono font-bold text-foreground">
-                    ₹{(selectedLotForBid.currentHighestBid || selectedLotForBid.reservePrice).toLocaleString('en-IN')}/Qtl
+                    {selectedLotForBid.currentHighestBid
+                      ? `₹${selectedLotForBid.currentHighestBid.toLocaleString('en-IN')}/Qtl`
+                      : 'No bids placed yet'}
                   </span>
                 </div>
+                {selectedLotForBid.myBid && (
+                  <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-semibold">
+                    <span>Your Previous Bid:</span>
+                    <span className="font-mono font-bold">
+                      ₹{selectedLotForBid.myBid.amount.toLocaleString('en-IN')}/Qtl
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">
-                    {selectedLotForBid.currentHighestBid ? 'Minimum Incremental Step:' : 'Minimum Starting Bid:'}
+                    {selectedLotForBid.myBid ? 'Rule:' : 'Reserve Floor Price:'}
                   </span>
                   <span className="font-mono font-bold text-emerald-600">
-                    {selectedLotForBid.currentHighestBid ? '+₹50 / Quintal' : `₹${selectedLotForBid.reservePrice} / Quintal`}
+                    {selectedLotForBid.myBid
+                      ? `Must be strictly > ₹${selectedLotForBid.myBid.amount.toLocaleString('en-IN')}/Qtl`
+                      : `₹${selectedLotForBid.reservePrice} / Quintal`}
                   </span>
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <label className="font-bold text-foreground">Your Bid Offer (₹ per Quintal) *</label>
+                <label className="font-bold text-foreground">
+                  {selectedLotForBid.myBid ? 'New Increased Bid (₹ per Quintal) *' : 'Your Bid Offer (₹ per Quintal) *'}
+                </label>
                 <div className="relative">
                   <span className="absolute left-3.5 top-3 text-sm font-mono font-bold text-muted-foreground">₹</span>
                   <input
                     type="number"
                     required
-                    min={selectedLotForBid.currentHighestBid ? selectedLotForBid.currentHighestBid + 10 : selectedLotForBid.reservePrice}
+                    min={selectedLotForBid.myBid ? selectedLotForBid.myBid.amount + 1 : (selectedLotForBid.currentHighestBid ? selectedLotForBid.currentHighestBid + 10 : selectedLotForBid.reservePrice)}
                     value={bidAmount}
                     onChange={(e) => setBidAmount(e.target.value)}
                     placeholder="Enter bid amount"
                     className="w-full h-11 pl-8 pr-4 rounded-xl bg-background border border-border text-sm font-mono font-bold text-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
                   />
                 </div>
+                {selectedLotForBid.myBid && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Must be strictly higher than your previous bid of ₹{selectedLotForBid.myBid.amount.toLocaleString('en-IN')}/Qtl.
+                  </p>
+                )}
               </div>
 
               {/* Total Escrow Value Calculation */}
@@ -541,7 +591,9 @@ export const TraderMarketplace = () => {
                 <Button
                   type="submit"
                   disabled={isSubmittingBid}
-                  className="rounded-xl text-xs font-bold h-10 px-6 bg-amber-600 hover:bg-amber-700 text-white shadow-md flex items-center gap-2"
+                  className={`rounded-xl text-xs font-bold h-10 px-6 text-white shadow-md flex items-center gap-2 ${
+                    selectedLotForBid.myBid ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-600 hover:bg-amber-700'
+                  }`}
                 >
                   {isSubmittingBid ? (
                     <>
@@ -549,7 +601,7 @@ export const TraderMarketplace = () => {
                       <span>Transmitting Bid...</span>
                     </>
                   ) : (
-                    <span>Confirm & Transmit Bid 🔨</span>
+                    <span>{selectedLotForBid.myBid ? 'Submit Increased Bid 📈' : 'Confirm & Transmit Bid 🔨'}</span>
                   )}
                 </Button>
               </div>

@@ -62,8 +62,9 @@ export const FarmerListings = () => {
   const [selectedLotForPass, setSelectedLotForPass] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   
-  // Multiple Photos state
-  const [uploadedPhotos, setUploadedPhotos] = useState([])
+  // Multiple Photos state: real File objects for Cloudinary multipart upload + preview URLs for UI
+  const [photoFiles, setPhotoFiles] = useState([])
+  const [photoPreviews, setPhotoPreviews] = useState([])
   const fileInputRef = useRef(null)
 
   // Single Clean Crop Lot Form State
@@ -119,29 +120,34 @@ export const FarmerListings = () => {
     const files = Array.from(e.target.files || [])
     if (files.length === 0) return
 
-    if (uploadedPhotos.length + files.length > 5) {
+    if (photoFiles.length + files.length > 5) {
       toast.error('You can upload a maximum of 5 crop photos')
       return
     }
 
-    files.forEach((file) => {
+    const validFiles = []
+    const newPreviews = []
+
+    for (const file of files) {
       if (file.size > 5 * 1024 * 1024) {
         toast.error(`${file.name} exceeds 5MB limit`)
-        return
+        continue
       }
+      validFiles.push(file)
+      newPreviews.push(URL.createObjectURL(file))
+    }
 
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setUploadedPhotos((prev) => [...prev, reader.result])
-      }
-      reader.readAsDataURL(file)
-    })
-
-    toast.success(`Added ${files.length} photo(s)!`)
+    setPhotoFiles((prev) => [...prev, ...validFiles])
+    setPhotoPreviews((prev) => [...prev, ...newPreviews])
+    if (validFiles.length > 0) {
+      toast.success(`Added ${validFiles.length} photo(s)!`)
+    }
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   const handleRemovePhoto = (indexToRemove) => {
-    setUploadedPhotos((prev) => prev.filter((_, idx) => idx !== indexToRemove))
+    setPhotoFiles((prev) => prev.filter((_, idx) => idx !== indexToRemove))
+    setPhotoPreviews((prev) => prev.filter((_, idx) => idx !== indexToRemove))
   }
 
   // Create Listing Submit Handler
@@ -152,37 +158,51 @@ export const FarmerListings = () => {
       const defaultImg = CROP_TYPES.find((c) => c.name === formData.cropType)?.defaultImg 
         || 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=600&auto=format&fit=crop'
       
-      const imagesList = uploadedPhotos.length > 0 ? uploadedPhotos : [defaultImg]
+      const formPayload = new FormData()
+      formPayload.append('name', formData.title || `${formData.cropType} Lot`)
+      formPayload.append('cropType', formData.cropType)
+      formPayload.append('category', formData.category || 'vegetables')
+      formPayload.append('quantity', Number(formData.quantity) || 50)
+      formPayload.append('unit', formData.unit || 'quintal')
+      formPayload.append('basePrice', Number(formData.basePrice) || 2000)
+      formPayload.append('district', formData.district || user?.district || 'Hassan')
+      formPayload.append('description', formData.description || `Freshly harvested ${formData.cropType} lot from farm gate.`)
 
-      const payload = {
-        name: formData.title || `${formData.cropType} Lot`,
-        cropType: formData.cropType,
-        category: formData.category || 'vegetables',
-        quantity: Number(formData.quantity) || 50,
-        unit: formData.unit || 'quintal',
-        basePrice: Number(formData.basePrice) || 2000,
-        district: formData.district || user?.district || 'Hassan',
-        description: formData.description || `Freshly harvested ${formData.cropType} lot from farm gate.`,
-        images: imagesList
+      if (photoFiles.length > 0) {
+        photoFiles.forEach((file) => {
+          formPayload.append('images', file)
+        })
+      } else {
+        formPayload.append('images', defaultImg)
       }
 
-      const createdCrop = await cropService.createListing(payload)
+      const createdCrop = await cropService.createListing(formPayload)
       
       const newListing = {
         _id: createdCrop?._id || `crop-${Date.now()}`,
-        ...payload,
+        name: createdCrop?.name || formData.title || `${formData.cropType} Lot`,
+        category: createdCrop?.category || formData.category || 'vegetables',
+        quantity: createdCrop?.quantity || Number(formData.quantity) || 50,
+        unit: createdCrop?.unit || formData.unit || 'quintal',
+        basePrice: createdCrop?.basePrice || Number(formData.basePrice) || 2000,
+        district: createdCrop?.district || formData.district || 'Hassan',
+        description: createdCrop?.description || formData.description,
+        images: createdCrop?.images && createdCrop.images.length > 0 
+          ? createdCrop.images 
+          : (photoPreviews.length > 0 ? photoPreviews : [defaultImg]),
         bidsCount: 0,
-        currentHighestBid: payload.basePrice,
+        currentHighestBid: Number(formData.basePrice) || 2000,
         status: 'available',
         createdAt: new Date().toISOString()
       }
 
       setListings((prev) => [newListing, ...prev])
-      toast.success(`"${payload.name}" published to Karnataka APMC marketplace! 🌾`)
+      toast.success(`"${newListing.name}" published to Karnataka APMC marketplace! 🌾`)
       
       // Reset form modal
       setIsCreateModalOpen(false)
-      setUploadedPhotos([])
+      setPhotoFiles([])
+      setPhotoPreviews([])
       setFormData({
         cropType: 'Tomato',
         title: 'Fresh Farm Tomato',
@@ -216,7 +236,9 @@ export const FarmerListings = () => {
   const filteredListings = useMemo(() => {
     return listings.filter((item) => {
       const matchesSearch = (item.name || '').toLowerCase().includes(searchQuery.toLowerCase())
-      const matchesStatus = statusFilter === 'all' || item.status === statusFilter
+      const matchesStatus = statusFilter === 'all' 
+        ? item.status !== 'withdrawn' && item.status !== 'removed'
+        : item.status === statusFilter
       return matchesSearch && matchesStatus
     })
   }, [listings, searchQuery, statusFilter])
@@ -479,10 +501,10 @@ export const FarmerListings = () => {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="font-bold text-foreground uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                    <Camera className="w-4 h-4 text-primary" /> 1. Upload Photos ({uploadedPhotos.length}/5)
+                    <Camera className="w-4 h-4 text-primary" /> 1. Upload Photos ({photoPreviews.length}/5)
                   </label>
                   <span className="text-[10px] text-muted-foreground">
-                    Upload up to 5 harvest photos
+                    Upload up to 5 harvest photos (Cloudinary CDN optimized)
                   </span>
                 </div>
 
@@ -498,7 +520,7 @@ export const FarmerListings = () => {
 
                 {/* Photos Preview Grid + Upload Trigger */}
                 <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
-                  {uploadedPhotos.map((photo, index) => (
+                  {photoPreviews.map((photo, index) => (
                     <div key={index} className="relative h-24 rounded-2xl overflow-hidden border border-border group bg-muted">
                       <img src={photo} alt={`Crop photo ${index + 1}`} className="w-full h-full object-cover" />
                       <button
@@ -516,7 +538,7 @@ export const FarmerListings = () => {
                   ))}
 
                   {/* Add Photo Button (if less than 5) */}
-                  {uploadedPhotos.length < 5 && (
+                  {photoPreviews.length < 5 && (
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}

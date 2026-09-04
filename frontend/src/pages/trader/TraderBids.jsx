@@ -28,7 +28,8 @@ import {
   Truck,
   XCircle,
   Check,
-  MessageCircle
+  MessageCircle,
+  Scale
 } from 'lucide-react'
 import { useSocket } from '@/hooks/useSocket'
 
@@ -38,6 +39,8 @@ const STATUS_TABS = [
   { id: 'countered', label: 'Farmer Counters 💬' },
   { id: 'rejected', label: 'Rejected by Farmer ❌' },
   { id: 'won', label: 'Accepted / Won 🏆' },
+  { id: 'disputes', label: 'Disputes & Rulings ⚖️' },
+  { id: 'withdrawn_by_farmer', label: 'Withdrawn by Farmer 🛑' },
   { id: 'cancelled', label: 'Cancelled' }
 ]
 
@@ -95,15 +98,24 @@ export const TraderBids = () => {
             negotiationHistory: b.negotiationHistory || [],
             rawStatus: b.status || 'pending',
             farmerId: b.farmer?._id || b.farmer,
-            status: b.status === 'accepted' 
-              ? 'won' 
-              : (b.status === 'cancelled' || b.status === 'withdrawn') 
-              ? 'cancelled' 
-              : b.status === 'rejected' 
-              ? 'rejected' 
-              : b.status === 'countered' 
-              ? 'countered' 
-              : 'winning',
+            dispute: b.dispute || null,
+            transaction: b.transaction || null,
+            status: (() => {
+              if (b.status === 'withdrawn_by_farmer' || crop.status === 'withdrawn' || crop.status === 'removed') {
+                return 'withdrawn_by_farmer'
+              }
+              if ((b.dispute && b.dispute.status?.startsWith('resolved_')) || b.status === 'dispute_resolved' || (b.transaction && b.transaction.logisticsStatus === 'resolved')) {
+                return 'dispute_resolved'
+              }
+              if ((b.dispute && b.dispute.status === 'under_review') || b.status === 'disputed' || (b.transaction && b.transaction.logisticsStatus === 'disputed')) {
+                return 'disputed'
+              }
+              if (b.status === 'accepted') return 'won'
+              if (b.status === 'cancelled' || b.status === 'withdrawn') return 'cancelled'
+              if (b.status === 'rejected') return 'rejected'
+              if (b.status === 'countered') return 'countered'
+              return 'winning'
+            })(),
             closingIn: 'Live Bidding',
             bidsCount: 1 + (b.negotiationHistory?.length || 0),
             image: cropImg,
@@ -264,6 +276,7 @@ export const TraderBids = () => {
   const filteredBids = useMemo(() => {
     return bids.filter((b) => {
       if (activeStatus === 'all') return true
+      if (activeStatus === 'disputes') return b.status === 'disputed' || b.status === 'dispute_resolved'
       return b.status === activeStatus
     })
   }, [bids, activeStatus])
@@ -346,6 +359,8 @@ export const TraderBids = () => {
           const count =
             tab.id === 'all'
               ? bids.length
+              : tab.id === 'disputes'
+              ? bids.filter((b) => b.status === 'disputed' || b.status === 'dispute_resolved').length
               : bids.filter((b) => b.status === tab.id).length
 
           return (
@@ -379,7 +394,11 @@ export const TraderBids = () => {
             <div
               key={bid._id}
               className={`p-6 rounded-3xl bg-card border transition-all space-y-5 shadow-sm ${
-                bid.status === 'winning'
+                bid.status === 'dispute_resolved'
+                  ? 'border-purple-500/40 bg-purple-500/[0.02]'
+                  : bid.status === 'disputed'
+                  ? 'border-amber-500/40 bg-amber-500/[0.02]'
+                  : bid.status === 'winning'
                   ? 'border-emerald-500/40 bg-emerald-500/[0.02]'
                   : bid.status === 'rejected'
                   ? 'border-rose-500/40 bg-rose-500/[0.02]'
@@ -432,7 +451,11 @@ export const TraderBids = () => {
                 {/* Status & Timer Pill */}
                 <div className="flex sm:flex-col items-center sm:items-end justify-between gap-2 shrink-0">
                   <span className={`px-3 py-1 rounded-xl text-xs font-extrabold flex items-center gap-1.5 ${
-                    bid.status === 'winning'
+                    bid.status === 'dispute_resolved'
+                      ? 'bg-purple-500/10 text-purple-600 border border-purple-500/20'
+                      : bid.status === 'disputed'
+                      ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
+                      : bid.status === 'winning'
                       ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
                       : bid.status === 'rejected'
                       ? 'bg-rose-500/10 text-rose-600 border border-rose-500/20'
@@ -440,15 +463,24 @@ export const TraderBids = () => {
                       ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
                       : bid.status === 'won'
                       ? 'bg-emerald-600/10 text-emerald-700 border border-emerald-600/20'
+                      : bid.status === 'withdrawn_by_farmer'
+                      ? 'bg-slate-500/10 text-slate-700 dark:text-slate-300 border border-slate-500/30'
                       : 'bg-muted text-muted-foreground border border-border'
                   }`}>
+                    {bid.status === 'dispute_resolved' && <Scale className="w-3.5 h-3.5 text-purple-600" />}
+                    {bid.status === 'disputed' && <Scale className="w-3.5 h-3.5 text-amber-600" />}
                     {bid.status === 'winning' && <CheckCircle2 className="w-3.5 h-3.5" />}
                     {bid.status === 'rejected' && <XCircle className="w-3.5 h-3.5" />}
                     {bid.status === 'countered' && <Sparkles className="w-3.5 h-3.5" />}
                     {bid.status === 'won' && <ShieldCheck className="w-3.5 h-3.5" />}
+                    {bid.status === 'withdrawn_by_farmer' && <XCircle className="w-3.5 h-3.5 text-slate-500" />}
                     {bid.status === 'cancelled' && <XCircle className="w-3.5 h-3.5" />}
                     <span>
-                      {bid.status === 'winning'
+                      {bid.status === 'dispute_resolved'
+                        ? 'Dispute Resolved 🏛️'
+                        : bid.status === 'disputed'
+                        ? 'Disputed • In Arbitration ⚖️'
+                        : bid.status === 'winning'
                         ? 'Active Bid • Pending Response'
                         : bid.status === 'rejected'
                         ? 'Bid Rejected by Farmer'
@@ -456,6 +488,8 @@ export const TraderBids = () => {
                         ? 'Farmer Counter Offer'
                         : bid.status === 'won'
                         ? 'Bid Accepted • Escrow Secured'
+                        : bid.status === 'withdrawn_by_farmer'
+                        ? 'Crop Withdrawn by Farmer 🛑'
                         : 'Bid Cancelled'}
                     </span>
                   </span>
@@ -615,6 +649,24 @@ export const TraderBids = () => {
                     </Button>
                   )}
 
+                  {/* 4b. DISPUTE RESOLVED: [View Dispute Ruling & Order] */}
+                  {bid.status === 'dispute_resolved' && (
+                    <Button asChild size="sm" className="rounded-xl text-xs font-bold h-9 bg-purple-600 hover:bg-purple-700 text-white shadow-sm">
+                      <Link to="/trader/orders">
+                        <Scale className="w-3.5 h-3.5 mr-1" /> View Ruling & Order Details <ChevronRight className="w-3.5 h-3.5 ml-1" />
+                      </Link>
+                    </Button>
+                  )}
+
+                  {/* 4c. DISPUTED (IN REVIEW): [Track Dispute] */}
+                  {bid.status === 'disputed' && (
+                    <Button asChild size="sm" className="rounded-xl text-xs font-bold h-9 bg-amber-600 hover:bg-amber-700 text-white shadow-sm">
+                      <Link to="/trader/orders">
+                        <Scale className="w-3.5 h-3.5 mr-1" /> Track Arbitration ⚖️ <ChevronRight className="w-3.5 h-3.5 ml-1" />
+                      </Link>
+                    </Button>
+                  )}
+
                   {/* 5. CANCELLED */}
                   {bid.status === 'cancelled' && (
                     <span className="text-xs font-bold text-rose-600 bg-rose-500/10 px-3 py-1.5 rounded-xl border border-rose-500/20 flex items-center gap-1">
@@ -622,11 +674,20 @@ export const TraderBids = () => {
                     </span>
                   )}
 
-                  <Button asChild variant="ghost" size="sm" className="rounded-xl text-xs h-9">
-                    <Link to={`/trader/crops/${bid.cropId || bid.lotId}`}>
-                      Inspect Lot <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
-                    </Link>
-                  </Button>
+                  {/* 5b. WITHDRAWN BY FARMER */}
+                  {bid.status === 'withdrawn_by_farmer' && (
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-500/10 px-3.5 py-1.5 rounded-xl border border-slate-500/30 flex items-center gap-1.5">
+                      <XCircle className="w-3.5 h-3.5 text-slate-500" /> Crop Withdrawn by Farmer
+                    </span>
+                  )}
+
+                  {bid.status !== 'withdrawn_by_farmer' && (
+                    <Button asChild variant="ghost" size="sm" className="rounded-xl text-xs h-9">
+                      <Link to={`/trader/crops/${bid.cropId || bid.lotId}`}>
+                        Inspect Lot <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
+                      </Link>
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>

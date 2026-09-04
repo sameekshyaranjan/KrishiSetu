@@ -5,6 +5,16 @@ const { paginate } = require('../utils/paginate');
 const redisClient = require('../config/redis');
 const socketEmitter = require('../utils/socketEmitter');
 
+const invalidateCropsFeedCache = async () => {
+  try {
+    if (redisClient && typeof redisClient.incr === 'function') {
+      await redisClient.incr('crops_feed_version');
+    }
+  } catch (err) {
+    console.warn('[Cache] Failed to bump crops_feed_version:', err.message);
+  }
+};
+
 const placeBid = async (req, res, next) => {
   try {
     const { cropId, amount, message } = req.body;
@@ -18,26 +28,14 @@ const placeBid = async (req, res, next) => {
       return res.status(400).json({ message: 'This crop listing is no longer available for bidding' });
     }
 
-    if (amount < crop.basePrice) {
+    const numericAmount = Number(amount);
+    if (!numericAmount || numericAmount < crop.basePrice) {
       return res.status(400).json({ message: `Bid amount must be at least the base price of ${crop.basePrice}` });
-    }
-
-    // Check if trader already has an active bid for this crop (cannot place duplicate, only increase)
-    const existingActiveBid = await Bid.findOne({
-      crop: cropId,
-      trader: req.user.id,
-      status: { $in: ['pending', 'countered'] }
-    });
-    if (existingActiveBid) {
-      return res.status(400).json({ 
-        message: 'You already have an active bid for this crop. Please increase your existing bid instead.',
-        existingBidId: existingActiveBid._id
-      });
     }
 
     // Insufficient balance check: quantity * bid price
     const Wallet = require('../models/Wallet');
-    const totalRequired = Number(crop.quantity || 1) * Number(amount);
+    const totalRequired = Number(crop.quantity || 1) * numericAmount;
     let wallet = await Wallet.findOne({ trader: req.user.id });
     if (!wallet || wallet.availableBalance < totalRequired) {
       return res.status(400).json({ 
@@ -45,6 +43,54 @@ const placeBid = async (req, res, next) => {
         required: totalRequired,
         available: wallet ? wallet.availableBalance : 0
       });
+    }
+
+    // Check if trader already has an active bid for this crop -> seamlessly handle increasing bid
+    const existingActiveBid = await Bid.findOne({
+      crop: cropId,
+      trader: req.user.id,
+      status: { $in: ['pending', 'countered'] }
+    });
+    if (existingActiveBid) {
+      if (numericAmount <= Number(existingActiveBid.amount)) {
+        return res.status(400).json({ 
+          message: 'Your new bid must be higher than your previous bid.',
+          previousBidAmount: existingActiveBid.amount
+        });
+      }
+
+      existingActiveBid.amount = numericAmount;
+      if (existingActiveBid.status === 'countered') {
+        existingActiveBid.counterAmount = null;
+        existingActiveBid.counterProposedBy = null;
+        existingActiveBid.counterMessage = null;
+        existingActiveBid.status = 'pending';
+      }
+      if (message) existingActiveBid.message = message;
+      if (!Array.isArray(existingActiveBid.negotiationHistory)) {
+        existingActiveBid.negotiationHistory = [];
+      }
+      existingActiveBid.negotiationHistory.push({
+        proposedBy: 'trader',
+        amount: numericAmount,
+        message: message || 'Trader increased bid',
+        createdAt: new Date()
+      });
+      await existingActiveBid.save();
+
+      await invalidateCropsFeedCache();
+
+      createNotification(
+        crop.farmer,
+        'Farmer',
+        'Bid Increased',
+        `A trader has increased their bid to ₹${numericAmount}/Qtl (Total: ₹${totalRequired.toLocaleString('en-IN')}) for your crop listing.`
+      );
+
+      socketEmitter.emit('bid-updated', existingActiveBid, crop.farmer.toString());
+      socketEmitter.emit('bid-updated', existingActiveBid, req.user.id.toString());
+
+      return res.status(200).json(existingActiveBid);
     }
 
     // Check if trader had a prior rejected bid on this crop -> must be strictly higher
@@ -55,7 +101,7 @@ const placeBid = async (req, res, next) => {
     }).sort({ createdAt: -1 });
 
     if (existingRejectedBid) {
-      if (Number(amount) <= Number(existingRejectedBid.amount)) {
+      if (numericAmount <= Number(existingRejectedBid.amount)) {
         return res.status(400).json({ 
           message: 'Your new bid must be higher than your previous bid.',
           previousBidAmount: existingRejectedBid.amount
@@ -64,7 +110,7 @@ const placeBid = async (req, res, next) => {
 
       existingRejectedBid.status = 'pending';
       existingRejectedBid.originalAmount = existingRejectedBid.originalAmount || existingRejectedBid.amount;
-      existingRejectedBid.amount = Number(amount);
+      existingRejectedBid.amount = numericAmount;
       existingRejectedBid.counterAmount = null;
       existingRejectedBid.counterProposedBy = null;
       existingRejectedBid.counterMessage = null;
@@ -74,17 +120,19 @@ const placeBid = async (req, res, next) => {
       }
       existingRejectedBid.negotiationHistory.push({
         proposedBy: 'trader',
-        amount: Number(amount),
+        amount: numericAmount,
         message: message || 'Trader submitted higher bid after rejection',
         createdAt: new Date()
       });
       await existingRejectedBid.save();
 
+      await invalidateCropsFeedCache();
+
       createNotification(
         crop.farmer,
         'Farmer',
         'New Higher Bid Received',
-        `A trader has placed a higher bid of ₹${amount}/Qtl (Total: ₹${totalRequired.toLocaleString('en-IN')}) for your crop listing.`
+        `A trader has placed a higher bid of ₹${numericAmount}/Qtl (Total: ₹${totalRequired.toLocaleString('en-IN')}) for your crop listing.`
       );
 
       socketEmitter.emit('bid-updated', existingRejectedBid, crop.farmer.toString());
@@ -97,24 +145,26 @@ const placeBid = async (req, res, next) => {
       crop: cropId,
       farmer: crop.farmer,
       trader: req.user.id,
-      amount,
-      originalAmount: amount,
+      amount: numericAmount,
+      originalAmount: numericAmount,
       message,
       negotiationHistory: [
         {
           proposedBy: 'trader',
-          amount: Number(amount),
+          amount: numericAmount,
           message: message || 'Initial bid placed',
           createdAt: new Date()
         }
       ]
     });
 
+    await invalidateCropsFeedCache();
+
     createNotification(
       crop.farmer,
       'Farmer',
       'New Bid Received',
-      `A trader has placed a bid of ₹${amount}/Qtl (Total: ₹${totalRequired.toLocaleString('en-IN')}) for your crop listing.`
+      `A trader has placed a bid of ₹${numericAmount}/Qtl (Total: ₹${totalRequired.toLocaleString('en-IN')}) for your crop listing.`
     );
 
     socketEmitter.emit('bid-updated', bid, crop.farmer.toString());
@@ -159,12 +209,30 @@ const getMyBids = async (req, res, next) => {
 
     const result = await paginate(
       Bid,
-      { ...filter, status: { $ne: 'withdrawn' } },
+      filter,
       req.query.page,
       req.query.limit,
       populatePaths,
       { createdAt: -1 }
     );
+
+    const Transaction = require('../models/Transaction');
+    const Dispute = require('../models/Dispute');
+
+    if (result && Array.isArray(result.data)) {
+      result.data = await Promise.all(result.data.map(async (bidDoc) => {
+        const bObj = bidDoc.toObject ? bidDoc.toObject() : bidDoc;
+        const tx = await Transaction.findOne({ bid: bObj._id });
+        if (tx) {
+          bObj.transaction = tx;
+          const dispute = await Dispute.findOne({ transaction: tx._id });
+          if (dispute) {
+            bObj.dispute = dispute;
+          }
+        }
+        return bObj;
+      }));
+    }
 
     res.status(200).json(result);
   } catch (error) {
@@ -225,6 +293,8 @@ const updateBid = async (req, res, next) => {
 
     const updatedBid = await bid.save();
 
+    await invalidateCropsFeedCache();
+
     createNotification(
       bid.farmer,
       'Farmer',
@@ -267,6 +337,8 @@ const withdrawBid = async (req, res, next) => {
 
     bid.status = 'cancelled';
     await bid.save();
+
+    await invalidateCropsFeedCache();
 
     createNotification(
       bid.farmer,
@@ -434,6 +506,8 @@ const respondToBid = async (req, res, next) => {
       });
       await bid.save();
 
+      await invalidateCropsFeedCache();
+
       createNotification(
         bid.trader,
         'Trader',
@@ -463,6 +537,8 @@ const respondToBid = async (req, res, next) => {
       createdAt: new Date()
     });
     await bid.save();
+
+    await invalidateCropsFeedCache();
 
     createNotification(
       bid.trader,
@@ -507,6 +583,8 @@ const undoAcceptBid = async (req, res, next) => {
 
     bid.status = 'pending';
     await bid.save();
+
+    await invalidateCropsFeedCache();
 
     await Crop.findByIdAndUpdate(bid.crop, { status: 'available' });
 
@@ -585,6 +663,8 @@ const counterBid = async (req, res, next) => {
     });
 
     await bid.save();
+
+    await invalidateCropsFeedCache();
 
     // Create Notification for Trader
     createNotification(
@@ -792,6 +872,8 @@ const traderRespondToCounter = async (req, res, next) => {
       });
       await bid.save();
 
+      await invalidateCropsFeedCache();
+
       createNotification(
         bid.farmer,
         'Farmer',
@@ -917,6 +999,8 @@ const bidHigherAfterRejection = async (req, res, next) => {
     });
 
     await bid.save();
+
+    await invalidateCropsFeedCache();
 
     createNotification(
       bid.farmer,

@@ -28,7 +28,8 @@ import {
   Plus,
   Check,
   XCircle,
-  X
+  X,
+  Scale
 } from 'lucide-react'
 
 export const TraderDashboard = () => {
@@ -69,11 +70,26 @@ export const TraderDashboard = () => {
             farmerName: b.farmer?.name || 'Verified Farmer',
             location: `${b.farmer?.village || 'APMC'}, ${b.farmer?.district || 'Karnataka'}`
           },
+          cropId: crop._id || (typeof b.crop === 'string' ? b.crop : null),
           myBidAmount: rate,
           highestBid: b.status === 'countered' && counterRate ? counterRate : rate,
           farmerCounterRate: counterRate,
           counterProposedBy: b.counterProposedBy,
-          status: b.status === 'accepted' ? 'accepted' : (b.status === 'cancelled' || b.status === 'withdrawn') ? 'cancelled' : b.status === 'countered' ? 'countered' : b.status === 'rejected' ? 'outbid' : 'winning',
+          dispute: b.dispute || null,
+          transaction: b.transaction || null,
+          status: (() => {
+            if ((b.dispute && b.dispute.status?.startsWith('resolved_')) || b.status === 'dispute_resolved' || (b.transaction && b.transaction.logisticsStatus === 'resolved')) {
+              return 'dispute_resolved'
+            }
+            if ((b.dispute && b.dispute.status === 'under_review') || b.status === 'disputed' || (b.transaction && b.transaction.logisticsStatus === 'disputed')) {
+              return 'disputed'
+            }
+            if (b.status === 'accepted') return 'accepted'
+            if (b.status === 'cancelled' || b.status === 'withdrawn') return 'cancelled'
+            if (b.status === 'countered') return 'countered'
+            if (b.status === 'rejected') return 'outbid'
+            return 'winning'
+          })(),
           bidCount: 1,
           closingIn: 'Live',
           lastBidTime: new Date(b.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -204,7 +220,13 @@ export const TraderDashboard = () => {
           <div className="flex items-center gap-2 text-[11px]">
             <span className="text-emerald-600 font-bold">{bids.filter(b => b.status === 'winning' || b.status === 'accepted').length} Winning</span>
             <span>•</span>
-            <span className="text-rose-500 font-bold">{bids.filter(b => b.status === 'outbid' || b.status === 'rejected').length} Outbid</span>
+            <span className="text-rose-500 font-bold">{bids.filter(b => b.status === 'outbid').length} Outbid</span>
+            {bids.some(b => b.status === 'disputed' || b.status === 'dispute_resolved') && (
+              <>
+                <span>•</span>
+                <span className="text-purple-600 font-bold">{bids.filter(b => b.status === 'disputed' || b.status === 'dispute_resolved').length} In Dispute</span>
+              </>
+            )}
           </div>
         </div>
 
@@ -278,7 +300,11 @@ export const TraderDashboard = () => {
               <div 
                 key={bid._id}
                 className={`p-5 rounded-3xl bg-card border transition-all flex flex-col justify-between space-y-4 shadow-sm ${
-                  bid.status === 'winning' 
+                  bid.status === 'dispute_resolved'
+                    ? 'border-purple-500/40 bg-purple-500/[0.02]'
+                    : bid.status === 'disputed'
+                    ? 'border-amber-500/40 bg-amber-500/[0.02]'
+                    : bid.status === 'winning' 
                     ? 'border-emerald-500/40 bg-emerald-500/[0.02]' 
                     : bid.status === 'outbid' 
                     ? 'border-rose-500/40 bg-rose-500/[0.02]' 
@@ -302,7 +328,11 @@ export const TraderDashboard = () => {
 
                       {/* Status Badge */}
                       <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1 ${
-                        bid.status === 'winning' 
+                        bid.status === 'dispute_resolved'
+                          ? 'bg-purple-500/10 text-purple-600 border border-purple-500/20'
+                          : bid.status === 'disputed'
+                          ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
+                          : bid.status === 'winning' 
                           ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' 
                           : bid.status === 'outbid' 
                           ? 'bg-rose-500/10 text-rose-600 border border-rose-500/20' 
@@ -310,12 +340,18 @@ export const TraderDashboard = () => {
                           ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
                           : 'bg-primary/10 text-primary border border-primary/20'
                       }`}>
+                        {bid.status === 'dispute_resolved' && <Scale className="w-3 h-3 text-purple-600" />}
+                        {bid.status === 'disputed' && <Scale className="w-3 h-3 text-amber-600" />}
                         {bid.status === 'winning' && <CheckCircle2 className="w-3 h-3" />}
                         {bid.status === 'outbid' && <AlertTriangle className="w-3 h-3" />}
                         {bid.status === 'countered' && <Sparkles className="w-3 h-3" />}
                         {bid.status === 'accepted' && <CheckCircle2 className="w-3 h-3" />}
                         <span>
-                          {bid.status === 'winning' 
+                          {bid.status === 'dispute_resolved'
+                            ? 'Dispute Resolved 🏛️'
+                            : bid.status === 'disputed'
+                            ? 'Disputed • In Review ⚖️'
+                            : bid.status === 'winning' 
                             ? 'Winning Bid' 
                             : bid.status === 'outbid' 
                             ? 'Outbid!' 
@@ -387,10 +423,46 @@ export const TraderDashboard = () => {
                       </Button>
                     )}
 
+                    {bid.status === 'dispute_resolved' && (
+                      <Button 
+                        asChild
+                        size="sm" 
+                        className="rounded-xl text-xs font-bold h-8 bg-purple-600 hover:bg-purple-700 text-white shadow-sm flex items-center gap-1"
+                      >
+                        <Link to="/trader/orders">
+                          <Scale className="w-3.5 h-3.5 mr-1" /> View Ruling & Order
+                        </Link>
+                      </Button>
+                    )}
+
+                    {bid.status === 'disputed' && (
+                      <Button 
+                        asChild
+                        size="sm" 
+                        className="rounded-xl text-xs font-bold h-8 bg-amber-600 hover:bg-amber-700 text-white shadow-sm flex items-center gap-1"
+                      >
+                        <Link to="/trader/orders">
+                          <Scale className="w-3.5 h-3.5 mr-1" /> Track Dispute ⚖️
+                        </Link>
+                      </Button>
+                    )}
+
                     {bid.status === 'winning' && (
                       <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
                         <CheckCircle2 className="w-4 h-4" /> Top Bidder
                       </span>
+                    )}
+
+                    {bid.status === 'accepted' && (
+                      <Button 
+                        asChild
+                        size="sm" 
+                        className="rounded-xl text-xs font-bold h-8 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm flex items-center gap-1"
+                      >
+                        <Link to="/trader/orders" state={{ cropId: bid.cropId, lotId: bid.lotId }}>
+                          <Truck className="w-3.5 h-3.5 mr-1" /> Continue to Shipment
+                        </Link>
+                      </Button>
                     )}
                   </div>
                 </div>
