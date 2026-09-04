@@ -5,6 +5,9 @@ const Bid = require('../models/Bid');
 const Transaction = require('../models/Transaction');
 const GovernmentScheme = require('../models/GovernmentScheme');
 const AuditLog = require('../models/AuditLog');
+const Dispute = require('../models/Dispute');
+const Wallet = require('../models/Wallet');
+const WalletLedger = require('../models/WalletLedger');
 const redisClient = require('../config/redis');
 const { paginate } = require('../utils/paginate');
 const logger = require('../utils/logger');
@@ -30,7 +33,8 @@ const getDashboardStats = async (req, res, next) => {
       activeCropListings,
       totalBids,
       totalTransactions,
-      publishedSchemes
+      publishedSchemes,
+      activeDisputes
     ] = await Promise.all([
       Farmer.countDocuments(),
       Trader.countDocuments(),
@@ -38,7 +42,8 @@ const getDashboardStats = async (req, res, next) => {
       Crop.countDocuments({ status: 'available' }),
       Bid.countDocuments(),
       Transaction.countDocuments(),
-      GovernmentScheme.countDocuments({ isPublished: true })
+      GovernmentScheme.countDocuments({ isPublished: true }),
+      Dispute.countDocuments({ status: { $in: ['raised', 'under_review'] } })
     ]);
 
     const stats = {
@@ -48,7 +53,8 @@ const getDashboardStats = async (req, res, next) => {
       activeCropListings,
       totalBids,
       totalTransactions,
-      publishedSchemes
+      publishedSchemes,
+      activeDisputes
     };
 
     // 3. Save to Redis (expire in 300 seconds / 5 minutes)
@@ -170,46 +176,260 @@ const suspendUser = async (req, res, next) => {
   }
 };
 
-const resolveDispute = async (req, res, next) => {
+const getAllDisputes = async (req, res, next) => {
   try {
-    const { action } = req.body; // 'refund_trader' or 'payout_farmer'
-    
-    if (!['refund_trader', 'payout_farmer'].includes(action)) {
-       return res.status(400).json({ message: "Action must be 'refund_trader' or 'payout_farmer'" });
+    const disputes = await Dispute.find()
+      .populate('farmer', 'name mobile email district state')
+      .populate('trader', 'name companyName mobile email district state')
+      .populate('cropListing', 'name category quantity unit basePrice images district')
+      .populate('transaction')
+      .sort({ createdAt: -1 });
+
+    // Sync any legacy disputed transactions missing a Dispute record
+    const existingTxIds = disputes.map(d => d.transaction?._id?.toString()).filter(Boolean);
+    const disputedTxs = await Transaction.find({
+      logisticsStatus: 'disputed',
+      _id: { $nin: existingTxIds }
+    })
+      .populate('farmer', 'name mobile email district state')
+      .populate('trader', 'name companyName mobile email district state')
+      .populate('cropListing', 'name category quantity unit basePrice images district');
+
+    for (const tx of disputedTxs) {
+      if (tx.farmer && tx.trader) {
+        const created = await Dispute.create({
+          transaction: tx._id,
+          trader: tx.trader._id,
+          farmer: tx.farmer._id,
+          cropListing: tx.cropListing?._id,
+          bid: tx.bid,
+          reason: 'Quality or delivery discrepancy reported during transit/unloading',
+          proofPhotos: [],
+          escrowAmount: tx.amount,
+          status: 'under_review'
+        });
+        const populated = await Dispute.findById(created._id)
+          .populate('farmer', 'name mobile email district state')
+          .populate('trader', 'name companyName mobile email district state')
+          .populate('cropListing', 'name category quantity unit basePrice images district')
+          .populate('transaction');
+        disputes.unshift(populated);
+      }
     }
 
-    const tx = await Transaction.findById(req.params.id).populate('farmer trader cropListing');
-    if (!tx) return res.status(404).json({ message: 'Transaction not found' });
+    res.status(200).json({ success: true, count: disputes.length, disputes, data: disputes });
+  } catch (error) {
+    next(error);
+  }
+};
 
-    if (tx.logisticsStatus !== 'disputed') {
-      return res.status(400).json({ message: 'Transaction is not disputed' });
+const resolveDispute = async (req, res, next) => {
+  try {
+    const { action, notes } = req.body; // 'refund_trader' | 'split_85_15' | 'payout_farmer'
+    
+    if (!['refund_trader', 'split_85_15', 'payout_farmer'].includes(action)) {
+      return res.status(400).json({ 
+        message: "Invalid resolution action. Must be 'refund_trader', 'split_85_15', or 'payout_farmer'." 
+      });
+    }
+
+    // Lookup by Dispute ID or Transaction ID
+    let dispute = await Dispute.findById(req.params.id)
+      .populate('farmer trader cropListing transaction');
+      
+    if (!dispute) {
+      dispute = await Dispute.findOne({ transaction: req.params.id })
+        .populate('farmer trader cropListing transaction');
+    }
+
+    let tx;
+    if (dispute && dispute.transaction) {
+      tx = dispute.transaction;
+      if (!tx.farmer || !tx.trader) {
+        tx = await Transaction.findById(tx._id).populate('farmer trader cropListing');
+      }
+    } else {
+      tx = await Transaction.findById(req.params.id).populate('farmer trader cropListing');
+      if (!tx) return res.status(404).json({ message: 'Dispute or Transaction not found' });
+      
+      dispute = await Dispute.create({
+        transaction: tx._id,
+        trader: tx.trader._id,
+        farmer: tx.farmer._id,
+        cropListing: tx.cropListing?._id,
+        bid: tx.bid,
+        reason: 'APMC Dispute logged for arbitration',
+        proofPhotos: [],
+        escrowAmount: tx.amount,
+        status: 'under_review'
+      });
+    }
+
+    if (dispute.status && dispute.status.startsWith('resolved_')) {
+      return res.status(400).json({ 
+        message: `Dispute has already been resolved with ruling: ${dispute.status}` 
+      });
     }
 
     const { createNotification } = require('../utils/createNotification');
+    const escrowAmount = dispute.escrowAmount || tx.amount;
+    let farmerPayout = 0;
+    let traderRefund = 0;
+    let disputeNewStatus = '';
 
     if (action === 'refund_trader') {
+      // 100% Refund to Buyer - Order is terminated and crop delisted
+      traderRefund = escrowAmount;
+      farmerPayout = 0;
+      disputeNewStatus = 'resolved_refund_trader';
+
+      // Update Trader Wallet: release locked escrow back to available balance
+      const traderWallet = await Wallet.findOne({ trader: tx.trader._id });
+      let updatedWallet = null;
+      if (traderWallet) {
+        const deductLocked = Math.min(traderWallet.lockedBalance || 0, escrowAmount);
+        updatedWallet = await Wallet.findByIdAndUpdate(
+          traderWallet._id,
+          {
+            $inc: { lockedBalance: -deductLocked, availableBalance: escrowAmount },
+            $set: { updatedAt: Date.now() }
+          },
+          { new: true }
+        );
+      }
+
+      // Ledger entry for refund
+      await WalletLedger.create({
+        trader: tx.trader._id,
+        wallet: updatedWallet ? updatedWallet._id : (traderWallet ? traderWallet._id : null),
+        type: 'REFUND',
+        amount: escrowAmount,
+        balanceAfter: updatedWallet ? updatedWallet.availableBalance : (traderWallet ? traderWallet.availableBalance : 0),
+        status: 'completed',
+        source: 'APMC_DISPUTE_ARBITRATION',
+        paymentMethod: 'Escrow Refund',
+        description: `100% Escrow refund following APMC arbitration for ${tx.cropListing?.name || 'crop lot'}`,
+        referenceId: String(dispute._id)
+      });
+
       tx.paymentStatus = 'refunded';
-      logger.info(`\n[REFUND SIMULATION] Refunding ₹${tx.amount} to Trader: ${tx.trader.name}\n`);
+      tx.logisticsStatus = 'resolved';
+      tx.disputeResolution = 'refund_trader';
+      tx.disputeResolutionStatus = 'executed';
+      tx.farmerPayoutAmount = 0;
+      tx.traderRefundAmount = escrowAmount;
+      await tx.save();
+
+      // Release bid & permanently delist crop from marketplace
+      if (tx.bid) await Bid.findByIdAndUpdate(tx.bid, { status: 'dispute_resolved' });
+      if (tx.cropListing) await Crop.findByIdAndUpdate(tx.cropListing._id, { status: 'delisted' });
+      await redisClient.incr('crops_feed_version');
+
+      createNotification(
+        tx.trader._id,
+        'Trader',
+        'Dispute Resolved: 100% Refund Approved 💰',
+        `APMC Admin resolved dispute in your favor for ${tx.cropListing?.name || 'crop lot'}. Full refund of ₹${escrowAmount.toLocaleString('en-IN')} returned to your available balance.`
+      );
+      createNotification(
+        tx.farmer._id,
+        'Farmer',
+        'Dispute Resolved: 100% Refund to Trader',
+        `APMC Admin ruled in favor of buyer for ${tx.cropListing?.name || 'crop lot'}. Escrow has been refunded and the crop lot has been delisted.`
+      );
+
+    } else if (action === 'split_85_15') {
+      // Mutual Split: 85% Farmer / 15% Buyer
+      // DO NOT DISBURSE MONEY YET: funds remain locked in escrow until Trader accepts delivery
+      farmerPayout = Math.round(escrowAmount * 0.85);
+      traderRefund = escrowAmount - farmerPayout;
+      disputeNewStatus = 'resolved_split_85_15';
+
+      tx.disputeResolution = 'split_85_15';
+      tx.disputeResolutionStatus = 'awaiting_delivery';
+      tx.farmerPayoutAmount = farmerPayout;
+      tx.traderRefundAmount = traderRefund;
+      tx.paymentStatus = 'held_in_escrow';
       
-      createNotification(tx.trader._id, 'Trader', 'Dispute Resolved', 'Admin resolved the dispute in your favor. A refund has been issued.');
-      createNotification(tx.farmer._id, 'Farmer', 'Dispute Resolved', 'Admin resolved the dispute in favor of the trader. Escrow funds were refunded.');
-      
-      // Revert crop and bid
-      await Bid.findByIdAndUpdate(tx.bid, { status: 'rejected' });
-      await Crop.findByIdAndUpdate(tx.cropListing._id, { status: 'available' });
+      // Allow shipment workflow to continue: ensure lot is marked in transit and ready for delivery
+      if (tx.logisticsStatus === 'disputed' || tx.logisticsStatus === 'pending') {
+        tx.logisticsStatus = 'in_transit';
+        if (!tx.dispatchedAt) tx.dispatchedAt = new Date();
+      }
+      await tx.save();
+
+      if (tx.bid) await Bid.findByIdAndUpdate(tx.bid, { status: 'accepted' });
+
+      createNotification(
+        tx.trader._id,
+        'Trader',
+        'Dispute Resolved: 85/15 Mutual Settlement',
+        `APMC Admin arbitrated 85/15 mutual split for ${tx.cropListing?.name || 'crop lot'}. Funds remain held in escrow. Payout of ₹${farmerPayout.toLocaleString('en-IN')} (85%) and your refund of ₹${traderRefund.toLocaleString('en-IN')} (15%) will be executed upon final delivery acceptance.`
+      );
+      createNotification(
+        tx.farmer._id,
+        'Farmer',
+        'Dispute Resolved: 85% Farmer / 15% Trader Approved',
+        `APMC Admin approved 85/15 mutual split for ${tx.cropListing?.name || 'crop lot'}. Escrow remains held. Your payout of ₹${farmerPayout.toLocaleString('en-IN')} (85%) will be disbursed upon verified delivery acceptance.`
+      );
 
     } else if (action === 'payout_farmer') {
-      tx.paymentStatus = 'payout_released';
-      logger.info(`\n[PAYOUT SIMULATION] Forcing release of ₹${tx.amount} to Farmer: ${tx.farmer.name}\n`);
-      
-      createNotification(tx.farmer._id, 'Farmer', 'Dispute Resolved', 'Admin resolved the dispute in your favor. Funds released from escrow.');
-      createNotification(tx.trader._id, 'Trader', 'Dispute Resolved', 'Admin resolved the dispute in favor of the farmer. Funds paid out.');
+      // 100% Payout to Farmer
+      // DO NOT DISBURSE MONEY YET: funds remain locked in escrow until Trader accepts delivery
+      farmerPayout = escrowAmount;
+      traderRefund = 0;
+      disputeNewStatus = 'resolved_payout_farmer';
+
+      tx.disputeResolution = 'payout_farmer';
+      tx.disputeResolutionStatus = 'awaiting_delivery';
+      tx.farmerPayoutAmount = farmerPayout;
+      tx.traderRefundAmount = 0;
+      tx.paymentStatus = 'held_in_escrow';
+      // Allow shipment workflow to continue: ensure lot is marked in transit and ready for delivery
+      if (tx.logisticsStatus === 'disputed' || tx.logisticsStatus === 'pending') {
+        tx.logisticsStatus = 'in_transit';
+        if (!tx.dispatchedAt) tx.dispatchedAt = new Date();
+      }
+      await tx.save();
+
+      if (tx.bid) await Bid.findByIdAndUpdate(tx.bid, { status: 'accepted' });
+
+      createNotification(
+        tx.farmer._id,
+        'Farmer',
+        'Dispute Resolved: 100% Payout to Farmer Approved',
+        `APMC Admin ruled in your favor for ${tx.cropListing?.name || 'crop lot'}. Full escrow of ₹${escrowAmount.toLocaleString('en-IN')} remains held and will be released upon verified delivery acceptance.`
+      );
+      createNotification(
+        tx.trader._id,
+        'Trader',
+        'Dispute Resolved: 100% Farmer Payout Upheld',
+        `APMC Admin reviewed evidence and ruled 100% payout to farmer for ${tx.cropListing?.name || 'crop lot'}. Funds remain held in escrow until delivery is accepted.`
+      );
     }
 
-    tx.logisticsStatus = 'resolved';
-    await tx.save();
+    // Update Dispute document
+    dispute.status = disputeNewStatus;
+    dispute.ruling = {
+      action,
+      notes: notes || `Admin resolved dispute with ruling: ${action.replace(/_/g, ' ').toUpperCase()}`,
+      farmerPayout,
+      traderRefund,
+      resolvedAt: new Date(),
+      resolvedBy: req.user?._id
+    };
+    dispute.updatedAt = new Date();
+    await dispute.save();
 
-    res.status(200).json({ message: `Dispute resolved with action: ${action}`, transaction: tx });
+    // Invalidate Redis dashboard cache
+    await redisClient.del('admin:dashboard:stats');
+
+    res.status(200).json({
+      success: true,
+      message: `Dispute resolved successfully with action: ${action}`,
+      dispute,
+      transaction: tx
+    });
   } catch (error) {
     next(error);
   }
@@ -297,6 +517,7 @@ module.exports = {
   getTraderById, 
   getAuditLogs, 
   suspendUser, 
+  getAllDisputes,
   resolveDispute,
   getRevenueAnalytics,
   getDeletedListings,

@@ -8,147 +8,48 @@ import {
   AlertTriangle, 
   ShieldCheck, 
   CheckCircle2, 
-  XCircle, 
-  FileText, 
   Search, 
-  Filter, 
-  Download, 
   RefreshCw, 
-  Clock, 
-  UserCheck, 
   Building2, 
-  Sparkles, 
-  Layers, 
   Eye, 
   X, 
   DollarSign, 
   Sprout, 
   Briefcase,
   Gavel,
-  ArrowUpRight
+  Phone,
+  Mail,
+  MapPin,
+  Image as ImageIcon
 } from 'lucide-react'
 
-const DEMO_DISPUTES = [
-  {
-    _id: 'DSP-KA-2026-001',
-    timestamp: '1 hour ago (14:30 IST)',
-    category: 'quality',
-    severity: 'HIGH',
-    mandiYard: 'Yeshwanthpur APMC Main Yard, Bengaluru',
-    farmerName: 'Ramesh Gowda',
-    farmerPhone: '+91 98451 23456',
-    farmerRtc: 'RTC-HSN-88192',
-    buyerName: 'Karnataka Agro Traders Pvt Ltd',
-    buyerPhone: '+91 98860 55432',
-    buyerLicense: 'KA-BLR-TRD-2026',
-    lotId: 'LOT-KA-HSN-101',
-    cropName: 'Grade-A Fresh Hybrid Tomato',
-    quantity: '120 Quintals',
-    escrowLockedAmount: 264000,
-    claimReason: 'Buyer reports 8.5% overripe fruit defect rate vs 3.0% maximum agreed Grade-A tolerance.',
-    farmerStatement: 'Harvest was loaded fresh at 05:00 AM; transit delay by buyer caused minor softening.',
-    assayerInspectionReport: 'Official APMC Assayer sample tested: 6.2% overripe softening; remaining 93.8% complies with Grade-A standard.',
-    status: 'under_review', // 'under_review' | 'resolved'
-    ruling: null
-  },
-  {
-    _id: 'DSP-KA-2026-002',
-    timestamp: '3 hours ago (12:15 IST)',
-    category: 'transit',
-    severity: 'HIGH',
-    mandiYard: 'Mandya APMC Market Yard',
-    farmerName: 'Basavaraj Patil',
-    farmerPhone: '+91 98801 44556',
-    farmerRtc: 'RTC-MND-33190',
-    buyerName: 'Coastal Agro Processing Corp',
-    buyerPhone: '+91 99002 44120',
-    buyerLicense: 'KA-MNG-TRD-2026',
-    lotId: 'LOT-KA-MND-102',
-    cropName: 'Bellary Premium Red Onion',
-    quantity: '250 Quintals',
-    escrowLockedAmount: 662500,
-    claimReason: 'Transporter arrived 6 hours past scheduled gate window resulting in unloading bottleneck.',
-    farmerStatement: 'Truck was dispatched on time; heavy rain near Channapatna caused highway delay.',
-    assayerInspectionReport: 'Produce condition 100% sound. Delay did not impact commodity marketability.',
-    status: 'under_review',
-    ruling: null
-  },
-  {
-    _id: 'DSP-KA-2026-003',
-    timestamp: '5 hours ago (10:45 IST)',
-    category: 'weighbridge',
-    severity: 'MEDIUM',
-    mandiYard: 'Kolar APMC Market Yard',
-    farmerName: 'Venkatesh Murthy',
-    farmerPhone: '+91 99805 77612',
-    farmerRtc: 'RTC-KLR-99214',
-    buyerName: 'Karnataka Agro Traders Pvt Ltd',
-    buyerPhone: '+91 98860 55432',
-    buyerLicense: 'KA-BLR-TRD-2026',
-    lotId: 'LOT-KA-KLR-103',
-    cropName: 'Organic Finger Millet (Ragi)',
-    quantity: '150 Quintals',
-    escrowLockedAmount: 517500,
-    claimReason: 'Weighbridge reading shows 148.8 Qtl vs declared 150.0 Qtl (1.2 Qtl moisture shrinkage).',
-    farmerStatement: 'Moisture loss during 48-hour storage in dry summer climate.',
-    assayerInspectionReport: 'Legal Metrology recalibration verified: Net weight 148.8 Qtl within allowable 1.0% natural shrinkage.',
-    status: 'under_review',
-    ruling: null
-  },
-  {
-    _id: 'DSP-KA-2026-004',
-    timestamp: '1 day ago (28 Aug 2026)',
-    category: 'quality',
-    severity: 'RESOLVED',
-    mandiYard: 'Bengaluru Rural (Doddaballapura)',
-    farmerName: 'Channappa Gowda',
-    farmerPhone: '+91 94480 33112',
-    farmerRtc: 'RTC-BLR-44102',
-    buyerName: 'Karnataka Agro Traders Pvt Ltd',
-    buyerPhone: '+91 98860 55432',
-    buyerLicense: 'KA-BLR-TRD-2026',
-    lotId: 'LOT-KA-BLR-104',
-    cropName: 'Yellow Dent Poultry Maize',
-    quantity: '300 Quintals',
-    escrowLockedAmount: 615000,
-    claimReason: 'Moisture content tested at 14.5% vs 13.0% maximum contract specification.',
-    farmerStatement: 'Harvest was sundried for 3 days before packaging.',
-    assayerInspectionReport: 'APMC Moisture Meter certified 14.2%.',
-    status: 'resolved',
-    ruling: '95% Disbursed to Farmer (₹5,84,250), 5% Refunded to Buyer (₹30,750) for additional mechanical drying.'
-  }
-]
-
-const CATEGORY_TABS = [
-  { id: 'all', label: 'All Disputes' },
-  { id: 'quality', label: 'Quality Variance 💧' },
-  { id: 'transit', label: 'Transit & Delay 🚛' },
-  { id: 'weighbridge', label: 'Weighbridge Discrepancy ⚖️' },
+const STATUS_TABS = [
+  { id: 'all', label: 'All Cases' },
+  { id: 'under_review', label: 'Under Review ⚖️' },
   { id: 'resolved', label: 'Resolved Rulings 🟢' }
 ]
 
 export const AdminDisputes = () => {
   const { user } = useAuth()
-  const [disputes, setDisputes] = useState(DEMO_DISPUTES)
-  const [selectedCategory, setSelectedCategory] = useState('all')
+  const [disputes, setDisputes] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [selectedStatusTab, setSelectedStatusTab] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedDisputeForRuling, setSelectedDisputeForRuling] = useState(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [resolvingId, setResolvingId] = useState(null)
+  
+  // Photo Lightbox modal
+  const [lightboxPhoto, setLightboxPhoto] = useState(null)
 
   const loadDisputes = async () => {
+    setLoading(true)
     try {
       const data = await disputeService.getAllDisputes()
-      if (Array.isArray(data) && data.length > 0) {
-        // Merge with existing rich demo items if needed
-        setDisputes(data.map((d) => ({
-          ...d,
-          cropName: d.cropName || d.commodity,
-          escrowLockedAmount: d.escrowLockedAmount || d.escrowAmount,
-          mandiYard: d.mandiYard || 'Hassan APMC Market Yard'
-        })))
-      }
-    } catch {
-      // Keep state
+      setDisputes(Array.isArray(data) ? data : [])
+    } catch (err) {
+      console.error('[AdminDisputes] Failed to load disputes:', err)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -160,75 +61,72 @@ export const AdminDisputes = () => {
     setIsRefreshing(true)
     await loadDisputes()
     setIsRefreshing(false)
-    toast.success('Karnataka APMC dispute arbitration docket synchronized! ⚡')
+    toast.success('Dispute arbitration docket updated from state node! ⚡')
   }
 
   // Execute Ruling Actions
-  const handleExecuteRuling = async (id, optionType) => {
-    let rulingText = ''
-    let farmerPct = 85
-    let traderPct = 15
-    let action = 'payout_farmer'
-
-    if (optionType === 'farmer_100') {
-      rulingText = '100% Escrow Released to Farmer 🌾 (Buyer claim dismissed by APMC tribunal).'
-      farmerPct = 100
-      traderPct = 0
-      action = 'payout_farmer'
-    } else if (optionType === 'split_85_15') {
-      rulingText = 'Mutual Compromise ⚖️: 85% Escrow Released to Farmer, 15% Refunded to Buyer for quality sorting allowance.'
-      farmerPct = 85
-      traderPct = 15
-      action = 'payout_farmer'
-    } else if (optionType === 'buyer_100') {
-      rulingText = '100% Full Refund to Buyer 💼 (Lot rejected for statutory non-conformance).'
-      farmerPct = 0
-      traderPct = 100
-      action = 'refund_trader'
+  const handleExecuteRuling = async (disputeId, action) => {
+    const actionLabels = {
+      refund_trader: '100% Refund to Buyer (Consignment Cancelled)',
+      split_85_15: 'Mutual Split (85% Farmer / 15% Buyer upon Delivery)',
+      payout_farmer: '100% Payout to Farmer (upon Delivery)'
     }
 
-    await disputeService.resolveDispute(id, {
-      action,
-      farmerPercent: farmerPct,
-      traderPercent: traderPct,
-      verdictNotes: rulingText
-    })
+    const confirmMsg = action === 'refund_trader'
+      ? `Record statutory APMC ruling: "${actionLabels[action]}"? This will refund escrow funds to buyer and close the transaction.`
+      : `Record statutory APMC ruling: "${actionLabels[action]}"? Escrow funds will remain safely held in vault until verified APMC delivery acceptance.`
 
-    setDisputes((prev) =>
-      prev.map((d) => (d._id === id ? { ...d, status: 'resolved', ruling: rulingText } : d))
-    )
-    setSelectedDisputeForRuling(null)
-    toast.success(`Statutory APMC Ruling Executed: ${rulingText}`)
+    if (!window.confirm(confirmMsg)) {
+      return
+    }
+
+    setResolvingId(disputeId)
+    try {
+      await disputeService.resolveDispute(disputeId, {
+        action,
+        notes: `Admin APMC arbitration ruling: ${actionLabels[action]}`
+      })
+      toast.success(`Statutory APMC Ruling Recorded: ${actionLabels[action]}! 🏛️`)
+      await loadDisputes()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to record dispute ruling')
+    } finally {
+      setResolvingId(null)
+    }
   }
 
   // Aggregate Metrics
-  const activeDisputesCount = disputes.filter((d) => d.status === 'under_review').length
+  const activeDisputesCount = disputes.filter(
+    (d) => d.status === 'under_review' || d.status === 'raised'
+  ).length
+
   const totalLockedInDispute = disputes
-    .filter((d) => d.status === 'under_review')
-    .reduce((acc, d) => acc + (d.escrowLockedAmount || d.escrowAmount || 0), 0)
+    .filter((d) => d.status === 'under_review' || d.status === 'raised')
+    .reduce((acc, d) => acc + (d.escrowAmount || 0), 0)
+
+  const resolvedCount = disputes.filter((d) => d.status && d.status.startsWith('resolved_')).length
 
   // Filtered List
   const filteredDisputes = useMemo(() => {
     return disputes.filter((d) => {
-      const matchesCategory =
-        selectedCategory === 'all'
-          ? true
-          : selectedCategory === 'resolved'
-          ? d.status === 'resolved'
-          : d.category === selectedCategory
+      const isResolved = d.status && d.status.startsWith('resolved_')
+      const isUnderReview = d.status === 'under_review' || d.status === 'raised'
 
-      const q = searchQuery.toLowerCase()
-      const matchesSearch =
-        (d._id || '').toLowerCase().includes(q) ||
-        (d.farmerName || '').toLowerCase().includes(q) ||
-        (d.buyerName || d.traderName || '').toLowerCase().includes(q) ||
-        (d.cropName || d.commodity || '').toLowerCase().includes(q) ||
-        (d.lotId || '').toLowerCase().includes(q) ||
-        (d.mandiYard || '').toLowerCase().includes(q)
+      if (selectedStatusTab === 'under_review' && !isUnderReview) return false
+      if (selectedStatusTab === 'resolved' && !isResolved) return false
 
-      return matchesCategory && matchesSearch
+      const q = searchQuery.toLowerCase().trim()
+      if (!q) return true
+
+      const caseId = (d._id || '').toLowerCase()
+      const farmerName = (d.farmer?.name || '').toLowerCase()
+      const traderName = (d.trader?.name || d.trader?.companyName || '').toLowerCase()
+      const cropName = (d.cropListing?.name || '').toLowerCase()
+      const reason = (d.reason || '').toLowerCase()
+
+      return caseId.includes(q) || farmerName.includes(q) || traderName.includes(q) || cropName.includes(q) || reason.includes(q)
     })
-  }, [disputes, selectedCategory, searchQuery])
+  }, [disputes, selectedStatusTab, searchQuery])
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto">
@@ -259,14 +157,6 @@ export const AdminDisputes = () => {
             <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />
             Sync APMC Docket
           </Button>
-
-          <Button 
-            onClick={() => toast.success('APMC Statutory Arbitration Summary PDF exported!')}
-            size="sm" 
-            className="rounded-xl text-xs font-bold shadow-md h-10 px-4 bg-purple-600 hover:bg-purple-700 text-white"
-          >
-            <Download className="w-3.5 h-3.5 mr-1.5" /> Export Docket PDF
-          </Button>
         </div>
       </div>
 
@@ -279,7 +169,7 @@ export const AdminDisputes = () => {
           <div>
             <p className="text-xs font-semibold text-muted-foreground">Cases Pending Ruling</p>
             <h3 className="text-2xl font-black text-foreground">{activeDisputesCount} Active Hearings</h3>
-            <span className="text-[11px] text-amber-600 font-medium">Avg Resolution Time: 4.2 Hours</span>
+            <span className="text-[11px] text-amber-600 font-medium">Awaiting APMC Arbitration</span>
           </div>
         </div>
 
@@ -290,7 +180,7 @@ export const AdminDisputes = () => {
           <div>
             <p className="text-xs font-semibold text-muted-foreground">Escrow Locked Under Dispute</p>
             <h3 className="text-2xl font-black text-purple-600 font-mono">₹{totalLockedInDispute.toLocaleString('en-IN')}</h3>
-            <span className="text-[11px] text-muted-foreground">Held in RBI Trust Vault</span>
+            <span className="text-[11px] text-muted-foreground">Held safely in Escrow Vault</span>
           </div>
         </div>
 
@@ -299,9 +189,9 @@ export const AdminDisputes = () => {
             <CheckCircle2 className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-xs font-semibold text-muted-foreground">Dispute Resolution Rate</p>
-            <h3 className="text-2xl font-black text-emerald-600">98.4%</h3>
-            <span className="text-[11px] text-emerald-600 font-medium">Zero Court Escalations</span>
+            <p className="text-xs font-semibold text-muted-foreground">Settled Rulings</p>
+            <h3 className="text-2xl font-black text-emerald-600">{resolvedCount} Cases</h3>
+            <span className="text-[11px] text-emerald-600 font-medium">Binding Rulings Executed</span>
           </div>
         </div>
       </div>
@@ -310,14 +200,14 @@ export const AdminDisputes = () => {
       <div className="p-6 rounded-3xl bg-card border border-border shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           
-          {/* Category Tabs */}
+          {/* Status Tabs */}
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar w-full sm:w-auto">
-            {CATEGORY_TABS.map((tab) => (
+            {STATUS_TABS.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setSelectedCategory(tab.id)}
+                onClick={() => setSelectedStatusTab(tab.id)}
                 className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                  selectedCategory === tab.id
+                  selectedStatusTab === tab.id
                     ? 'bg-purple-600 text-white shadow-md'
                     : 'bg-muted/60 text-muted-foreground hover:text-foreground border border-border'
                 }`}
@@ -334,7 +224,7 @@ export const AdminDisputes = () => {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search case #, producer, buyer, or APMC yard..."
+              placeholder="Search case #, producer, buyer, or crop..."
               className="w-full h-10 pl-10 pr-4 rounded-xl bg-background border border-border text-xs focus:outline-none focus:ring-2 focus:ring-purple-500/40 font-medium"
             />
           </div>
@@ -344,8 +234,9 @@ export const AdminDisputes = () => {
       {/* 4. Disputes List */}
       <div className="space-y-4">
         {filteredDisputes.map((dispute) => {
-          const isResolved = dispute.status === 'resolved'
-          const lockedAmount = dispute.escrowLockedAmount || dispute.escrowAmount || 0
+          const isResolved = dispute.status && dispute.status.startsWith('resolved_')
+          const lockedAmount = dispute.escrowAmount || dispute.transaction?.amount || 0
+          const proofPhotos = dispute.proofPhotos || []
 
           return (
             <div
@@ -353,29 +244,35 @@ export const AdminDisputes = () => {
               className={`p-6 sm:p-7 rounded-3xl border transition-all space-y-5 ${
                 isResolved
                   ? 'bg-card border-border/80 opacity-90'
-                  : 'bg-card border-purple-500/30 shadow-md'
+                  : 'bg-card border-purple-500/40 shadow-md'
               }`}
             >
-              {/* Header: Case #, Severity, Escrow */}
+              {/* Header: Case #, Status, Escrow */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-mono font-black text-sm text-foreground">{dispute._id}</span>
-                    <span className="text-xs text-muted-foreground">• {dispute.timestamp || dispute.filedDate}</span>
+                    <span className="font-mono font-black text-sm text-foreground">
+                      CASE #{String(dispute._id).slice(-8).toUpperCase()}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      • {dispute.createdAt ? new Date(dispute.createdAt).toLocaleString('en-IN') : 'Recent'}
+                    </span>
                     <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ${
                       isResolved
                         ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
-                        : 'bg-rose-500/10 text-rose-600 border border-rose-500/20'
+                        : 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
                     }`}>
-                      {isResolved ? 'Resolved 🟢' : `${dispute.severity} Priority`}
+                      {isResolved ? 'Resolved 🟢' : 'Under APMC Review ⚖️'}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground font-semibold flex items-center gap-1.5">
-                    <Building2 className="w-3.5 h-3.5 text-purple-600" /> {dispute.mandiYard}
+                    <Building2 className="w-3.5 h-3.5 text-purple-600" />
+                    Consignment: <strong className="text-foreground">{dispute.cropListing?.name || 'Agricultural Produce'}</strong>
+                    {dispute.cropListing?.quantity ? ` (${dispute.cropListing.quantity} ${dispute.cropListing.unit || 'Qtl'})` : ''}
                   </p>
                 </div>
 
-                <div className="text-right">
+                <div className="text-left sm:text-right">
                   <span className="text-xs text-muted-foreground block font-medium">Locked Escrow Vault:</span>
                   <span className="text-xl font-black text-purple-600 font-mono">
                     ₹{lockedAmount.toLocaleString('en-IN')}
@@ -383,75 +280,220 @@ export const AdminDisputes = () => {
                 </div>
               </div>
 
-              {/* Producer & Buyer Grid */}
+              {/* Producer & Buyer Contact Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                <div className="p-4 rounded-2xl bg-muted/40 border border-border/80 space-y-1">
-                  <span className="font-bold text-foreground flex items-center gap-1.5">
-                    <Sprout className="w-3.5 h-3.5 text-emerald-600" /> Producer: {dispute.farmerName}
+                <div className="p-4 rounded-2xl bg-muted/40 border border-border/80 space-y-1.5">
+                  <span className="font-bold text-foreground flex items-center gap-1.5 text-xs">
+                    <Sprout className="w-3.5 h-3.5 text-emerald-600" /> Farmer (Seller): {dispute.farmer?.name || 'Verified Farmer'}
                   </span>
-                  <p className="text-muted-foreground">{dispute.farmerPhone} • Lot #{dispute.lotId}</p>
-                  <p className="font-semibold text-foreground pt-1">Produce: {dispute.cropName || dispute.commodity}</p>
+                  <div className="text-muted-foreground space-y-0.5 text-[11px]">
+                    {dispute.farmer?.mobile && (
+                      <p className="flex items-center gap-1.5">
+                        <Phone className="w-3 h-3 text-emerald-600" /> {dispute.farmer.mobile}
+                      </p>
+                    )}
+                    {dispute.farmer?.email && (
+                      <p className="flex items-center gap-1.5">
+                        <Mail className="w-3 h-3 text-emerald-600" /> {dispute.farmer.email}
+                      </p>
+                    )}
+                    {dispute.farmer?.district && (
+                      <p className="flex items-center gap-1.5">
+                        <MapPin className="w-3 h-3 text-emerald-600" /> {dispute.farmer.district}, {dispute.farmer.state || 'Karnataka'}
+                      </p>
+                    )}
+                  </div>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-muted/40 border border-border/80 space-y-1">
-                  <span className="font-bold text-foreground flex items-center gap-1.5">
-                    <Briefcase className="w-3.5 h-3.5 text-amber-600" /> Buyer: {dispute.buyerName || dispute.traderName}
+                <div className="p-4 rounded-2xl bg-muted/40 border border-border/80 space-y-1.5">
+                  <span className="font-bold text-foreground flex items-center gap-1.5 text-xs">
+                    <Briefcase className="w-3.5 h-3.5 text-amber-600" /> Trader (Buyer): {dispute.trader?.name || dispute.trader?.companyName || 'Registered Trader'}
                   </span>
-                  <p className="text-muted-foreground">{dispute.buyerPhone || dispute.traderMobile}</p>
-                  <p className="font-semibold text-foreground pt-1">Claim: {dispute.claimReason || dispute.disputeReason}</p>
+                  <div className="text-muted-foreground space-y-0.5 text-[11px]">
+                    {dispute.trader?.mobile && (
+                      <p className="flex items-center gap-1.5">
+                        <Phone className="w-3 h-3 text-amber-600" /> {dispute.trader.mobile}
+                      </p>
+                    )}
+                    {dispute.trader?.email && (
+                      <p className="flex items-center gap-1.5">
+                        <Mail className="w-3 h-3 text-amber-600" /> {dispute.trader.email}
+                      </p>
+                    )}
+                    {dispute.trader?.district && (
+                      <p className="flex items-center gap-1.5">
+                        <MapPin className="w-3 h-3 text-amber-600" /> {dispute.trader.district}, {dispute.trader.state || 'Karnataka'}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* Assayer Inspection Note */}
-              <div className="p-4 rounded-2xl bg-purple-500/5 border border-purple-500/20 text-xs space-y-1">
-                <span className="font-bold text-purple-700 flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-purple-600" /> APMC Official Assayer Laboratory Certificate
+              {/* Dispute Description */}
+              <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20 text-xs space-y-1">
+                <span className="font-bold text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5" /> Buyer Dispute Statement & Defect Report:
                 </span>
-                <p className="text-muted-foreground">
-                  {dispute.assayerInspectionReport || dispute.hearingNotes?.[0] || 'Quality parameters independently certified by APMC mandi lab.'}
+                <p className="text-foreground font-medium pt-0.5">
+                  "{dispute.reason || 'Consignment quality discrepancy reported by buyer.'}"
                 </p>
               </div>
 
+              {/* Photo Proofs Gallery */}
+              {proofPhotos.length > 0 && (
+                <div className="space-y-2 text-xs">
+                  <span className="font-bold text-foreground flex items-center gap-1.5">
+                    <ImageIcon className="w-3.5 h-3.5 text-purple-600" /> Photographic Proof Evidence ({proofPhotos.length}):
+                  </span>
+                  <div className="flex flex-wrap gap-3">
+                    {proofPhotos.map((photoUrl, idx) => {
+                      const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '')
+                      const fullUrl = photoUrl.startsWith('http') || photoUrl.startsWith('blob:')
+                        ? photoUrl
+                        : `${apiBase}${photoUrl.startsWith('/') ? '' : '/'}${photoUrl}`
+                      return (
+                        <div
+                          key={idx}
+                          onClick={() => setLightboxPhoto(fullUrl)}
+                          className="relative w-20 h-20 rounded-2xl overflow-hidden border border-border cursor-pointer hover:opacity-90 transition-opacity shadow-xs group"
+                        >
+                          <img
+                            src={fullUrl}
+                            alt={`Evidence ${idx + 1}`}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.target.onerror = null
+                              e.target.src = 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=400&auto=format&fit=crop'
+                            }}
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity">
+                            <Eye className="w-4 h-4" />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Resolved Ruling Box or Action Buttons */}
               {isResolved ? (
-                <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs space-y-1">
-                  <span className="font-bold text-emerald-700 flex items-center gap-1.5">
-                    <Gavel className="w-4 h-4 text-emerald-600" /> Official APMC Statutory Ruling
-                  </span>
-                  <p className="font-medium text-foreground">{dispute.ruling || dispute.verdict?.verdictNotes}</p>
+                <div className="p-4 rounded-2xl bg-purple-500/10 border border-purple-500/30 text-xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-purple-700 dark:text-purple-400 flex items-center gap-1.5">
+                      <Gavel className="w-4 h-4 text-purple-600" /> Official APMC Statutory Ruling Recorded
+                    </span>
+                    <span className="font-mono font-bold text-[11px] px-2 py-0.5 rounded bg-purple-500/20 text-purple-700 dark:text-purple-300 uppercase">
+                      {dispute.ruling?.action || dispute.status}
+                    </span>
+                  </div>
+                  <p className="font-medium text-foreground">{dispute.ruling?.notes || 'Dispute resolved.'}</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-1 border-t border-purple-500/20 text-[11px]">
+                    <div>
+                      <span className="text-muted-foreground block">Farmer Eventual Payout:</span>
+                      <strong className="text-emerald-600 font-mono">₹{(dispute.ruling?.farmerPayout || 0).toLocaleString('en-IN')}</strong>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block">Buyer Refund:</span>
+                      <strong className="text-amber-600 font-mono">₹{(dispute.ruling?.traderRefund || 0).toLocaleString('en-IN')}</strong>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block">Ruling Date:</span>
+                      <span className="text-foreground font-semibold">
+                        {dispute.ruling?.resolvedAt ? new Date(dispute.ruling.resolvedAt).toLocaleDateString('en-IN') : 'Completed'}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-[11px] font-semibold text-purple-700 dark:text-purple-400 pt-0.5">
+                    {dispute.ruling?.action === 'refund_trader'
+                      ? '✅ 100% refunded to buyer and harvest lot cancelled.'
+                      : '🔒 Funds held in escrow. Payout will execute automatically when buyer confirms delivery at mandi.'}
+                  </p>
                 </div>
               ) : (
-                <div className="flex flex-wrap items-center justify-end gap-3 pt-2 border-t border-border">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleExecuteRuling(dispute._id, 'buyer_100')}
-                    className="rounded-xl text-xs h-9 font-semibold text-rose-600 hover:bg-rose-500/10 border-rose-500/30"
-                  >
-                    100% Refund to Buyer
-                  </Button>
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border">
+                  <span className="text-[11px] text-muted-foreground italic">
+                    Escrow funds will remain safely locked until delivery is confirmed.
+                  </span>
 
-                  <Button
-                    size="sm"
-                    onClick={() => handleExecuteRuling(dispute._id, 'split_85_15')}
-                    className="rounded-xl text-xs h-9 font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-sm"
-                  >
-                    Mutual Split (85% Farmer / 15% Buyer) ⚖️
-                  </Button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={resolvingId === dispute._id}
+                      onClick={() => handleExecuteRuling(dispute._id, 'refund_trader')}
+                      className="rounded-xl text-xs h-9 font-semibold text-rose-600 hover:bg-rose-500/10 border-rose-500/30"
+                    >
+                      100% Refund to Buyer
+                    </Button>
 
-                  <Button
-                    size="sm"
-                    onClick={() => handleExecuteRuling(dispute._id, 'farmer_100')}
-                    className="rounded-xl text-xs h-9 font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
-                  >
-                    100% Payout to Farmer 🌾
-                  </Button>
+                    <Button
+                      size="sm"
+                      disabled={resolvingId === dispute._id}
+                      onClick={() => handleExecuteRuling(dispute._id, 'split_85_15')}
+                      className="rounded-xl text-xs h-9 font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-sm"
+                    >
+                      Mutual Split (85% Farmer / 15% Buyer) ⚖️
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      disabled={resolvingId === dispute._id}
+                      onClick={() => handleExecuteRuling(dispute._id, 'payout_farmer')}
+                      className="rounded-xl text-xs h-9 font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                    >
+                      100% Payout to Farmer 🌾
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
           )
         })}
       </div>
+
+      {/* Empty State */}
+      {filteredDisputes.length === 0 && !loading && (
+        <div className="p-12 text-center rounded-3xl bg-card border border-border space-y-3">
+          <div className="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-600 mx-auto flex items-center justify-center">
+            <CheckCircle2 className="w-6 h-6" />
+          </div>
+          <p className="text-base font-bold text-foreground">No Disputes Found in Docket</p>
+          <p className="text-xs text-muted-foreground">
+            All harvest transactions are currently proceeding without active quality disputes. Any new dispute raised by buyers will appear here immediately.
+          </p>
+        </div>
+      )}
+
+      {/* 5. Photo Lightbox Modal */}
+      {lightboxPhoto && (
+        <div 
+          onClick={() => setLightboxPhoto(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200 cursor-pointer"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="relative bg-card border border-border rounded-3xl p-4 max-w-2xl w-full shadow-2xl space-y-3"
+          >
+            <div className="flex items-center justify-between border-b border-border pb-2">
+              <span className="font-bold text-xs text-foreground flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-purple-600" /> APMC Disputed Consignment Photo Proof
+              </span>
+              <button
+                type="button"
+                onClick={() => setLightboxPhoto(null)}
+                className="w-7 h-7 rounded-xl bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="rounded-2xl overflow-hidden bg-black max-h-[70vh] flex items-center justify-center">
+              <img src={lightboxPhoto} alt="Dispute evidence enlarged" className="max-w-full max-h-[70vh] object-contain" />
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

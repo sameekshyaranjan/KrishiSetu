@@ -24,7 +24,8 @@ import {
   Package,
   Layers,
   RefreshCw,
-  Printer
+  Printer,
+  Scale
 } from 'lucide-react'
 
 export const FarmerOrders = () => {
@@ -77,7 +78,11 @@ export const FarmerOrders = () => {
         (o.crop?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         (o.trader?.name || '').toLowerCase().includes(searchQuery.toLowerCase())
 
-      const matchesStatus = statusFilter === 'all' || o.paymentStatus === statusFilter
+      const matchesStatus = 
+        statusFilter === 'all' || 
+        (statusFilter === 'disputed' 
+          ? (o.isDisputed || o.logisticsStatus === 'disputed' || o.isResolved || o.logisticsStatus === 'resolved') 
+          : o.paymentStatus === statusFilter)
       return matchesSearch && matchesStatus
     })
   }, [orders, searchQuery, statusFilter])
@@ -187,7 +192,8 @@ export const FarmerOrders = () => {
           {[
             { id: 'all', label: 'All Orders' },
             { id: 'escrow_locked', label: 'Active Escrow 🔒' },
-            { id: 'disbursed', label: 'Disbursed / Completed 💸' }
+            { id: 'disbursed', label: 'Disbursed / Completed 💸' },
+            { id: 'disputed', label: 'Disputes & Claims ⚖️' }
           ].map((tab) => (
             <button
               key={tab.id}
@@ -207,9 +213,12 @@ export const FarmerOrders = () => {
       {/* 4. Orders List Cards */}
       <div className="space-y-6">
         {filteredOrders.map((order) => {
-          const isDelivered = order.stage === 4
-          const isInTransit = order.stage === 2 || order.stage === 3
-          const isPending = order.stage === 1
+          const isDelivered = order.stage === 4 || order.logisticsStatus === 'delivered'
+          const isInTransit = (order.stage === 2 || order.stage === 3 || order.logisticsStatus === 'in_transit' || order.logisticsStatus === 'arrived_mandi') && !isDelivered
+          const isDisputed = order.isDisputed || order.logisticsStatus === 'disputed'
+          const isResolved = order.isResolved || order.logisticsStatus === 'resolved' || Boolean(order.dispute && order.dispute.status?.startsWith('resolved_'))
+          const isRefunded = order.paymentStatus === 'refunded' || order.rawPaymentStatus === 'refunded'
+          const isPending = !isDelivered && !isInTransit && !isDisputed && !isRefunded
 
           return (
             <div 
@@ -240,7 +249,13 @@ export const FarmerOrders = () => {
                   </div>
 
                   <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                    isDelivered 
+                    isRefunded
+                      ? 'bg-rose-500/10 text-rose-600 border border-rose-500/20'
+                      : isDisputed
+                      ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
+                      : isResolved
+                      ? 'bg-purple-500/10 text-purple-600 border border-purple-500/20'
+                      : isDelivered 
                       ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' 
                       : isInTransit 
                       ? 'bg-sky-500/10 text-sky-600 border border-sky-500/20'
@@ -248,7 +263,13 @@ export const FarmerOrders = () => {
                       ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
                       : 'bg-muted text-muted-foreground border border-border'
                   }`}>
-                    {isDelivered 
+                    {isRefunded
+                      ? 'Refunded to Buyer 🛑'
+                      : isDisputed
+                      ? 'Disputed • Under Review ⚖️'
+                      : isResolved
+                      ? 'Dispute Resolved 🏛️'
+                      : isDelivered 
                       ? 'Disbursed to Bank 💸' 
                       : isInTransit 
                       ? 'In Logistics Transit 🚚' 
@@ -258,6 +279,54 @@ export const FarmerOrders = () => {
                   </span>
                 </div>
               </div>
+
+              {/* Dispute Under Review Banner */}
+              {isDisputed && (
+                <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-extrabold text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                      <Scale className="w-4 h-4 text-amber-600" /> APMC Dispute Lodged by Buyer • Under Tribunal Review
+                    </span>
+                    <span className="font-mono font-bold px-2.5 py-0.5 rounded-md bg-amber-500/20 text-amber-700 dark:text-amber-300">
+                      Escrow Frozen: ₹{order.escrowAmount?.toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                  <p className="text-muted-foreground font-medium">
+                    Reason reported: &quot;{order.dispute?.reason || 'Quality or transit discrepancy reported by buyer'}&quot;
+                  </p>
+                  <p className="text-[11px] text-amber-700 dark:text-amber-300 font-medium">
+                    Escrow funds are safely frozen in the APMC vault. Consignment dispatch and financial settlement are held until state administrator arbitration.
+                  </p>
+                </div>
+              )}
+
+              {/* Dispute Resolved Banner */}
+              {isResolved && (
+                <div className="p-4 rounded-2xl bg-purple-500/10 border border-purple-500/30 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-extrabold text-purple-700 dark:text-purple-400 flex items-center gap-1.5">
+                      <Scale className="w-4 h-4 text-purple-600" /> APMC Dispute Ruling Finalized
+                    </span>
+                    <span className="font-mono font-bold px-2.5 py-0.5 rounded-md bg-purple-500/20 text-purple-700 dark:text-purple-300 uppercase">
+                      {order.disputeResolution || order.dispute?.ruling?.action || 'RESOLVED'}
+                    </span>
+                  </div>
+                  <p className="text-muted-foreground font-medium">
+                    {order.disputeResolution === 'split_85_15'
+                      ? `Tribunal Ruling: 85/15 Mutual Split. Your Payout: ₹${(order.farmerPayoutAmount || Math.round(order.escrowAmount * 0.85)).toLocaleString('en-IN')} (85%), Buyer Refund: ₹${(order.traderRefundAmount || Math.round(order.escrowAmount * 0.15)).toLocaleString('en-IN')} (15%).`
+                      : order.disputeResolution === 'payout_farmer'
+                      ? `Tribunal Ruling: 100% Payout to Farmer Approved: ₹${order.escrowAmount?.toLocaleString('en-IN')}.`
+                      : order.disputeResolution === 'refund_trader'
+                      ? 'Tribunal Ruling: 100% Refund to Buyer. Order closed and crop lot delisted.'
+                      : 'Tribunal arbitration completed.'}
+                  </p>
+                  <p className="text-[11px] font-semibold text-purple-700 dark:text-purple-300">
+                    {order.disputeResolutionStatus === 'awaiting_delivery' || order.rawPaymentStatus === 'held_in_escrow'
+                      ? '⏳ Funds remain held in escrow. Payout will be disbursed directly upon verified delivery acceptance.'
+                      : '✅ Financial resolution executed.'}
+                  </p>
+                </div>
+              )}
 
               {/* Card Middle: Crop Snippet & 4-Stage Lifecycle Stepper */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
@@ -380,6 +449,16 @@ export const FarmerOrders = () => {
                       </Button>
                     )}
                   </div>
+                ) : isDisputed ? (
+                  <p className="text-xs text-amber-600 flex items-center gap-1.5 pt-0.5">
+                    <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    Consignment is currently under APMC arbitration. Dispatch is on hold.
+                  </p>
+                ) : isRefunded ? (
+                  <p className="text-xs text-rose-600 flex items-center gap-1.5 pt-0.5">
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                    This transaction was refunded to buyer and closed.
+                  </p>
                 ) : (
                   <p className="text-xs text-muted-foreground flex items-center gap-1.5 pt-0.5">
                     <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
@@ -634,6 +713,22 @@ export const FarmerOrders = () => {
                 </span>
               </div>
             </div>
+
+            {selectedOrderForLogistics.vehiclePhoto && (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
+                  <span>Verified Transport Vehicle:</span>
+                  <span className="text-[10px] text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-md font-mono font-bold">Cloudinary Verified</span>
+                </div>
+                <div className="relative h-44 rounded-2xl overflow-hidden border border-border group bg-muted">
+                  <img
+                    src={selectedOrderForLogistics.vehiclePhoto}
+                    alt="Assigned Vehicle"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
+            )}
 
             <Button 
               onClick={() => setSelectedOrderForLogistics(null)}

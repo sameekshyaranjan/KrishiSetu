@@ -57,9 +57,17 @@ export const orderService = {
             escrowAmount: totalAmount,
             mandiCess: Math.round(totalAmount * 0.015),
             netFarmerPayout: Math.round(totalAmount * 0.985),
-            paymentStatus: tx.paymentStatus === 'payout_released' || tx.paymentStatus === 'completed' ? 'disbursed' : 'escrow_locked',
+            paymentStatus: tx.paymentStatus === 'payout_released' || tx.paymentStatus === 'completed' ? 'disbursed' : tx.paymentStatus === 'refunded' ? 'refunded' : 'escrow_locked',
+            rawPaymentStatus: tx.paymentStatus || 'held_in_escrow',
             stage: tx.logisticsStatus === 'delivered' ? 4 : (tx.logisticsStatus === 'in_transit' || tx.logisticsStatus === 'arrived_mandi') ? 2 : 1,
             logisticsStatus: tx.logisticsStatus || 'pending',
+            dispute: tx.dispute || null,
+            isDisputed: tx.logisticsStatus === 'disputed' || Boolean(tx.dispute && tx.dispute.status === 'under_review'),
+            isResolved: tx.logisticsStatus === 'resolved' || Boolean(tx.dispute && tx.dispute.status?.startsWith('resolved_')),
+            disputeResolution: tx.disputeResolution || tx.dispute?.ruling?.action || '',
+            disputeResolutionStatus: tx.disputeResolutionStatus || 'none',
+            farmerPayoutAmount: tx.farmerPayoutAmount || tx.dispute?.ruling?.farmerPayout || 0,
+            traderRefundAmount: tx.traderRefundAmount || tx.dispute?.ruling?.traderRefund || 0,
             utrNumber: tx.paymentGatewayId || `ESC-${String(tx._id).slice(-8).toUpperCase()}`,
             hasVehicleDetails: hasVehicle,
             vehicleDetails: tx.vehicleDetails || null,
@@ -119,11 +127,18 @@ export const orderService = {
             grossEscrow: totalAmount,
             statutoryCess: Math.round(totalAmount * 0.015),
             totalEscrowLocked: totalAmount,
-            status: tx.paymentStatus === 'payout_released' || tx.paymentStatus === 'completed' ? 'dbt_released' : 'in_transit',
+            status: tx.paymentStatus === 'payout_released' || tx.paymentStatus === 'completed' ? 'dbt_released' : tx.paymentStatus === 'refunded' ? 'refunded' : 'in_transit',
             paymentStatus: tx.paymentStatus || 'held_in_escrow',
             logisticsStatus: tx.logisticsStatus || 'pending',
             currentStage: tx.logisticsStatus === 'delivered' ? 4 : (tx.logisticsStatus === 'in_transit' || tx.logisticsStatus === 'arrived_mandi') ? 2 : 1,
             stage: tx.logisticsStatus === 'delivered' ? 4 : (tx.logisticsStatus === 'in_transit' || tx.logisticsStatus === 'arrived_mandi') ? 2 : 1,
+            dispute: tx.dispute || null,
+            isDisputed: tx.logisticsStatus === 'disputed' || Boolean(tx.dispute && tx.dispute.status === 'under_review'),
+            isResolved: tx.logisticsStatus === 'resolved' || Boolean(tx.dispute && tx.dispute.status?.startsWith('resolved_')),
+            disputeResolution: tx.disputeResolution || tx.dispute?.ruling?.action || '',
+            disputeResolutionStatus: tx.disputeResolutionStatus || 'none',
+            farmerPayoutAmount: tx.farmerPayoutAmount || tx.dispute?.ruling?.farmerPayout || 0,
+            traderRefundAmount: tx.traderRefundAmount || tx.dispute?.ruling?.traderRefund || 0,
             image: cropImg,
             images: tx.cropListing?.images?.length ? tx.cropListing.images : [cropImg],
             farmer: {
@@ -178,10 +193,20 @@ export const orderService = {
   },
 
   /**
-   * Confirm Delivery & Release Escrow / Payout (Trader action)
-   */
   confirmDelivery: async (orderId) => {
     const res = await api.put(`/transactions/${orderId}/confirm-delivery`, {})
+    return res?.data || res
+  },
+
+  /**
+   * Raise Dispute against an Order before confirming delivery (Trader action)
+   */
+  raiseDispute: async (orderId, disputeData) => {
+    const config = {}
+    if (disputeData instanceof FormData) {
+      config.headers = { 'Content-Type': 'multipart/form-data' }
+    }
+    const res = await api.put(`/transactions/${orderId}/dispute`, disputeData, config)
     return res?.data || res
   },
 

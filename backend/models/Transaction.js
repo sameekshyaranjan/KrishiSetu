@@ -58,6 +58,24 @@ const transactionSchema = new mongoose.Schema({
   receiptUrl: {
     type: String
   },
+  disputeResolution: {
+    type: String,
+    enum: ['none', 'refund_trader', 'split_85_15', 'payout_farmer'],
+    default: 'none'
+  },
+  disputeResolutionStatus: {
+    type: String,
+    enum: ['none', 'awaiting_delivery', 'executed'],
+    default: 'none'
+  },
+  farmerPayoutAmount: {
+    type: Number,
+    default: 0
+  },
+  traderRefundAmount: {
+    type: Number,
+    default: 0
+  },
   transactionDate: {
     type: Date,
     default: Date.now

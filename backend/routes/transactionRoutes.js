@@ -33,6 +33,7 @@ router.patch('/:id/confirm-delivery', authorize('trader'), confirmDelivery);
 
 // Generic/compatibility endpoints
 router.put('/:id/logistics', updateLogisticsStatus);
-router.put('/:id/dispute', disputeTransaction);
+router.put('/:id/dispute', upload.array('proofPhotos', 5), disputeTransaction);
+router.post('/:id/dispute', upload.array('proofPhotos', 5), disputeTransaction);
 
 module.exports = router;

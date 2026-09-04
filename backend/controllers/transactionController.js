@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const Transaction = require('../models/Transaction');
 const Bid = require('../models/Bid');
 const Crop = require('../models/Crop');
+const Dispute = require('../models/Dispute');
 const { paginate } = require('../utils/paginate');
 const { createNotification } = require('../utils/createNotification');
 const logger = require('../utils/logger');
@@ -158,6 +159,18 @@ const getMyTransactions = async (req, res, next) => {
       { transactionDate: -1 }
     );
 
+    const Dispute = require('../models/Dispute');
+    if (result && Array.isArray(result.data)) {
+      result.data = await Promise.all(result.data.map(async (tx) => {
+        const txObj = tx.toObject ? tx.toObject() : tx;
+        const dispute = await Dispute.findOne({ transaction: tx._id });
+        if (dispute) {
+          txObj.dispute = dispute;
+        }
+        return txObj;
+      }));
+    }
+
     res.status(200).json(result);
   } catch (error) {
     next(error);
@@ -180,7 +193,14 @@ const getTransactionById = async (req, res, next) => {
       return res.status(403).json({ message: 'Not authorized to view this transaction' });
     }
 
-    res.status(200).json(transaction);
+    const Dispute = require('../models/Dispute');
+    const dispute = await Dispute.findOne({ transaction: transaction._id });
+    const txObj = transaction.toObject();
+    if (dispute) {
+      txObj.dispute = dispute;
+    }
+
+    res.status(200).json(txObj);
   } catch (error) {
     next(error);
   }
@@ -229,8 +249,8 @@ const submitVehicleDetails = async (req, res, next) => {
       return res.status(403).json({ message: 'Only the assigned trader can upload vehicle details' });
     }
 
-    if (tx.logisticsStatus === 'in_transit' || tx.logisticsStatus === 'delivered') {
-      return res.status(400).json({ message: 'Cannot update vehicle details for lots already dispatched or delivered' });
+    if (tx.paymentStatus === 'refunded' || tx.logisticsStatus === 'delivered' || tx.logisticsStatus === 'in_transit') {
+      return res.status(400).json({ message: 'Cannot update vehicle details for lots already dispatched, delivered, or refunded' });
     }
 
     // Validation
@@ -255,7 +275,7 @@ const submitVehicleDetails = async (req, res, next) => {
     }
 
     const serverUrl = process.env.SERVER_URL || `${req.protocol}://${req.get('host')}`;
-    let photoUrl = vehiclePhoto;
+    let photoUrl = (vehiclePhoto && typeof vehiclePhoto === 'string' && !vehiclePhoto.startsWith('data:image')) ? vehiclePhoto : '';
     if (req.file) {
       if (req.file.path && req.file.path.startsWith('http')) {
         photoUrl = req.file.path;
@@ -320,7 +340,11 @@ const dispatchLot = async (req, res, next) => {
       return res.status(400).json({ message: 'Vehicle details must be submitted by trader before lot can be dispatched' });
     }
 
-    if (tx.logisticsStatus !== 'pending') {
+    if (tx.paymentStatus === 'refunded') {
+      return res.status(400).json({ message: 'This transaction has been refunded and closed.' });
+    }
+
+    if (tx.logisticsStatus !== 'pending' && tx.logisticsStatus !== 'disputed' && tx.logisticsStatus !== 'resolved') {
       return res.status(400).json({ message: `Lot is already ${tx.logisticsStatus}` });
     }
 
@@ -354,67 +378,165 @@ const confirmDelivery = async (req, res, next) => {
     if (!tx) return res.status(404).json({ message: 'Transaction not found' });
 
     // Authorization: only the receiving trader can confirm delivery
-    if (tx.trader._id.toString() !== req.user.id) {
+    const traderId = (tx.trader && tx.trader._id) ? tx.trader._id.toString() : (tx.trader ? tx.trader.toString() : '');
+    const currentUserId = (req.user && req.user._id) ? req.user._id.toString() : (req.user ? req.user.id?.toString() : '');
+    if (traderId !== currentUserId) {
       return res.status(403).json({ message: 'Only the receiving trader can confirm delivery' });
     }
 
-    if (tx.logisticsStatus === 'pending') {
+    if (tx.paymentStatus === 'refunded') {
+      return res.status(400).json({ message: 'This transaction has been refunded to buyer and closed' });
+    }
+
+    const Dispute = require('../models/Dispute');
+    const dispute = await Dispute.findOne({ transaction: tx._id });
+
+    // Check if this transaction has an arbitrated dispute awaiting delivery
+    const isDisputeAwaitingDelivery = 
+      tx.disputeResolutionStatus === 'awaiting_delivery' ||
+      tx.logisticsStatus === 'resolved' ||
+      (dispute && dispute.status && dispute.status.startsWith('resolved_') && tx.paymentStatus === 'held_in_escrow');
+
+    if (tx.logisticsStatus === 'pending' && !isDisputeAwaitingDelivery) {
       return res.status(400).json({ message: 'Delivery cannot be confirmed before the lot is dispatched by the farmer' });
     }
 
-    if (tx.logisticsStatus === 'delivered' || tx.paymentStatus === 'payout_released') {
+    if (tx.logisticsStatus === 'delivered' || tx.paymentStatus === 'payout_released' || (tx.disputeResolutionStatus === 'executed' && tx.paymentStatus === 'completed')) {
       return res.status(400).json({ message: 'Delivery and payout have already been confirmed for this transaction' });
     }
 
-    const payoutAmount = tx.amount;
+    const totalEscrow = tx.amount;
+    let farmerPayout = totalEscrow;
+    let traderRefund = 0;
+    let finalPaymentStatus = 'payout_released';
+
+    // Check if an Admin dispute ruling exists
+    if (dispute && dispute.ruling && dispute.ruling.action) {
+      if (dispute.ruling.action === 'split_85_15') {
+        farmerPayout = dispute.ruling.farmerPayout || Math.round(totalEscrow * 0.85);
+        traderRefund = dispute.ruling.traderRefund || (totalEscrow - farmerPayout);
+        finalPaymentStatus = 'completed';
+      } else if (dispute.ruling.action === 'payout_farmer') {
+        farmerPayout = totalEscrow;
+        traderRefund = 0;
+        finalPaymentStatus = 'payout_released';
+      }
+    } else if (tx.disputeResolution === 'split_85_15') {
+      farmerPayout = tx.farmerPayoutAmount || Math.round(totalEscrow * 0.85);
+      traderRefund = tx.traderRefundAmount || (totalEscrow - farmerPayout);
+      finalPaymentStatus = 'completed';
+    } else if (tx.disputeResolution === 'payout_farmer') {
+      farmerPayout = totalEscrow;
+      traderRefund = 0;
+      finalPaymentStatus = 'payout_released';
+    }
+
     const Wallet = require('../models/Wallet');
     const WalletLedger = require('../models/WalletLedger');
 
-    // Release escrow: decrement lockedBalance and increment totalDisbursed
-    const updatedTraderWallet = await Wallet.findOneAndUpdate(
-      { trader: tx.trader._id, lockedBalance: { $gte: payoutAmount } },
-      {
-        $inc: { lockedBalance: -payoutAmount, totalDisbursed: payoutAmount },
-        $set: { updatedAt: Date.now() }
-      },
-      { new: true }
-    );
+    // Release escrow: decrement lockedBalance, credit traderRefund to available, credit farmerPayout to disbursed
+    const traderWallet = await Wallet.findOne({ trader: tx.trader._id || tx.trader });
+    let updatedTraderWallet = null;
+    if (traderWallet) {
+      const deductLocked = Math.min(traderWallet.lockedBalance || 0, totalEscrow);
+      traderWallet.lockedBalance = Math.max(0, (traderWallet.lockedBalance || 0) - deductLocked);
+      traderWallet.availableBalance = (traderWallet.availableBalance || 0) + traderRefund;
+      traderWallet.totalDisbursed = (traderWallet.totalDisbursed || 0) + farmerPayout;
+      traderWallet.updatedAt = Date.now();
+      await traderWallet.save();
+      updatedTraderWallet = traderWallet;
+    }
 
-    // Create immutable WalletLedger PAYOUT_DISBURSED record
-    await WalletLedger.create({
-      trader: tx.trader._id,
-      wallet: updatedTraderWallet ? updatedTraderWallet._id : null,
-      type: 'PAYOUT_DISBURSED',
-      amount: payoutAmount,
-      balanceAfter: updatedTraderWallet ? updatedTraderWallet.availableBalance : 0,
-      status: 'completed',
-      source: 'DEVELOPMENT_SANDBOX',
-      paymentMethod: 'Direct Benefit Transfer (DBT)',
-      description: `Escrow payout released to farmer for ${tx.cropListing?.name || 'Crop Lot'}`,
-      referenceId: String(tx._id)
-    });
+    // Create immutable WalletLedger entries
+    if (traderRefund > 0) {
+      await WalletLedger.create({
+        trader: tx.trader._id,
+        wallet: updatedTraderWallet ? updatedTraderWallet._id : null,
+        type: 'REFUND',
+        amount: traderRefund,
+        balanceAfter: updatedTraderWallet ? updatedTraderWallet.availableBalance : 0,
+        status: 'completed',
+        source: 'APMC_DISPUTE_ARBITRATION',
+        paymentMethod: 'Escrow Partial Refund (15%)',
+        description: `15% Escrow refund to trader upon delivery acceptance for ${tx.cropListing?.name || 'Crop Lot'}`,
+        referenceId: String(tx._id)
+      });
+    }
+
+    if (farmerPayout > 0) {
+      await WalletLedger.create({
+        trader: tx.trader._id,
+        wallet: updatedTraderWallet ? updatedTraderWallet._id : null,
+        type: 'PAYOUT_DISBURSED',
+        amount: farmerPayout,
+        balanceAfter: updatedTraderWallet ? updatedTraderWallet.availableBalance : 0,
+        status: 'completed',
+        source: 'APMC_ESCROW_SETTLEMENT',
+        paymentMethod: 'Direct Benefit Transfer (DBT)',
+        description: `Escrow payout released to farmer for ${tx.cropListing?.name || 'Crop Lot'}`,
+        referenceId: String(tx._id)
+      });
+    }
+
+    // Finalize Dispute document if present
+    if (dispute) {
+      if (dispute.ruling?.action === 'split_85_15') {
+        dispute.status = 'resolved_split_85_15';
+      } else if (dispute.ruling?.action === 'payout_farmer') {
+        dispute.status = 'resolved_payout_farmer';
+      }
+      dispute.updatedAt = new Date();
+      await dispute.save();
+    }
 
     tx.logisticsStatus = 'delivered';
-    tx.paymentStatus = 'payout_released';
+    tx.paymentStatus = finalPaymentStatus;
     tx.deliveredAt = new Date();
+    tx.disputeResolutionStatus = 'executed';
+    tx.farmerPayoutAmount = farmerPayout;
+    tx.traderRefundAmount = traderRefund;
     await tx.save();
 
-    createNotification(
-      tx.farmer._id,
-      'Farmer',
-      'Escrow Payout Released 💸',
-      `Crop delivery confirmed! ₹${payoutAmount.toLocaleString('en-IN')} has been released from escrow directly to your account.`
-    );
+    if (tx.bid) {
+      await Bid.findByIdAndUpdate(tx.bid, { status: isDisputeAwaitingDelivery ? 'dispute_resolved' : 'accepted' });
+    }
 
-    createNotification(
-      tx.trader._id,
-      'Trader',
-      'Delivery Confirmed & Disbursed',
-      `Delivery of ${tx.cropListing?.name || 'crop lot'} confirmed. ₹${payoutAmount.toLocaleString('en-IN')} escrow has been disbursed to ${tx.farmer?.name || 'farmer'}.`
-    );
+    if (tx.cropListing) {
+      await Crop.findByIdAndUpdate(tx.cropListing._id, { status: 'sold' });
+    }
+
+    if (traderRefund > 0) {
+      createNotification(
+        tx.farmer._id,
+        'Farmer',
+        'Escrow Payout Released 💸',
+        `Crop delivery confirmed! ₹${farmerPayout.toLocaleString('en-IN')} (85% dispute settlement) has been released from escrow directly to your account.`
+      );
+
+      createNotification(
+        tx.trader._id,
+        'Trader',
+        'Delivery Confirmed & Settled',
+        `Delivery of ${tx.cropListing?.name || 'crop lot'} confirmed. ₹${farmerPayout.toLocaleString('en-IN')} (85%) disbursed to farmer, and ₹${traderRefund.toLocaleString('en-IN')} (15%) returned to your available balance.`
+      );
+    } else {
+      createNotification(
+        tx.farmer._id,
+        'Farmer',
+        'Escrow Payout Released 💸',
+        `Crop delivery confirmed! ₹${farmerPayout.toLocaleString('en-IN')} has been released from escrow directly to your account.`
+      );
+
+      createNotification(
+        tx.trader._id,
+        'Trader',
+        'Delivery Confirmed & Disbursed',
+        `Delivery of ${tx.cropListing?.name || 'crop lot'} confirmed. ₹${farmerPayout.toLocaleString('en-IN')} escrow has been disbursed to ${tx.farmer?.name || 'farmer'}.`
+      );
+    }
 
     res.status(200).json({
-      message: `Delivery confirmed! ₹${payoutAmount.toLocaleString('en-IN')} released from escrow to farmer.`,
+      message: `Delivery confirmed! ₹${farmerPayout.toLocaleString('en-IN')} released from escrow to farmer${traderRefund > 0 ? `, and ₹${traderRefund.toLocaleString('en-IN')} refunded to buyer.` : '.'}`,
       transaction: tx
     });
   } catch (error) {
@@ -431,26 +553,68 @@ const disputeTransaction = async (req, res, next) => {
       return res.status(403).json({ message: 'Not authorized to dispute this transaction' });
     }
 
-    if (tx.paymentStatus !== 'held_in_escrow' || !['pending', 'in_transit', 'delivered'].includes(tx.logisticsStatus)) {
-      return res.status(400).json({ message: 'Transaction cannot be disputed at this stage' });
+    if (tx.logisticsStatus === 'disputed') {
+      return res.status(400).json({ message: 'A dispute has already been filed for this transaction and is under review.' });
     }
+
+    if (tx.logisticsStatus === 'delivered' || tx.paymentStatus === 'payout_released' || tx.paymentStatus === 'refunded') {
+      return res.status(400).json({ message: 'Cannot dispute an order that has already been completed, disbursed, or refunded.' });
+    }
+
+    // Check if Dispute record already exists
+    const existingDispute = await Dispute.findOne({ transaction: tx._id });
+    if (existingDispute) {
+      return res.status(400).json({ message: 'Dispute already exists for this transaction' });
+    }
+
+    // Extract photos from multipart upload or body
+    let proofPhotos = [];
+    if (req.files && req.files.length > 0) {
+      proofPhotos = req.files.map(f => (f.path && f.path.startsWith('http')) ? f.path : `/uploads/${f.filename}`);
+    } else if (req.file) {
+      const p = (req.file.path && req.file.path.startsWith('http')) ? req.file.path : `/uploads/${req.file.filename}`;
+      proofPhotos = [p];
+    } else if (req.body.proofPhotos) {
+      const raw = Array.isArray(req.body.proofPhotos) ? req.body.proofPhotos : [req.body.proofPhotos];
+      proofPhotos = raw.filter(p => typeof p === 'string' && !p.startsWith('data:image'));
+    }
+
+    const reason = req.body.reason || req.body.description || req.body.disputeReason || 'Quality discrepancy / delivery issue reported by buyer';
+
+    const dispute = await Dispute.create({
+      transaction: tx._id,
+      trader: tx.trader._id,
+      farmer: tx.farmer._id,
+      cropListing: tx.cropListing?._id,
+      bid: tx.bid,
+      reason,
+      proofPhotos,
+      escrowAmount: tx.amount,
+      status: 'under_review'
+    });
 
     tx.logisticsStatus = 'disputed';
     await tx.save();
 
+    if (tx.bid) {
+      await Bid.findByIdAndUpdate(tx.bid, { status: 'disputed' });
+    }
+
     const otherParty = tx.farmer._id.toString() === req.user.id ? tx.trader._id : tx.farmer._id;
     const otherPartyRole = tx.farmer._id.toString() === req.user.id ? 'Trader' : 'Farmer';
-    const myRole = req.user.role === 'farmer' ? 'Farmer' : 'Trader';
 
-    const { createNotification } = require('../utils/createNotification');
     createNotification(
       otherParty,
       otherPartyRole,
-      'Transaction Disputed',
-      `The ${myRole} has disputed the transaction for ${tx.cropListing.name}. Escrow is frozen pending Admin review.`
+      'Dispute Raised — Under Review',
+      `Buyer ${tx.trader?.name || ''} has raised an APMC dispute for order #${String(tx._id).slice(-6).toUpperCase()} (${tx.cropListing?.name || 'crop lot'}). Escrow of ₹${tx.amount.toLocaleString('en-IN')} is locked under arbitration.`
     );
 
-    res.status(200).json({ message: 'Transaction marked as disputed. Escrow frozen.', transaction: tx });
+    res.status(201).json({ 
+      message: 'Dispute filed successfully with photo evidence. Escrow funds remain frozen.', 
+      dispute, 
+      transaction: tx 
+    });
   } catch (error) {
     next(error);
   }

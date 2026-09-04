@@ -1,63 +1,21 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 import toast from 'react-hot-toast'
+import api from '@/services/api'
 import { 
   ShieldCheck, 
   Users, 
-  BookOpen, 
-  FileText, 
   Landmark, 
   TrendingUp, 
-  TrendingDown, 
   CheckCircle2, 
-  AlertTriangle, 
-  Clock, 
-  Activity, 
   Download, 
   RefreshCw, 
   Building2, 
   Scale, 
-  UserCheck, 
-  X, 
-  Sparkles,
-  Layers,
   ArrowUpRight
 } from 'lucide-react'
-
-const PENDING_VERIFICATIONS = [
-  {
-    _id: 'KYC-FRM-8819',
-    type: 'farmer',
-    name: 'Nagaraju Byrappa',
-    district: 'Mandya',
-    documentType: 'Bhoomi RTC Land Parcel #RTC-MND-4421',
-    appliedAt: '25 mins ago',
-    acres: 4.8,
-    soilType: 'Red Loam'
-  },
-  {
-    _id: 'KYC-TRD-4412',
-    type: 'trader',
-    name: 'Coastal Agro Processing Corp',
-    district: 'Mangaluru',
-    documentType: 'APMC Unified License #KA-MNG-TRD-2026',
-    appliedAt: '1 hour ago',
-    category: 'Category-A Wholesale',
-    gstin: '29AABCC4412K1Z9'
-  },
-  {
-    _id: 'KYC-FRM-8820',
-    type: 'farmer',
-    name: 'Savitramma Gowda',
-    district: 'Hassan',
-    documentType: 'Bhoomi RTC Land Parcel #RTC-HSN-1129',
-    appliedAt: '2 hours ago',
-    acres: 6.2,
-    soilType: 'Black Cotton Soil'
-  }
-]
 
 const MANDI_YARDS_PERFORMANCE = [
   {
@@ -102,40 +60,48 @@ const MANDI_YARDS_PERFORMANCE = [
   }
 ]
 
-const SYSTEM_AUDIT_STREAM = [
-  { id: 'log-1', time: '5 mins ago', event: 'Escrow Lock Authorized', detail: '₹2,64,000 locked for Tomato Lot #LOT-KA-HSN-101 (Buyer: KA Agro Traders)', type: 'escrow' },
-  { id: 'log-2', time: '22 mins ago', event: 'Weighbridge Certificate Verified', detail: 'Gross 14,280 kg, Tare 2,280 kg (Net 120 Qtl) verified at Yeshwanthpur APMC', type: 'weighment' },
-  { id: 'log-3', time: '1 hour ago', event: 'Statutory Mandi Cess Remitted', detail: '₹3,960 (1.5%) credited to Karnataka State Treasury Account', type: 'cess' },
-  { id: 'log-4', time: '2 hours ago', event: 'New Trader Registered', detail: 'Mysuru Wholesale Spices Ltd registered with GSTIN 29AABCM8821P1Z4', type: 'auth' }
-]
-
 export const AdminDashboard = () => {
   const { user } = useAuth()
-  const [kycQueue, setKycQueue] = useState(PENDING_VERIFICATIONS)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [dbStats, setDbStats] = useState({
+    totalFarmers: 0,
+    totalTraders: 0,
+    activeDisputes: 0,
+    totalTransactions: 0
+  })
 
-  const handleRefresh = () => {
+  const fetchStats = async () => {
+    try {
+      const res = await api.get('/admin/dashboard')
+      if (res?.data) {
+        setDbStats(res.data)
+      } else if (res?.totalFarmers !== undefined) {
+        setDbStats(res)
+      }
+    } catch (e) {
+      console.warn('Could not fetch admin dashboard stats from API:', e)
+    }
+  }
+
+  useEffect(() => {
+    fetchStats()
+  }, [])
+
+  const handleRefresh = async () => {
     setIsRefreshing(true)
+    await fetchStats()
     setTimeout(() => {
       setIsRefreshing(false)
       toast.success('Central APMC state command metrics synchronized!')
-    }, 600)
-  }
-
-  const handleApproveKyc = (id, name) => {
-    setKycQueue((prev) => prev.filter((k) => k._id !== id))
-    toast.success(`KYC Approved for ${name}! Clearance certificate issued. 🟢`)
-  }
-
-  const handleRejectKyc = (id, name) => {
-    setKycQueue((prev) => prev.filter((k) => k._id !== id))
-    toast.error(`Clarification requested from ${name}.`)
+    }, 400)
   }
 
   // Aggregate Metrics
   const totalTurnover = MANDI_YARDS_PERFORMANCE.reduce((acc, y) => acc + y.turnover, 0)
   const totalCess = MANDI_YARDS_PERFORMANCE.reduce((acc, y) => acc + y.cessCollected, 0)
   const totalActiveAuctions = MANDI_YARDS_PERFORMANCE.reduce((acc, y) => acc + y.activeAuctions, 0)
+
+  const activeStakeholders = (dbStats.totalFarmers || 0) + (dbStats.totalTraders || 0)
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto">
@@ -151,7 +117,7 @@ export const AdminDashboard = () => {
             State APMC Command Center & Oversight Dashboard 🏛️
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-            Real-time monitoring of statewide harvest auctions, statutory market cess remittances, and stakeholder KYC moderation.
+            Real-time monitoring of statewide harvest auctions, statutory market cess remittances, and dispute arbitration.
           </p>
         </div>
 
@@ -187,7 +153,7 @@ export const AdminDashboard = () => {
           </div>
           <p className="text-3xl font-black text-foreground">₹{(totalTurnover / 10000000).toFixed(2)} Cr</p>
           <span className="text-[11px] text-emerald-600 font-bold flex items-center gap-1">
-            <ArrowUpRight className="w-3.5 h-3.5" /> +16.4% YoY Volume Growth
+            <ArrowUpRight className="w-3.5 h-3.5" /> Statewide APMC Aggregated
           </span>
         </div>
 
@@ -198,20 +164,31 @@ export const AdminDashboard = () => {
               <Users className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-3xl font-black text-foreground">1,482 Users</p>
-          <span className="text-[11px] text-muted-foreground">1,240 Farmers • 242 Traders</span>
+          <p className="text-3xl font-black text-foreground">{activeStakeholders > 0 ? activeStakeholders : 'Registered'}</p>
+          <span className="text-[11px] text-muted-foreground">
+            {dbStats.totalFarmers || 0} Farmers • {dbStats.totalTraders || 0} Traders
+          </span>
         </div>
 
-        <div className="p-6 rounded-3xl bg-card border border-border shadow-sm space-y-2">
+        <Link 
+          to="/admin/disputes"
+          className="p-6 rounded-3xl bg-card border border-border hover:border-amber-500/50 transition-all shadow-sm space-y-2 group block"
+        >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-muted-foreground">Pending KYC Moderation</span>
+            <span className="text-xs font-bold text-muted-foreground group-hover:text-amber-600 transition-colors">
+              Disputes Under Arbitration
+            </span>
             <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-600">
-              <UserCheck className="w-4 h-4" />
+              <Scale className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-3xl font-black text-amber-600">{kycQueue.length} Requests</p>
-          <span className="text-[11px] text-amber-600 font-semibold">Bhoomi RTC & APMC Licenses</span>
-        </div>
+          <p className="text-3xl font-black text-amber-600">
+            {dbStats.activeDisputes !== undefined ? `${dbStats.activeDisputes} Active` : 'Disputes'}
+          </p>
+          <span className="text-[11px] text-amber-600 font-semibold flex items-center gap-1">
+            Review Escrow Claims <ArrowUpRight className="w-3.5 h-3.5" />
+          </span>
+        </Link>
 
         <div className="p-6 rounded-3xl bg-card border border-border shadow-sm space-y-2">
           <div className="flex items-center justify-between">
@@ -225,86 +202,7 @@ export const AdminDashboard = () => {
         </div>
       </div>
 
-      {/* 3. Pending KYC Verification Quick Triage Queue */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-extrabold text-foreground tracking-tight flex items-center gap-2">
-              <UserCheck className="w-5 h-5 text-purple-600" />
-              Pending Farmer & Trader KYC Verification Queue ({kycQueue.length})
-            </h2>
-            <p className="text-xs text-muted-foreground">
-              Review Land RTC demographic records and corporate APMC wholesale permits awaiting state authorization.
-            </p>
-          </div>
-
-          <Button asChild variant="outline" size="sm" className="rounded-xl text-xs h-9">
-            <Link to="/admin/users">
-              View All Directory <ArrowUpRight className="w-3.5 h-3.5 ml-1" />
-            </Link>
-          </Button>
-        </div>
-
-        {kycQueue.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {kycQueue.map((item) => (
-              <div 
-                key={item._id}
-                className="p-5 rounded-3xl bg-card border border-border hover:border-purple-500/40 transition-all shadow-sm space-y-4 flex flex-col justify-between"
-              >
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-[10px] font-bold text-muted-foreground uppercase">{item._id}</span>
-                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wider ${
-                      item.type === 'farmer' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-amber-500/10 text-amber-600'
-                    }`}>
-                      {item.type} KYC
-                    </span>
-                  </div>
-
-                  <h3 className="font-extrabold text-sm text-foreground">{item.name}</h3>
-                  <p className="text-xs text-muted-foreground font-semibold">
-                    District: <span className="text-foreground">{item.district}</span> • Applied: {item.appliedAt}
-                  </p>
-
-                  <div className="p-3 rounded-2xl bg-muted/40 border border-border/80 text-xs space-y-1 font-mono">
-                    <span className="text-[10px] text-muted-foreground font-sans block font-bold">Document Submitted:</span>
-                    <p className="text-foreground font-semibold truncate">{item.documentType}</p>
-                    {item.acres && <span className="text-[11px] text-emerald-600 block">{item.acres} Acres • {item.soilType}</span>}
-                    {item.gstin && <span className="text-[11px] text-primary block">GSTIN: {item.gstin}</span>}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border">
-                  <Button 
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleRejectKyc(item._id, item.name)}
-                    className="rounded-xl text-xs h-9 text-rose-500 hover:bg-rose-500/10 hover:text-rose-600"
-                  >
-                    Clarify
-                  </Button>
-                  <Button 
-                    size="sm"
-                    onClick={() => handleApproveKyc(item._id, item.name)}
-                    className="rounded-xl text-xs font-bold h-9 bg-purple-600 hover:bg-purple-700 text-white shadow-sm"
-                  >
-                    Approve 🟢
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="p-8 text-center rounded-3xl bg-card border border-border space-y-2">
-            <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto" />
-            <p className="text-sm font-bold text-foreground">KYC Queue Cleared</p>
-            <p className="text-xs text-muted-foreground">All farmer and trader verification requests have been audited.</p>
-          </div>
-        )}
-      </div>
-
-      {/* 4. State Mandi Yards Turnover & Cess Performance Table */}
+      {/* 3. State Mandi Yards Turnover & Cess Performance Table */}
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -378,38 +276,6 @@ export const AdminDashboard = () => {
         </div>
       </div>
 
-      {/* 5. Real-Time Platform Security & Escrow Audit Log Strip */}
-      <div className="p-6 sm:p-7 rounded-3xl bg-card border border-border shadow-sm space-y-4">
-        <div className="flex items-center justify-between border-b border-border pb-3">
-          <div className="flex items-center gap-2">
-            <Activity className="w-5 h-5 text-purple-600" />
-            <h3 className="text-base font-extrabold text-foreground">
-              Real-Time Platform Security & Escrow Transaction Stream
-            </h3>
-          </div>
-          <span className="text-[10px] font-mono text-muted-foreground">
-            Audit Ledger: Block #2026-KA-9912
-          </span>
-        </div>
-
-        <div className="divide-y divide-border text-xs">
-          {SYSTEM_AUDIT_STREAM.map((log) => (
-            <div key={log.id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div className="flex items-center gap-3">
-                <span className="text-muted-foreground font-mono text-[10px] shrink-0 w-20">{log.time}</span>
-                <div>
-                  <span className="font-extrabold text-foreground">{log.event}</span>
-                  <p className="text-[11px] text-muted-foreground">{log.detail}</p>
-                </div>
-              </div>
-
-              <span className="font-mono text-[10px] font-bold text-purple-600 bg-purple-500/10 px-2 py-0.5 rounded-md self-start sm:self-center shrink-0">
-                {log.type.toUpperCase()}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   )
 }

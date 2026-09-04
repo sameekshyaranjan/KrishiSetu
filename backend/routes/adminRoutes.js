@@ -7,6 +7,7 @@ const {
   getTraderById, 
   getAuditLogs, 
   suspendUser, 
+  getAllDisputes,
   resolveDispute,
   getRevenueAnalytics,
   getDeletedListings,
@@ -20,7 +21,9 @@ router.get('/dashboard', protect, authorize('admin'), getDashboardStats);
 router.get('/analytics/revenue', protect, authorize('admin'), getRevenueAnalytics);
 router.get('/audit-logs', protect, authorize('admin'), getAuditLogs);
 
-router.get('/farmers', protect, authorize('admin'), getAllFarmers);
+router.get('/disputes', protect, authorize('admin'), getAllDisputes);
+router.put('/disputes/:id/resolve', protect, authorize('admin'), resolveDispute);
+router.put('/transactions/:id/resolve-dispute', protect, authorize('admin'), resolveDispute);
 router.get('/farmers/:id', protect, authorize('admin'), getFarmerById);
 
 router.get('/traders', protect, authorize('admin'), getAllTraders);
