@@ -27,17 +27,18 @@ import {
   Zap,
   Truck,
   XCircle,
-  Check
+  Check,
+  MessageCircle
 } from 'lucide-react'
 import { useSocket } from '@/hooks/useSocket'
 
 const STATUS_TABS = [
   { id: 'all', label: 'All Bids' },
+  { id: 'winning', label: 'Active / Pending ⏳' },
   { id: 'countered', label: 'Farmer Counters 💬' },
-  { id: 'winning', label: 'Active / Pending' },
-  { id: 'won', label: 'Accepted / Won' },
-  { id: 'cancelled', label: 'Cancelled' },
-  { id: 'outbid', label: 'Outbid / Declined' }
+  { id: 'rejected', label: 'Rejected by Farmer ❌' },
+  { id: 'won', label: 'Accepted / Won 🏆' },
+  { id: 'cancelled', label: 'Cancelled' }
 ]
 
 export const TraderBids = () => {
@@ -48,8 +49,12 @@ export const TraderBids = () => {
   const [activeStatus, setActiveStatus] = useState('all')
   const [isRefreshing, setIsRefreshing] = useState(false)
 
-  // Raise Bid Modal
+  // View Counter Review Modal
+  const [viewCounterBid, setViewCounterBid] = useState(null)
+
+  // Raise Bid Modal (handles both "Increase Bid" and "Bid Higher")
   const [raiseBidLot, setRaiseBidLot] = useState(null)
+  const [raiseBidMode, setRaiseBidMode] = useState('increase') // 'increase' | 'rebid'
   const [customBidAmount, setCustomBidAmount] = useState('')
 
   // Auto-Bid Modal
@@ -89,12 +94,13 @@ export const TraderBids = () => {
             counterMessage: b.counterMessage,
             negotiationHistory: b.negotiationHistory || [],
             rawStatus: b.status || 'pending',
+            farmerId: b.farmer?._id || b.farmer,
             status: b.status === 'accepted' 
               ? 'won' 
               : (b.status === 'cancelled' || b.status === 'withdrawn') 
               ? 'cancelled' 
               : b.status === 'rejected' 
-              ? 'outbid' 
+              ? 'rejected' 
               : b.status === 'countered' 
               ? 'countered' 
               : 'winning',
@@ -103,6 +109,7 @@ export const TraderBids = () => {
             image: cropImg,
             images: crop.images || (cropImg ? [cropImg] : []),
             farmer: {
+              _id: b.farmer?._id || b.farmer,
               name: b.farmer?.name || 'Verified Farmer',
               village: b.farmer?.village || 'Karnataka',
               district: b.farmer?.district || 'APMC Yard',
@@ -177,33 +184,39 @@ export const TraderBids = () => {
     }
   }
 
-  const handleOpenRaiseModal = (bidItem) => {
+  const handleOpenRaiseModal = (bidItem, mode = 'increase') => {
     setRaiseBidLot(bidItem)
-    const currentRate = bidItem.status === 'countered' ? (bidItem.farmerCounterRate || bidItem.highestBid) : bidItem.highestBid
-    setCustomBidAmount(String(currentRate + 50))
+    setRaiseBidMode(mode)
+    const baseRate = Number(bidItem.myBidAmount || bidItem.highestBid || 0)
+    setCustomBidAmount(String(baseRate + 50))
   }
 
   const handleConfirmCustomRaise = async (e) => {
     e.preventDefault()
     const parsed = Number(customBidAmount)
     if (!parsed || parsed <= 0) {
-      toast.error(`Please enter a valid rate greater than 0`)
+      toast.error('Please enter a valid rate greater than 0')
+      return
+    }
+
+    const previousRate = Number(raiseBidLot.myBidAmount || raiseBidLot.highestBid || 0)
+    if (parsed <= previousRate) {
+      toast.error('Your new bid must be higher than your previous bid.')
       return
     }
 
     try {
-      if (raiseBidLot?.status === 'countered') {
-        // Trader is proposing a revised counter offer to the farmer
-        await bidService.respondToCounter(raiseBidLot._id, 'counter', parsed)
-        toast.success(`🎉 Revised counter offer of ₹${parsed.toLocaleString('en-IN')}/Qtl submitted to farmer!`)
+      if (raiseBidMode === 'rebid' || raiseBidLot?.status === 'rejected') {
+        await bidService.bidHigher(raiseBidLot._id, parsed)
+        toast.success(`🎉 Fresh higher bid of ₹${parsed.toLocaleString('en-IN')}/Qtl submitted to farmer!`)
       } else {
         await bidService.updateBid(raiseBidLot._id, parsed)
-        toast.success(`Custom bid of ₹${parsed.toLocaleString('en-IN')}/Qtl submitted successfully!`)
+        toast.success(`🎉 Bid increased to ₹${parsed.toLocaleString('en-IN')}/Qtl successfully!`)
       }
       setRaiseBidLot(null)
       await loadTraderBids()
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to submit rate.')
+      toast.error(err.response?.data?.message || 'Failed to submit bid.')
     }
   }
 
@@ -251,7 +264,6 @@ export const TraderBids = () => {
   const filteredBids = useMemo(() => {
     return bids.filter((b) => {
       if (activeStatus === 'all') return true
-      if (activeStatus === 'winning') return b.status === 'winning' || b.status === 'countered'
       return b.status === activeStatus
     })
   }, [bids, activeStatus])
@@ -261,7 +273,7 @@ export const TraderBids = () => {
   const winningCapital = bids
     .filter((b) => b.status === 'winning' || b.status === 'won')
     .reduce((acc, b) => acc + b.myBidAmount * b.quantity, 0)
-  const outbidCount = bids.filter((b) => b.status === 'outbid').length
+  const rejectedCount = bids.filter((b) => b.status === 'rejected').length
 
   return (
     <div className="space-y-8">
@@ -277,7 +289,7 @@ export const TraderBids = () => {
             My Active Bids & Auction Console ⚖️
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-            Monitor outbid lots in real-time, configure smart auto-bidding ceilings, and lock accepted deals into escrow.
+            Monitor bids, review farmer counter offers, submit higher bids on rejected lots, and track accepted deals.
           </p>
         </div>
 
@@ -312,13 +324,13 @@ export const TraderBids = () => {
         <div className="p-5 rounded-3xl bg-card border border-border shadow-sm space-y-1">
           <span className="text-xs font-bold text-muted-foreground">Secured Winning Capital</span>
           <p className="text-2xl font-black text-emerald-600">₹{winningCapital.toLocaleString('en-IN')}</p>
-          <span className="text-[11px] text-emerald-600 font-medium">Leading 2 active auctions</span>
+          <span className="text-[11px] text-emerald-600 font-medium">Leading active bids</span>
         </div>
 
         <div className="p-5 rounded-3xl bg-card border border-border shadow-sm space-y-1">
-          <span className="text-xs font-bold text-muted-foreground">Outbid Capital at Risk</span>
-          <p className="text-2xl font-black text-rose-600">{outbidCount} Lot{outbidCount !== 1 ? 's' : ''}</p>
-          <span className="text-[11px] text-rose-500 font-bold">Action Required to Win</span>
+          <span className="text-xs font-bold text-muted-foreground">Rejected by Farmer</span>
+          <p className="text-2xl font-black text-rose-600">{rejectedCount} Lot{rejectedCount !== 1 ? 's' : ''}</p>
+          <span className="text-[11px] text-rose-500 font-bold">Can Submit Higher Bid</span>
         </div>
 
         <div className="p-5 rounded-3xl bg-card border border-border shadow-sm space-y-1">
@@ -369,11 +381,13 @@ export const TraderBids = () => {
               className={`p-6 rounded-3xl bg-card border transition-all space-y-5 shadow-sm ${
                 bid.status === 'winning'
                   ? 'border-emerald-500/40 bg-emerald-500/[0.02]'
-                  : bid.status === 'outbid'
+                  : bid.status === 'rejected'
                   ? 'border-rose-500/40 bg-rose-500/[0.02]'
                   : bid.status === 'countered'
                   ? 'border-amber-500/40 bg-amber-500/[0.02]'
-                  : 'border-primary/40 bg-primary/[0.02]'
+                  : bid.status === 'won'
+                  ? 'border-emerald-600/40 bg-emerald-600/[0.02]'
+                  : 'border-border bg-muted/[0.02]'
               }`}
             >
               {/* Top Row: Crop Snapshot & Badges */}
@@ -420,24 +434,29 @@ export const TraderBids = () => {
                   <span className={`px-3 py-1 rounded-xl text-xs font-extrabold flex items-center gap-1.5 ${
                     bid.status === 'winning'
                       ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
-                      : bid.status === 'outbid'
+                      : bid.status === 'rejected'
                       ? 'bg-rose-500/10 text-rose-600 border border-rose-500/20'
                       : bid.status === 'countered'
                       ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
-                      : 'bg-primary/10 text-primary border border-primary/20'
+                      : bid.status === 'won'
+                      ? 'bg-emerald-600/10 text-emerald-700 border border-emerald-600/20'
+                      : 'bg-muted text-muted-foreground border border-border'
                   }`}>
                     {bid.status === 'winning' && <CheckCircle2 className="w-3.5 h-3.5" />}
-                    {bid.status === 'outbid' && <AlertTriangle className="w-3.5 h-3.5" />}
+                    {bid.status === 'rejected' && <XCircle className="w-3.5 h-3.5" />}
                     {bid.status === 'countered' && <Sparkles className="w-3.5 h-3.5" />}
                     {bid.status === 'won' && <ShieldCheck className="w-3.5 h-3.5" />}
+                    {bid.status === 'cancelled' && <XCircle className="w-3.5 h-3.5" />}
                     <span>
                       {bid.status === 'winning'
-                        ? 'Leading Top Bid'
-                        : bid.status === 'outbid'
-                        ? 'Outbid by Competitor'
+                        ? 'Active Bid • Pending Response'
+                        : bid.status === 'rejected'
+                        ? 'Bid Rejected by Farmer'
                         : bid.status === 'countered'
                         ? 'Farmer Counter Offer'
-                        : 'Auction Won • Lock Escrow'}
+                        : bid.status === 'won'
+                        ? 'Bid Accepted • Escrow Secured'
+                        : 'Bid Cancelled'}
                     </span>
                   </span>
 
@@ -504,50 +523,56 @@ export const TraderBids = () => {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  {bid.status === 'outbid' && (
+                  {/* 1. ACTIVE / PENDING BID: [Increase Bid], [Chat], [Cancel Bid] */}
+                  {bid.status === 'winning' && (
                     <>
                       <Button
                         size="sm"
-                        onClick={() => handleQuickRaise(bid, 50)}
-                        className="rounded-xl text-xs font-bold h-9 bg-rose-600 hover:bg-rose-700 text-white shadow-sm"
+                        onClick={() => handleOpenRaiseModal(bid, 'increase')}
+                        className="rounded-xl text-xs font-bold h-9 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
                       >
-                        <Zap className="w-3.5 h-3.5 mr-1" /> Quick Raise (+₹50)
+                        <TrendingUp className="w-3.5 h-3.5 mr-1" /> Increase Bid
                       </Button>
                       <Button
+                        asChild
                         variant="outline"
                         size="sm"
-                        onClick={() => handleOpenRaiseModal(bid)}
                         className="rounded-xl text-xs font-bold h-9"
                       >
-                        Custom Rate
+                        <Link to={`/trader/chats?farmerId=${bid.farmerId}&cropId=${bid.cropId}`}>
+                          <MessageCircle className="w-3.5 h-3.5 mr-1 text-primary" /> Chat
+                        </Link>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleCancelBid(bid._id)}
+                        className="rounded-xl text-xs font-bold h-9 border-rose-500/30 text-rose-600 hover:bg-rose-500/10"
+                      >
+                        <X className="w-3.5 h-3.5 mr-1" /> Cancel Bid
                       </Button>
                     </>
                   )}
 
+                  {/* 2. FARMER COUNTERED: [View Counter], [Chat] (NO Re-counter Bid!) */}
                   {bid.status === 'countered' && bid.counterProposedBy === 'farmer' && (
                     <>
                       <Button
                         size="sm"
-                        onClick={() => handleAcceptCounter(bid)}
+                        onClick={() => setViewCounterBid(bid)}
                         className="rounded-xl text-xs font-bold h-9 bg-amber-600 hover:bg-amber-700 text-white shadow-sm"
                       >
-                        <Check className="w-3.5 h-3.5 mr-1" /> Accept Counter (₹{bid.farmerCounterRate}/Qtl)
+                        <Sparkles className="w-3.5 h-3.5 mr-1" /> View Counter
                       </Button>
                       <Button
+                        asChild
                         variant="outline"
                         size="sm"
-                        onClick={() => handleOpenRaiseModal(bid)}
-                        className="rounded-xl text-xs font-bold h-9 border-amber-500/40 text-amber-700 hover:bg-amber-500/10"
+                        className="rounded-xl text-xs font-bold h-9"
                       >
-                        Re-Counter
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRejectCounter(bid)}
-                        className="rounded-xl text-xs font-bold h-9 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10"
-                      >
-                        <XCircle className="w-3.5 h-3.5 mr-1" /> Decline
+                        <Link to={`/trader/chats?farmerId=${bid.farmerId}&cropId=${bid.cropId}`}>
+                          <MessageCircle className="w-3.5 h-3.5 mr-1 text-primary" /> Chat
+                        </Link>
                       </Button>
                     </>
                   )}
@@ -558,45 +583,47 @@ export const TraderBids = () => {
                     </span>
                   )}
 
+                  {/* 3. FARMER REJECTED: [Bid Higher], [Chat] */}
+                  {bid.status === 'rejected' && (
+                    <>
+                      <Button
+                        size="sm"
+                        onClick={() => handleOpenRaiseModal(bid, 'rebid')}
+                        className="rounded-xl text-xs font-bold h-9 bg-rose-600 hover:bg-rose-700 text-white shadow-sm"
+                      >
+                        <TrendingUp className="w-3.5 h-3.5 mr-1" /> Bid Higher
+                      </Button>
+                      <Button
+                        asChild
+                        variant="outline"
+                        size="sm"
+                        className="rounded-xl text-xs font-bold h-9"
+                      >
+                        <Link to={`/trader/chats?farmerId=${bid.farmerId}&cropId=${bid.cropId}`}>
+                          <MessageCircle className="w-3.5 h-3.5 mr-1 text-primary" /> Chat
+                        </Link>
+                      </Button>
+                    </>
+                  )}
+
+                  {/* 4. WON / ACCEPTED: [View Order & Vehicle Details] */}
                   {bid.status === 'won' && (
                     <Button asChild size="sm" className="rounded-xl text-xs font-bold h-9 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm">
                       <Link to="/trader/orders">
-                        <Truck className="w-3.5 h-3.5 mr-1" /> View Order & Vehicle <ChevronRight className="w-3.5 h-3.5 ml-1" />
+                        <Truck className="w-3.5 h-3.5 mr-1" /> View Order & Vehicle Details <ChevronRight className="w-3.5 h-3.5 ml-1" />
                       </Link>
                     </Button>
                   )}
 
+                  {/* 5. CANCELLED */}
                   {bid.status === 'cancelled' && (
                     <span className="text-xs font-bold text-rose-600 bg-rose-500/10 px-3 py-1.5 rounded-xl border border-rose-500/20 flex items-center gap-1">
                       <XCircle className="w-3.5 h-3.5" /> Cancelled
                     </span>
                   )}
 
-                  {bid.status !== 'won' && bid.status !== 'cancelled' && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleCancelBid(bid._id)}
-                      className="rounded-xl text-xs font-bold h-9 border-rose-500/30 text-rose-600 hover:bg-rose-500/10"
-                    >
-                      <X className="w-3.5 h-3.5 mr-1" /> Cancel Bid
-                    </Button>
-                  )}
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setAutoBidLot(bid)
-                      setAutoBidCeilingInput(String(bid.autoBidCeiling || bid.highestBid + 200))
-                    }}
-                    className="rounded-xl text-xs h-9"
-                  >
-                    <Sliders className="w-3.5 h-3.5 mr-1" /> Auto-Bid
-                  </Button>
-
                   <Button asChild variant="ghost" size="sm" className="rounded-xl text-xs h-9">
-                    <Link to={`/trader/crops/${bid.lotId}`}>
+                    <Link to={`/trader/crops/${bid.cropId || bid.lotId}`}>
                       Inspect Lot <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
                     </Link>
                   </Button>
@@ -618,20 +645,24 @@ export const TraderBids = () => {
         </div>
       )}
 
-      {/* Modal: Custom Raise Bid */}
+      {/* Modal: Custom Raise / Bid Higher */}
       {raiseBidLot && (
         <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-card border border-border rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-6">
             <div className="flex items-start justify-between border-b border-border pb-4">
               <div className="space-y-1">
-                <span className="text-[10px] font-mono font-bold text-rose-600 uppercase">
+                <span className={`text-[10px] font-mono font-bold uppercase ${raiseBidMode === 'rebid' ? 'text-rose-600' : 'text-emerald-600'}`}>
                   {raiseBidLot.lotId}
                 </span>
                 <h3 className="text-lg font-extrabold text-foreground">
-                  Counter Competitor Bid
+                  {raiseBidMode === 'rebid' ? 'Bid Higher after Farmer Rejection' : 'Increase Your Bid'}
                 </h3>
                 <p className="text-xs text-muted-foreground">
-                  Highest competitor bid: <span className="font-bold text-rose-600">₹{raiseBidLot.highestBid}/Qtl</span>
+                  {raiseBidMode === 'rebid' ? (
+                    <>Previous rejected bid: <span className="font-bold text-rose-600">₹{raiseBidLot.highestBid}/Qtl</span>. Your new bid must be higher.</>
+                  ) : (
+                    <>Current bid: <span className="font-bold text-emerald-600">₹{raiseBidLot.highestBid}/Qtl</span>. Enter higher offer.</>
+                  )}
                 </p>
               </div>
 
@@ -655,7 +686,9 @@ export const TraderBids = () => {
                     required
                     value={customBidAmount}
                     onChange={(e) => setCustomBidAmount(e.target.value)}
-                    className="w-full h-11 pl-8 pr-4 rounded-xl bg-background border border-border text-sm font-bold focus:outline-none focus:ring-2 focus:ring-rose-500/40"
+                    className={`w-full h-11 pl-8 pr-4 rounded-xl bg-background border text-sm font-bold focus:outline-none focus:ring-2 ${
+                      raiseBidMode === 'rebid' ? 'focus:ring-rose-500/40 border-rose-500/40' : 'focus:ring-emerald-500/40 border-emerald-500/40'
+                    }`}
                   />
                 </div>
                 <p className="text-[11px] text-muted-foreground">
@@ -674,9 +707,11 @@ export const TraderBids = () => {
                 </Button>
                 <Button 
                   type="submit" 
-                  className="rounded-xl text-xs font-bold h-10 bg-rose-600 hover:bg-rose-700 text-white shadow-md"
+                  className={`rounded-xl text-xs font-bold h-10 text-white shadow-md ${
+                    raiseBidMode === 'rebid' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-emerald-600 hover:bg-emerald-700'
+                  }`}
                 >
-                  Submit Higher Bid
+                  {raiseBidMode === 'rebid' ? 'Submit Higher Bid' : 'Confirm Increased Bid'}
                 </Button>
               </div>
             </form>
@@ -747,6 +782,85 @@ export const TraderBids = () => {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* View Counter Review Modal */}
+      {viewCounterBid && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-card border border-border rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-6">
+            <div className="flex items-center justify-between border-b border-border pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-600">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-foreground">Review Farmer Counter Offer</h3>
+                  <span className="text-[10px] text-muted-foreground">
+                    {viewCounterBid.cropName} • APMC Direct Procurement
+                  </span>
+                </div>
+              </div>
+              <button onClick={() => setViewCounterBid(null)} className="p-1 rounded-xl text-muted-foreground hover:text-foreground">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 p-4 rounded-2xl bg-muted/40 border border-border text-xs">
+              <div>
+                <span className="text-[10px] text-muted-foreground block">Lot Quantity</span>
+                <span className="text-sm font-extrabold text-foreground">{viewCounterBid.quantity} {viewCounterBid.unit}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-muted-foreground block">Crop Base Price</span>
+                <span className="text-sm font-extrabold text-foreground">₹{viewCounterBid.reservePrice?.toLocaleString('en-IN')}/Qtl</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-muted-foreground block">Your Original Bid</span>
+                <span className="text-sm font-extrabold text-foreground">₹{viewCounterBid.myBidAmount?.toLocaleString('en-IN')}/Qtl</span>
+                <span className="text-[10px] text-muted-foreground block">
+                  Total: ₹{(viewCounterBid.myBidAmount * viewCounterBid.quantity)?.toLocaleString('en-IN')}
+                </span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                <span className="text-[10px] font-bold text-amber-800 dark:text-amber-300 block">Farmer Counter Rate</span>
+                <span className="text-base font-black text-amber-600">₹{viewCounterBid.farmerCounterRate?.toLocaleString('en-IN')}/Qtl</span>
+                <span className="text-xs font-bold text-emerald-600 block">
+                  Total: ₹{(viewCounterBid.farmerCounterRate * viewCounterBid.quantity)?.toLocaleString('en-IN')}
+                </span>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-sky-500/10 border border-sky-500/20 space-y-1 text-xs">
+              <div className="flex items-center justify-between font-bold text-sky-900 dark:text-sky-300">
+                <span>Total Escrow Commitment Required:</span>
+                <span className="text-base font-black text-sky-600">
+                  ₹{(viewCounterBid.farmerCounterRate * viewCounterBid.quantity)?.toLocaleString('en-IN')}
+                </span>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Upon accepting, this exact total will be locked in escrow. You will then assign collection vehicle details for pickup.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleRejectCounter(viewCounterBid)}
+                className="rounded-xl text-xs text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 h-10 px-4"
+              >
+                <XCircle className="w-3.5 h-3.5 mr-1" /> Decline Offer
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => handleAcceptCounter(viewCounterBid)}
+                className="rounded-xl text-xs font-bold h-10 px-5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-md"
+              >
+                <Check className="w-3.5 h-3.5 mr-1.5" /> Accept Counter & Lock Escrow
+              </Button>
+            </div>
           </div>
         </div>
       )}

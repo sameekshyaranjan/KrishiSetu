@@ -219,7 +219,7 @@ const updateLogisticsStatus = async (req, res, next) => {
 
 const submitVehicleDetails = async (req, res, next) => {
   try {
-    const { vehicleNumber, vehicleType, driverName, driverContact, vehiclePhoto, additionalNotes } = req.body;
+    const { vehicleNumber, vehicleType, capacity, driverName, driverContact, vehiclePhoto, additionalNotes } = req.body;
 
     const tx = await Transaction.findById(req.params.id).populate('farmer trader cropListing');
     if (!tx) return res.status(404).json({ message: 'Transaction not found' });
@@ -238,6 +238,14 @@ const submitVehicleDetails = async (req, res, next) => {
       return res.status(400).json({ message: 'Please provide a valid vehicle registration number (e.g. KA-04-E-8821)' });
     }
 
+    if (!vehicleType || vehicleType.trim().length < 2) {
+      return res.status(400).json({ message: 'Please provide vehicle type (e.g. Tata 407, Eicher 19ft)' });
+    }
+
+    if (!capacity || capacity.trim().length < 1) {
+      return res.status(400).json({ message: 'Please provide vehicle capacity (e.g. 10 tonnes, 80 quintals)' });
+    }
+
     if (!driverName || driverName.trim().length < 2) {
       return res.status(400).json({ message: 'Please provide driver full name' });
     }
@@ -246,9 +254,16 @@ const submitVehicleDetails = async (req, res, next) => {
       return res.status(400).json({ message: 'Please provide a valid 10-digit driver contact number' });
     }
 
+    const serverUrl = process.env.SERVER_URL || `${req.protocol}://${req.get('host')}`;
     let photoUrl = vehiclePhoto;
     if (req.file) {
-      photoUrl = req.file.path;
+      if (req.file.path && req.file.path.startsWith('http')) {
+        photoUrl = req.file.path;
+      } else if (req.file.filename) {
+        photoUrl = `${serverUrl}/uploads/${req.file.filename}`;
+      } else {
+        photoUrl = req.file.path || '';
+      }
     }
     if (!photoUrl) {
       photoUrl = 'https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?w=600&auto=format&fit=crop';
@@ -256,7 +271,8 @@ const submitVehicleDetails = async (req, res, next) => {
 
     tx.vehicleDetails = {
       vehicleNumber: vehicleNumber.trim().toUpperCase(),
-      vehicleType: vehicleType ? vehicleType.trim() : 'APMC Standard Freight Fleet',
+      vehicleType: vehicleType.trim(),
+      capacity: capacity.trim(),
       driverName: driverName.trim(),
       driverContact: driverContact.trim(),
       vehiclePhoto: photoUrl,

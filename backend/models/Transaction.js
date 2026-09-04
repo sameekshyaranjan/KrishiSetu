@@ -35,6 +35,7 @@ const transactionSchema = new mongoose.Schema({
   vehicleDetails: {
     vehicleNumber: { type: String, trim: true },
     vehicleType: { type: String, trim: true },
+    capacity: { type: String, trim: true },
     driverName: { type: String, trim: true },
     driverContact: { type: String, trim: true },
     vehiclePhoto: { type: String, trim: true },

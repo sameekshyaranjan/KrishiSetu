@@ -9,7 +9,8 @@ const {
   respondToBid, 
   undoAcceptBid,
   counterBid,
-  traderRespondToCounter
+  traderRespondToCounter,
+  bidHigherAfterRejection
 } = require('../controllers/bidController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
@@ -21,6 +22,8 @@ router.get('/listing/:cropId', authorize('farmer', 'trader', 'admin'), getBidsFo
 router.get('/crop/:cropId', authorize('farmer', 'trader', 'admin'), getBidsForListing);
 router.post('/', authorize('trader'), placeBid);
 router.put('/:id', authorize('trader'), updateBid);
+router.post('/:id/bid-higher', authorize('trader'), bidHigherAfterRejection);
+router.put('/:id/bid-higher', authorize('trader'), bidHigherAfterRejection);
 router.put('/:id/withdraw', authorize('trader'), withdrawBid);
 router.put('/:id/cancel', authorize('trader'), withdrawBid);
 router.patch('/:id/cancel', authorize('trader'), withdrawBid);

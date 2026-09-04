@@ -81,6 +81,14 @@ export const bidService = {
     if (counterAmount) payload.counterAmount = Number(counterAmount)
     const res = await api.put(`/bids/${bidId}/trader-respond`, payload)
     return res?.data || res
+  },
+
+  /**
+   * Submit a new higher bid after a bid was rejected by farmer
+   */
+  bidHigher: async (bidId, amount, message = '') => {
+    const res = await api.post(`/bids/${bidId}/bid-higher`, { amount: Number(amount), message })
+    return res?.data || res
   }
 }
 

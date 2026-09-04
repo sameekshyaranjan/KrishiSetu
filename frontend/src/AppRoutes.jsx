@@ -86,6 +86,7 @@ export const AppRoutes = () => {
           <Route path="marketplace" element={<TraderMarketplace />} />
           <Route path="crops/:id" element={<TraderCropDetails />} />
           <Route path="my-bids" element={<TraderBids />} />
+          <Route path="bids" element={<TraderBids />} />
           <Route path="chats" element={<TraderChats />} />
           <Route path="escrow" element={<TraderEscrow />} />
           <Route path="wallet" element={<TraderEscrow />} />

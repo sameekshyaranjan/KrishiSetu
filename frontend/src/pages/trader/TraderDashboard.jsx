@@ -25,7 +25,10 @@ import {
   FileText, 
   MapPin,
   RefreshCw,
-  Plus
+  Plus,
+  Check,
+  XCircle,
+  X
 } from 'lucide-react'
 
 export const TraderDashboard = () => {
@@ -39,6 +42,9 @@ export const TraderDashboard = () => {
   const [raiseBidLot, setRaiseBidLot] = useState(null)
   const [newBidAmount, setNewBidAmount] = useState('')
 
+  // View Counter Review Modal State
+  const [viewCounterBid, setViewCounterBid] = useState(null)
+
   const loadDashboardData = async () => {
     setLoading(true)
     try {
@@ -50,6 +56,7 @@ export const TraderDashboard = () => {
       const formattedBids = Array.isArray(rawBids) ? rawBids.map(b => {
         const crop = b.crop || b.cropListing || {}
         const rate = Number(b.amount || b.bidPrice || 0)
+        const counterRate = Number(b.counterAmount || 0)
         return {
           _id: b._id,
           lotId: `LOT-${b._id?.slice(-6)}`,
@@ -63,7 +70,9 @@ export const TraderDashboard = () => {
             location: `${b.farmer?.village || 'APMC'}, ${b.farmer?.district || 'Karnataka'}`
           },
           myBidAmount: rate,
-          highestBid: b.status === 'countered' && b.counterAmount ? b.counterAmount : rate,
+          highestBid: b.status === 'countered' && counterRate ? counterRate : rate,
+          farmerCounterRate: counterRate,
+          counterProposedBy: b.counterProposedBy,
           status: b.status === 'accepted' ? 'accepted' : (b.status === 'cancelled' || b.status === 'withdrawn') ? 'cancelled' : b.status === 'countered' ? 'countered' : b.status === 'rejected' ? 'outbid' : 'winning',
           bidCount: 1,
           closingIn: 'Live',
@@ -98,7 +107,7 @@ export const TraderDashboard = () => {
     setNewBidAmount(bidItem.highestBid + 50)
   }
 
-  const handleConfirmRaiseBid = (e) => {
+  const handleConfirmRaiseBid = async (e) => {
     e.preventDefault()
     const parsed = Number(newBidAmount)
     if (!parsed || parsed <= (raiseBidLot?.highestBid || 0)) {
@@ -106,28 +115,37 @@ export const TraderDashboard = () => {
       return
     }
 
-    setBids((prev) =>
-      prev.map((b) =>
-        b._id === raiseBidLot._id
-          ? { ...b, myBidAmount: parsed, highestBid: parsed, status: 'winning', bidCount: b.bidCount + 1 }
-          : b
-      )
-    )
-
-    toast.success(`Bid raised to ₹${parsed.toLocaleString('en-IN')}/Qtl! You are now highest bidder!`)
-    setRaiseBidLot(null)
+    try {
+      await bidService.updateBid(raiseBidLot._id, parsed)
+      toast.success(`Bid raised to ₹${parsed.toLocaleString('en-IN')}/Qtl! You are now highest bidder!`)
+      setRaiseBidLot(null)
+      await loadDashboardData()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to raise bid.')
+    }
   }
 
-  const handleAcceptCounter = (bidItem) => {
+  const handleAcceptCounter = async (bidItem) => {
     const acceptedRate = bidItem.farmerCounterRate || bidItem.highestBid
-    setBids((prev) =>
-      prev.map((b) =>
-        b._id === bidItem._id
-          ? { ...b, myBidAmount: acceptedRate, status: 'accepted' }
-          : b
-      )
-    )
-    toast.success(`Counter offer of ₹${acceptedRate}/Qtl accepted! Lot transitioned to Escrow Funding.`)
+    try {
+      await bidService.respondToCounter(bidItem._id, 'accept')
+      toast.success(`🎉 Counter offer of ₹${acceptedRate.toLocaleString('en-IN')}/Qtl accepted! Lot transitioned to Escrow Funding.`)
+      setViewCounterBid(null)
+      await loadDashboardData()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to accept counter offer.')
+    }
+  }
+
+  const handleRejectCounter = async (bidItem) => {
+    try {
+      await bidService.respondToCounter(bidItem._id, 'reject')
+      toast.success('Counter offer declined.')
+      setViewCounterBid(null)
+      await loadDashboardData()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to decline counter offer.')
+    }
   }
 
   return (
@@ -360,10 +378,12 @@ export const TraderDashboard = () => {
                     )}
 
                     {bid.status === 'countered' && (
-                      <Button asChild size="sm" className="rounded-xl text-xs font-bold h-8 bg-amber-600 hover:bg-amber-700 text-white shadow-sm">
-                        <Link to="/trader/bids">
-                          <Sparkles className="w-3.5 h-3.5 mr-1" /> View Counter
-                        </Link>
+                      <Button 
+                        size="sm" 
+                        onClick={() => setViewCounterBid(bid)}
+                        className="rounded-xl text-xs font-bold h-8 bg-amber-600 hover:bg-amber-700 text-white shadow-sm"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 mr-1" /> View Counter (₹{bid.farmerCounterRate}/Qtl)
                       </Button>
                     )}
 
@@ -513,6 +533,90 @@ export const TraderDashboard = () => {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* View Counter Review Modal */}
+      {viewCounterBid && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-card border border-border rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-6">
+            <div className="flex items-center justify-between border-b border-border pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-600">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-foreground">Review Farmer Counter Offer</h3>
+                  <span className="text-[10px] text-muted-foreground">
+                    {viewCounterBid.crop?.name} • APMC Direct Procurement
+                  </span>
+                </div>
+              </div>
+              <button onClick={() => setViewCounterBid(null)} className="p-1 rounded-xl text-muted-foreground hover:text-foreground">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 p-4 rounded-2xl bg-muted/40 border border-border text-xs">
+              <div>
+                <span className="text-[10px] text-muted-foreground block">Lot Quantity</span>
+                <span className="text-sm font-extrabold text-foreground">{viewCounterBid.crop?.quantity} {viewCounterBid.crop?.unit}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-muted-foreground block">Crop Base Price</span>
+                <span className="text-sm font-extrabold text-foreground">₹{viewCounterBid.crop?.basePrice?.toLocaleString('en-IN')}/Qtl</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-muted-foreground block">Your Original Bid</span>
+                <span className="text-sm font-extrabold text-foreground">₹{viewCounterBid.myBidAmount?.toLocaleString('en-IN')}/Qtl</span>
+                <span className="text-[10px] text-muted-foreground block">
+                  Total: ₹{(viewCounterBid.myBidAmount * viewCounterBid.crop?.quantity)?.toLocaleString('en-IN')}
+                </span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                <span className="text-[10px] font-bold text-amber-800 dark:text-amber-300 block">Farmer Counter Rate</span>
+                <span className="text-base font-black text-amber-600">₹{viewCounterBid.farmerCounterRate?.toLocaleString('en-IN')}/Qtl</span>
+                <span className="text-xs font-bold text-emerald-600 block">
+                  Total: ₹{(viewCounterBid.farmerCounterRate * viewCounterBid.crop?.quantity)?.toLocaleString('en-IN')}
+                </span>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-sky-500/10 border border-sky-500/20 space-y-1 text-xs">
+              <div className="flex items-center justify-between font-bold text-sky-900 dark:text-sky-300">
+                <span>Total Escrow Commitment Required:</span>
+                <span className="text-base font-black text-sky-600">
+                  ₹{(viewCounterBid.farmerCounterRate * viewCounterBid.crop?.quantity)?.toLocaleString('en-IN')}
+                </span>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Upon accepting, this exact total will be locked in escrow. You will then assign collection vehicle details for pickup.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleRejectCounter(viewCounterBid)}
+                className="rounded-xl text-xs text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 h-10 px-4"
+              >
+                <XCircle className="w-3.5 h-3.5 mr-1" /> Decline Offer
+              </Button>
+              <Button asChild variant="outline" size="sm" className="rounded-xl text-xs font-bold h-10 px-4 border-amber-500/40 text-amber-700 hover:bg-amber-500/10">
+                <Link to="/trader/bids">
+                  Negotiate on Bids Page
+                </Link>
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => handleAcceptCounter(viewCounterBid)}
+                className="rounded-xl text-xs font-bold h-10 px-5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-md"
+              >
+                <Check className="w-3.5 h-3.5 mr-1.5" /> Accept Counter & Lock Escrow
+              </Button>
+            </div>
           </div>
         </div>
       )}

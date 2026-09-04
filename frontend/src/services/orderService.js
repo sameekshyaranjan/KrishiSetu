@@ -6,6 +6,13 @@ import api from './api'
  * Strict User Scoping: Zero Dummy / Fallback Data Contamination
  */
 
+const normalizeMediaUrl = (url) => {
+  if (!url) return ''
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:')) return url
+  if (url.startsWith('/uploads')) return `http://localhost:5000${url}`
+  return url
+}
+
 export const orderService = {
   /**
    * Get all orders/transactions for Farmer Portal
@@ -60,7 +67,8 @@ export const orderService = {
             driverName: tx.vehicleDetails?.driverName || '',
             driverContact: tx.vehicleDetails?.driverContact || '',
             vehicleType: tx.vehicleDetails?.vehicleType || '',
-            vehiclePhoto: tx.vehicleDetails?.vehiclePhoto || '',
+            capacity: tx.vehicleDetails?.capacity || '',
+            vehiclePhoto: normalizeMediaUrl(tx.vehicleDetails?.vehiclePhoto || ''),
             dispatchedAt: tx.dispatchedAt || null,
             deliveredAt: tx.deliveredAt || null
           }
@@ -129,7 +137,8 @@ export const orderService = {
             driverName: tx.vehicleDetails?.driverName || '',
             driverContact: tx.vehicleDetails?.driverContact || '',
             vehicleType: tx.vehicleDetails?.vehicleType || '',
-            vehiclePhoto: tx.vehicleDetails?.vehiclePhoto || '',
+            capacity: tx.vehicleDetails?.capacity || '',
+            vehiclePhoto: normalizeMediaUrl(tx.vehicleDetails?.vehiclePhoto || ''),
             dispatchedAt: tx.dispatchedAt || null,
             deliveredAt: tx.deliveredAt || null,
             weighment: {
@@ -152,7 +161,11 @@ export const orderService = {
    * Submit Vehicle Details for an Accepted Order (Trader action)
    */
   submitVehicleDetails: async (orderId, vehicleData) => {
-    const res = await api.put(`/transactions/${orderId}/vehicle`, vehicleData)
+    const config = {}
+    if (vehicleData instanceof FormData) {
+      config.headers = { 'Content-Type': 'multipart/form-data' }
+    }
+    const res = await api.put(`/transactions/${orderId}/vehicle`, vehicleData, config)
     return res?.data || res
   },
 

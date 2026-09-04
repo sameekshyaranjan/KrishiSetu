@@ -349,15 +349,18 @@ export const FarmerOrders = () => {
                     <div className="flex items-center gap-3">
                       {order.vehiclePhoto && (
                         <img
-                          src={order.vehiclePhoto}
+                          src={order.vehiclePhoto.startsWith('http') || order.vehiclePhoto.startsWith('blob:') ? order.vehiclePhoto : `http://localhost:5000${order.vehiclePhoto}`}
                           alt="Vehicle"
-                          className="w-12 h-12 rounded-xl object-cover border border-border shrink-0"
-                          onError={(e) => { e.target.style.display = 'none' }}
+                          className="w-14 h-14 rounded-xl object-cover border border-border shrink-0 shadow-sm"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = 'https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?w=600&auto=format&fit=crop';
+                          }}
                         />
                       )}
                       <div className="space-y-0.5">
                         <p className="text-foreground font-bold">
-                          Driver: {order.driverName} <span className="font-normal text-muted-foreground">({order.vehicleType})</span>
+                          Driver: {order.driverName} <span className="font-normal text-muted-foreground">• {order.vehicleType} {order.capacity ? `(${order.capacity})` : ''}</span>
                         </p>
                         <p className="text-muted-foreground font-mono">
                           Contact: <strong className="text-primary">{order.driverContact}</strong>

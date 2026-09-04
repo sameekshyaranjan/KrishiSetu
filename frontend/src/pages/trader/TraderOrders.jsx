@@ -50,12 +50,15 @@ export const TraderOrders = () => {
   const [vehicleModalOrder, setVehicleModalOrder] = useState(null)
   const [vehicleForm, setVehicleForm] = useState({
     vehicleNumber: '',
-    vehicleType: 'Eicher Pro 10-Tonne Freight Truck',
+    vehicleType: '',
+    capacity: '',
     driverName: '',
     driverContact: '',
     vehiclePhoto: '',
     additionalNotes: ''
   })
+  const [vehicleFile, setVehicleFile] = useState(null)
+  const [photoPreview, setPhotoPreview] = useState('')
   const [submittingVehicle, setSubmittingVehicle] = useState(false)
 
   const loadOrders = async () => {
@@ -83,9 +86,12 @@ export const TraderOrders = () => {
 
   const handleOpenVehicleModal = (order) => {
     setVehicleModalOrder(order)
+    setVehicleFile(null)
+    setPhotoPreview(order.vehiclePhoto || '')
     setVehicleForm({
       vehicleNumber: order.vehicleDetails?.vehicleNumber || '',
-      vehicleType: order.vehicleDetails?.vehicleType || 'Eicher Pro 10-Tonne Freight Truck',
+      vehicleType: order.vehicleDetails?.vehicleType || '',
+      capacity: order.vehicleDetails?.capacity || '',
       driverName: order.driverName || '',
       driverContact: order.driverContact || '',
       vehiclePhoto: order.vehiclePhoto || '',
@@ -99,6 +105,14 @@ export const TraderOrders = () => {
       toast.error('Please enter vehicle registration number')
       return
     }
+    if (!vehicleForm.vehicleType.trim()) {
+      toast.error('Please enter vehicle type (e.g. Tata 407)')
+      return
+    }
+    if (!vehicleForm.capacity.trim()) {
+      toast.error('Please enter vehicle capacity (e.g. 10 tonnes)')
+      return
+    }
     if (!vehicleForm.driverName.trim()) {
       toast.error('Please enter driver name')
       return
@@ -110,7 +124,20 @@ export const TraderOrders = () => {
 
     setSubmittingVehicle(true)
     try {
-      await orderService.submitVehicleDetails(vehicleModalOrder._id, vehicleForm)
+      const formData = new FormData()
+      formData.append('vehicleNumber', vehicleForm.vehicleNumber.trim())
+      formData.append('vehicleType', vehicleForm.vehicleType.trim())
+      formData.append('capacity', vehicleForm.capacity.trim())
+      formData.append('driverName', vehicleForm.driverName.trim())
+      formData.append('driverContact', vehicleForm.driverContact.trim())
+      formData.append('additionalNotes', vehicleForm.additionalNotes.trim())
+      if (vehicleFile) {
+        formData.append('vehiclePhoto', vehicleFile)
+      } else if (vehicleForm.vehiclePhoto) {
+        formData.append('vehiclePhoto', vehicleForm.vehiclePhoto)
+      }
+
+      await orderService.submitVehicleDetails(vehicleModalOrder._id, formData)
       toast.success('Vehicle details assigned! Farmer notified to dispatch crop lot. 🚚')
       setVehicleModalOrder(null)
       await loadOrders()
@@ -296,14 +323,29 @@ export const TraderOrders = () => {
                   </div>
                   
                   {order.hasVehicleDetails ? (
-                    <div className="space-y-0.5 text-[11px]">
-                      <p className="text-muted-foreground">
-                        Driver: <strong className="text-foreground">{order.driverName}</strong>
-                      </p>
-                      <p className="text-muted-foreground">
-                        Phone: <strong className="text-foreground font-mono">{order.driverContact}</strong>
-                      </p>
-                      <p className="text-[10px] text-muted-foreground">{order.vehicleType}</p>
+                    <div className="flex items-center gap-3 pt-1">
+                      {order.vehiclePhoto && (
+                        <img
+                          src={order.vehiclePhoto.startsWith('http') || order.vehiclePhoto.startsWith('blob:') ? order.vehiclePhoto : `http://localhost:5000${order.vehiclePhoto}`}
+                          alt="Truck"
+                          className="w-14 h-14 rounded-xl object-cover border border-border shrink-0 shadow-sm"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = 'https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?w=600&auto=format&fit=crop';
+                          }}
+                        />
+                      )}
+                      <div className="space-y-0.5 text-[11px]">
+                        <p className="text-foreground font-bold">
+                          {order.vehicleType} {order.capacity ? `(${order.capacity})` : ''}
+                        </p>
+                        <p className="text-muted-foreground">
+                          Driver: <strong className="text-foreground">{order.driverName}</strong>
+                        </p>
+                        <p className="text-muted-foreground">
+                          Phone: <strong className="text-foreground font-mono">{order.driverContact}</strong>
+                        </p>
+                      </div>
                     </div>
                   ) : (
                     <p className="text-[11px] text-amber-600 flex items-center gap-1">
@@ -670,34 +712,73 @@ export const TraderOrders = () => {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-foreground mb-1">
-                  Vehicle Type / Capacity
-                </label>
-                <select
-                  value={vehicleForm.vehicleType}
-                  onChange={(e) => setVehicleForm({ ...vehicleForm, vehicleType: e.target.value })}
-                  className="w-full h-10 px-3 rounded-xl bg-muted border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  <option value="Eicher Pro 10-Tonne Freight Truck">Eicher Pro 10-Tonne Freight Truck</option>
-                  <option value="Tata Ace 1.5-Tonne Mini Truck">Tata Ace 1.5-Tonne Mini Truck</option>
-                  <option value="Mahindra Bolero Maxi Truck Plus">Mahindra Bolero Maxi Truck Plus</option>
-                  <option value="Ashok Leyland 16-Wheeler Freight">Ashok Leyland 16-Wheeler Heavy Freight</option>
-                  <option value="Standard APMC Commercial Fleet">Standard APMC Commercial Fleet</option>
-                </select>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-foreground mb-1">
+                    Vehicle Type *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Tata 407"
+                    value={vehicleForm.vehicleType}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, vehicleType: e.target.value })}
+                    className="w-full h-10 px-3 rounded-xl bg-muted border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-foreground mb-1">
+                    Capacity *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 10 tonnes"
+                    value={vehicleForm.capacity}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, capacity: e.target.value })}
+                    className="w-full h-10 px-3 rounded-xl bg-muted border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    required
+                  />
+                </div>
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-foreground mb-1">
-                  Vehicle Photo URL (Optional)
+                  Upload Truck / Vehicle Photo (Optional)
                 </label>
-                <input
-                  type="url"
-                  placeholder="https://images.unsplash.com/... (or paste image URL)"
-                  value={vehicleForm.vehiclePhoto}
-                  onChange={(e) => setVehicleForm({ ...vehicleForm, vehiclePhoto: e.target.value })}
-                  className="w-full h-10 px-3 rounded-xl bg-muted border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                />
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center justify-center gap-2 h-10 px-4 rounded-xl border border-dashed border-border bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer transition-colors text-xs font-semibold">
+                    <Upload className="w-4 h-4" />
+                    <span>Choose File</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          setVehicleFile(file)
+                          setPhotoPreview(URL.createObjectURL(file))
+                        }
+                      }}
+                    />
+                  </label>
+                  {photoPreview && (
+                    <div className="relative w-10 h-10 rounded-xl overflow-hidden border border-border shrink-0">
+                      <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => { setVehicleFile(null); setPhotoPreview(''); }}
+                        className="absolute inset-0 bg-black/50 text-white flex items-center justify-center text-[10px]"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                  <span className="text-[11px] text-muted-foreground truncate">
+                    {vehicleFile ? vehicleFile.name : (photoPreview ? 'Photo selected' : 'PNG, JPG up to 10MB')}
+                  </span>
+                </div>
               </div>
 
               <div>

@@ -13,6 +13,7 @@ const {
   disputeTransaction
 } = require('../controllers/transactionController');
 const { protect, authorize } = require('../middleware/authMiddleware');
+const upload = require('../middleware/uploadMiddleware');
 
 router.use(protect);
 
@@ -23,8 +24,8 @@ router.get('/my-transactions', getMyTransactions);
 router.get('/:id', getTransactionById);
 
 // Specific workflow transition endpoints
-router.put('/:id/vehicle', authorize('trader'), submitVehicleDetails);
-router.post('/:id/vehicle', authorize('trader'), submitVehicleDetails);
+router.put('/:id/vehicle', authorize('trader'), upload.single('vehiclePhoto'), submitVehicleDetails);
+router.post('/:id/vehicle', authorize('trader'), upload.single('vehiclePhoto'), submitVehicleDetails);
 router.put('/:id/dispatch', authorize('farmer'), dispatchLot);
 router.patch('/:id/dispatch', authorize('farmer'), dispatchLot);
 router.put('/:id/confirm-delivery', authorize('trader'), confirmDelivery);

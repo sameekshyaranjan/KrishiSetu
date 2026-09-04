@@ -36,21 +36,29 @@ export const TraderInvoices = () => {
       const orders = await orderService.getTraderOrders()
       if (Array.isArray(orders)) {
         const formatted = orders
-          .filter(o => o.paymentStatus === 'completed' || o.paymentStatus === 'disbursed' || o.deliveryStatus === 'delivered')
+          .filter(o => 
+            o.paymentStatus === 'completed' || 
+            o.paymentStatus === 'disbursed' || 
+            o.paymentStatus === 'payout_released' || 
+            o.logisticsStatus === 'delivered' || 
+            o.status === 'dbt_released'
+          )
           .map(o => {
-            const baseAmount = Number(o.totalAmount || o.escrowAmount || 0)
+            const quantity = Number(o.quantity) || 10
+            const unitRate = Number(o.agreedRate || o.unitPrice || (quantity && o.grossEscrow ? Math.round(o.grossEscrow / quantity) : 2000))
+            const baseAmount = Number(o.grossEscrow || o.escrowAmount || o.totalAmount || (quantity * unitRate))
             const apmcCess = Math.round(baseAmount * 0.015)
             const ruralCess = Math.round(baseAmount * 0.005)
             return {
-              _id: `INV-${o._id?.slice(-6)}`,
-              orderId: o.orderId || o._id,
+              _id: `INV-${String(o._id).slice(-6).toUpperCase()}`,
+              orderId: o.orderCode || o.orderId || o._id,
               date: new Date(o.createdAt || Date.now()).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
               cropName: o.cropName || 'Farm Fresh Produce',
               variety: o.variety || 'Graded Lot',
               hsnCode: '07020000',
-              quantity: Number(o.quantity) || 50,
+              quantity,
               unit: o.unit || 'Quintals',
-              unitRate: Number(o.unitPrice) || 2000,
+              unitRate,
               baseAmount,
               apmcCess,
               ruralCess,
@@ -58,11 +66,11 @@ export const TraderInvoices = () => {
               totalAmount: baseAmount + apmcCess + ruralCess,
               amountInWords: `Total ₹${(baseAmount + apmcCess + ruralCess).toLocaleString('en-IN')}`,
               farmer: {
-                name: o.farmerName || 'Verified Farmer',
+                name: o.farmer?.name || o.farmerName || 'Verified Farmer',
                 village: 'APMC Market',
-                district: o.district || 'Karnataka',
+                district: o.farmer?.district || o.district || 'Karnataka',
                 rtcNumber: 'RTC-APMC-VERIFIED',
-                bankUtr: o.utr || 'DBT-SETTLED'
+                bankUtr: o.utrNumber || o.utr || `DBT-${String(o._id).slice(-8).toUpperCase()}`
               },
               buyer: {
                 entity: user?.companyName || user?.name || 'Registered Trader',

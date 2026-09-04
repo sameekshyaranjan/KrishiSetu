@@ -74,10 +74,11 @@ export const cropService = {
     try {
       const endpoint = cropId ? `/bids/listing/${cropId}` : '/bids/my'
       const res = await api.get(endpoint)
-      const payload = res?.data
-      if (Array.isArray(payload)) return payload
-      if (Array.isArray(payload?.data)) return payload.data
-      if (Array.isArray(payload?.docs)) return payload.docs
+      if (Array.isArray(res)) return res
+      if (Array.isArray(res?.data)) return res.data
+      if (Array.isArray(res?.docs)) return res.docs
+      if (Array.isArray(res?.data?.data)) return res.data.data
+      if (Array.isArray(res?.data?.docs)) return res.data.docs
       return []
     } catch (err) {
       console.warn('[cropService] Failed to load inbound bids:', err.message)

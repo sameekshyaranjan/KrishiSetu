@@ -22,20 +22,103 @@ const placeBid = async (req, res, next) => {
       return res.status(400).json({ message: `Bid amount must be at least the base price of ${crop.basePrice}` });
     }
 
+    // Check if trader already has an active bid for this crop (cannot place duplicate, only increase)
+    const existingActiveBid = await Bid.findOne({
+      crop: cropId,
+      trader: req.user.id,
+      status: { $in: ['pending', 'countered'] }
+    });
+    if (existingActiveBid) {
+      return res.status(400).json({ 
+        message: 'You already have an active bid for this crop. Please increase your existing bid instead.',
+        existingBidId: existingActiveBid._id
+      });
+    }
+
+    // Insufficient balance check: quantity * bid price
+    const Wallet = require('../models/Wallet');
+    const totalRequired = Number(crop.quantity || 1) * Number(amount);
+    let wallet = await Wallet.findOne({ trader: req.user.id });
+    if (!wallet || wallet.availableBalance < totalRequired) {
+      return res.status(400).json({ 
+        message: 'Insufficient balance to place this bid.',
+        required: totalRequired,
+        available: wallet ? wallet.availableBalance : 0
+      });
+    }
+
+    // Check if trader had a prior rejected bid on this crop -> must be strictly higher
+    const existingRejectedBid = await Bid.findOne({
+      crop: cropId,
+      trader: req.user.id,
+      status: 'rejected'
+    }).sort({ createdAt: -1 });
+
+    if (existingRejectedBid) {
+      if (Number(amount) <= Number(existingRejectedBid.amount)) {
+        return res.status(400).json({ 
+          message: 'Your new bid must be higher than your previous bid.',
+          previousBidAmount: existingRejectedBid.amount
+        });
+      }
+
+      existingRejectedBid.status = 'pending';
+      existingRejectedBid.originalAmount = existingRejectedBid.originalAmount || existingRejectedBid.amount;
+      existingRejectedBid.amount = Number(amount);
+      existingRejectedBid.counterAmount = null;
+      existingRejectedBid.counterProposedBy = null;
+      existingRejectedBid.counterMessage = null;
+      if (message) existingRejectedBid.message = message;
+      if (!Array.isArray(existingRejectedBid.negotiationHistory)) {
+        existingRejectedBid.negotiationHistory = [];
+      }
+      existingRejectedBid.negotiationHistory.push({
+        proposedBy: 'trader',
+        amount: Number(amount),
+        message: message || 'Trader submitted higher bid after rejection',
+        createdAt: new Date()
+      });
+      await existingRejectedBid.save();
+
+      createNotification(
+        crop.farmer,
+        'Farmer',
+        'New Higher Bid Received',
+        `A trader has placed a higher bid of ₹${amount}/Qtl (Total: ₹${totalRequired.toLocaleString('en-IN')}) for your crop listing.`
+      );
+
+      socketEmitter.emit('bid-updated', existingRejectedBid, crop.farmer.toString());
+      socketEmitter.emit('bid-updated', existingRejectedBid, req.user.id.toString());
+
+      return res.status(200).json(existingRejectedBid);
+    }
+
     const bid = await Bid.create({
       crop: cropId,
       farmer: crop.farmer,
       trader: req.user.id,
       amount,
-      message
+      originalAmount: amount,
+      message,
+      negotiationHistory: [
+        {
+          proposedBy: 'trader',
+          amount: Number(amount),
+          message: message || 'Initial bid placed',
+          createdAt: new Date()
+        }
+      ]
     });
 
     createNotification(
       crop.farmer,
       'Farmer',
       'New Bid Received',
-      `A trader has placed a bid of ₹${amount} for your crop listing.`
+      `A trader has placed a bid of ₹${amount}/Qtl (Total: ₹${totalRequired.toLocaleString('en-IN')}) for your crop listing.`
     );
+
+    socketEmitter.emit('bid-updated', bid, crop.farmer.toString());
+    socketEmitter.emit('bid-updated', bid, req.user.id.toString());
 
     res.status(201).json(bid);
   } catch (error) {
@@ -76,7 +159,7 @@ const getMyBids = async (req, res, next) => {
 
     const result = await paginate(
       Bid,
-      filter,
+      { ...filter, status: { $ne: 'withdrawn' } },
       req.query.page,
       req.query.limit,
       populatePaths,
@@ -106,8 +189,39 @@ const updateBid = async (req, res, next) => {
     }
 
     const { amount, message } = req.body;
-    bid.amount = amount || bid.amount;
-    bid.message = message || bid.message;
+
+    // Enforce only increasing bid amount (cannot decrease)
+    if (amount) {
+      if (Number(amount) <= Number(bid.amount)) {
+        return res.status(400).json({ message: 'Your new bid must be higher than your previous bid.' });
+      }
+
+      // Check available balance for total amount = quantity * new amount
+      const crop = await Crop.findById(bid.crop);
+      const totalRequired = Number(crop ? crop.quantity : 1) * Number(amount);
+      const Wallet = require('../models/Wallet');
+      const wallet = await Wallet.findOne({ trader: req.user.id });
+      if (!wallet || wallet.availableBalance < totalRequired) {
+        return res.status(400).json({ 
+          message: 'Insufficient balance to place this bid.',
+          required: totalRequired,
+          available: wallet ? wallet.availableBalance : 0
+        });
+      }
+
+      bid.amount = Number(amount);
+      if (!Array.isArray(bid.negotiationHistory)) {
+        bid.negotiationHistory = [];
+      }
+      bid.negotiationHistory.push({
+        proposedBy: 'trader',
+        amount: Number(amount),
+        message: message || 'Trader increased bid',
+        createdAt: new Date()
+      });
+    }
+
+    if (message) bid.message = message;
 
     const updatedBid = await bid.save();
 
@@ -115,8 +229,11 @@ const updateBid = async (req, res, next) => {
       bid.farmer,
       'Farmer',
       'Bid Updated',
-      `A trader has updated their bid to ₹${amount}.`
+      `A trader has increased their bid to ₹${bid.amount}/Qtl.`
     );
+
+    socketEmitter.emit('bid-updated', updatedBid, bid.farmer.toString());
+    socketEmitter.emit('bid-updated', updatedBid, bid.trader.toString());
 
     res.status(200).json(updatedBid);
   } catch (error) {
@@ -210,7 +327,8 @@ const respondToBid = async (req, res, next) => {
         return res.status(403).json({ message: 'You are not authorized to accept bids for this crop.' });
       }
 
-      const lockAmount = agreedRate;
+      const cropQuantity = Number(crop.quantity || 1);
+      const lockAmount = agreedRate * cropQuantity;
       bid.amount = agreedRate;
       const Wallet = require('../models/Wallet');
       const WalletLedger = require('../models/WalletLedger');
@@ -341,7 +459,7 @@ const respondToBid = async (req, res, next) => {
     bid.negotiationHistory.push({
       proposedBy: 'farmer',
       amount: bid.counterAmount || bid.amount,
-      message: 'Bid declined by farmer',
+      message: 'Bid rejected by farmer',
       createdAt: new Date()
     });
     await bid.save();
@@ -349,8 +467,8 @@ const respondToBid = async (req, res, next) => {
     createNotification(
       bid.trader,
       'Trader',
-      'Bid Rejected',
-      `Your bid was declined by the farmer.`
+      'Bid Rejected by Farmer',
+      `Your bid was rejected by the farmer.`
     );
 
     socketEmitter.emit('bid-updated', bid, bid.trader.toString());
@@ -536,8 +654,15 @@ const traderRespondToCounter = async (req, res, next) => {
     }
 
     if (action === 'accept') {
+      const crop = await Crop.findById(bid.crop);
+      if (!crop) {
+        return res.status(404).json({ message: 'Crop not found' });
+      }
+
       // Final agreed amount becomes the farmer's counter offer rate
       const agreedRate = Number(bid.counterAmount || bid.amount);
+      const cropQuantity = Number(crop.quantity || 1);
+      const lockAmount = agreedRate * cropQuantity;
       bid.amount = agreedRate;
 
       const Wallet = require('../models/Wallet');
@@ -545,9 +670,9 @@ const traderRespondToCounter = async (req, res, next) => {
 
       // Verify Trader Escrow Wallet Balance
       const traderWallet = await Wallet.findOne({ trader: bid.trader });
-      if (!traderWallet || traderWallet.availableBalance < agreedRate) {
+      if (!traderWallet || traderWallet.availableBalance < lockAmount) {
         return res.status(400).json({
-          message: `Insufficient available balance in your escrow wallet (Available: ₹${traderWallet ? traderWallet.availableBalance.toLocaleString('en-IN') : 0}, Required: ₹${agreedRate.toLocaleString('en-IN')}) to accept this counter offer.`
+          message: `Insufficient available balance in your escrow wallet (Available: ₹${traderWallet ? traderWallet.availableBalance.toLocaleString('en-IN') : 0}, Required: ₹${lockAmount.toLocaleString('en-IN')}) to accept this counter offer.`
         });
       }
 
@@ -564,9 +689,9 @@ const traderRespondToCounter = async (req, res, next) => {
 
       // Atomically move trader balance into locked escrow
       const updatedWallet = await Wallet.findOneAndUpdate(
-        { trader: bid.trader, availableBalance: { $gte: agreedRate } },
+        { trader: bid.trader, availableBalance: { $gte: lockAmount } },
         {
-          $inc: { availableBalance: -agreedRate, lockedBalance: agreedRate },
+          $inc: { availableBalance: -lockAmount, lockedBalance: lockAmount },
           $set: { updatedAt: Date.now() }
         },
         { new: true }
@@ -582,7 +707,7 @@ const traderRespondToCounter = async (req, res, next) => {
         trader: bid.trader,
         wallet: updatedWallet._id,
         type: 'ESCROW_LOCK',
-        amount: agreedRate,
+        amount: lockAmount,
         balanceAfter: updatedWallet.availableBalance,
         status: 'completed',
         source: 'DEVELOPMENT_SANDBOX',
@@ -627,7 +752,7 @@ const traderRespondToCounter = async (req, res, next) => {
           trader: bid.trader,
           cropListing: bid.crop,
           bid: bid._id,
-          amount: agreedRate,
+          amount: lockAmount,
           paymentStatus: 'held_in_escrow',
           logisticsStatus: 'pending',
           paymentMethod: 'manual',
@@ -729,6 +854,89 @@ const traderRespondToCounter = async (req, res, next) => {
   }
 };
 
+/**
+ * Trader submits a higher bid after the farmer rejected their previous bid
+ * POST /api/bids/:id/bid-higher
+ */
+const bidHigherAfterRejection = async (req, res, next) => {
+  try {
+    const bid = await Bid.findById(req.params.id);
+    if (!bid) {
+      return res.status(404).json({ message: 'Bid not found' });
+    }
+
+    if (bid.trader.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'You are not authorized to update this bid' });
+    }
+
+    if (bid.status !== 'rejected') {
+      return res.status(400).json({ message: 'Only rejected bids can be re-bid higher' });
+    }
+
+    const { amount, message } = req.body;
+    const newAmount = Number(amount);
+
+    if (!newAmount || newAmount <= 0) {
+      return res.status(400).json({ message: 'Please provide a valid bid amount greater than 0' });
+    }
+
+    if (newAmount <= Number(bid.amount)) {
+      return res.status(400).json({ message: 'Your new bid must be higher than your previous bid.' });
+    }
+
+    const crop = await Crop.findById(bid.crop);
+    if (!crop || crop.status !== 'available') {
+      return res.status(400).json({ message: 'This crop listing is no longer available for bidding' });
+    }
+
+    // Insufficient balance check: quantity * new bid price
+    const Wallet = require('../models/Wallet');
+    const totalRequired = Number(crop.quantity || 1) * newAmount;
+    const wallet = await Wallet.findOne({ trader: req.user.id });
+    if (!wallet || wallet.availableBalance < totalRequired) {
+      return res.status(400).json({ 
+        message: 'Insufficient balance to place this bid.',
+        required: totalRequired,
+        available: wallet ? wallet.availableBalance : 0
+      });
+    }
+
+    bid.status = 'pending';
+    bid.amount = newAmount;
+    bid.counterAmount = null;
+    bid.counterProposedBy = null;
+    bid.counterMessage = null;
+    if (message) bid.message = message;
+
+    if (!Array.isArray(bid.negotiationHistory)) bid.negotiationHistory = [];
+    bid.negotiationHistory.push({
+      proposedBy: 'trader',
+      amount: newAmount,
+      message: message || 'Trader submitted higher bid after rejection',
+      createdAt: new Date()
+    });
+
+    await bid.save();
+
+    createNotification(
+      bid.farmer,
+      'Farmer',
+      'New Higher Bid Received',
+      `Trader has submitted a higher bid of ₹${newAmount}/Qtl (Total: ₹${totalRequired.toLocaleString('en-IN')}) for ${crop.name}.`
+    );
+
+    socketEmitter.emit('bid-updated', bid, bid.farmer.toString());
+    socketEmitter.emit('bid-updated', bid, bid.trader.toString());
+
+    res.status(200).json({
+      message: `New higher bid of ₹${newAmount}/Qtl submitted successfully!`,
+      bid
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   placeBid,
   getBidsForListing,
@@ -738,5 +946,6 @@ module.exports = {
   respondToBid,
   undoAcceptBid,
   counterBid,
-  traderRespondToCounter
+  traderRespondToCounter,
+  bidHigherAfterRejection
 };
