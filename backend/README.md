@@ -20,18 +20,46 @@ This repository houses the Express/Node.js backend, powered by MongoDB, Redis fo
 - Redis Server (Required for BullMQ & Caching)
 
 ## Environment Variables
-Create a `.env` file in the `backend` directory with the following keys:
+Create a `.env` file in the `backend` directory with the following configuration:
 
 ```env
-NODE_ENV=development
+# Server & Database Configuration (Required)
 PORT=5000
-MONGO_URI=mongodb+srv://<user>:<password>@cluster.mongodb.net/krishisetu
-JWT_SECRET=your_super_secret_jwt_key
-REDIS_HOST=127.0.0.1
-REDIS_PORT=6379
-TWILIO_ACCOUNT_SID=your_twilio_sid
-TWILIO_AUTH_TOKEN=your_twilio_token
-TWILIO_PHONE_NUMBER=your_twilio_number
+NODE_ENV=development
+MONGO_URI=mongodb://127.0.0.1:27017/krishisetu
+CLIENT_URL=http://localhost:5173
+SERVER_URL=http://localhost:5000
+
+# Authentication (Required)
+JWT_SECRET=super_secret_jwt_key_krishisetu_2026
+JWT_REFRESH_SECRET=super_secret_refresh_jwt_key_krishisetu_2026
+
+# Redis Cache & BullMQ Queue (Optional - falls back to ioredis-mock if USE_REDIS=false)
+USE_REDIS=false
+REDIS_URL=redis://127.0.0.1:6379
+
+# Payment Gateway (Optional - falls back to sandbox mock orders in development)
+RAZORPAY_KEY_ID=dummy_key_id
+RAZORPAY_KEY_SECRET=dummy_key_secret
+
+# Media Storage (Optional - falls back to local disk uploads in development)
+CLOUDINARY_CLOUD_NAME=dummy_cloud
+CLOUDINARY_API_KEY=dummy_key
+CLOUDINARY_API_SECRET=dummy_secret
+
+# SMS & OTP Notifications (Optional - falls back to console logging in development)
+TWILIO_ACCOUNT_SID=dummy_sid
+TWILIO_AUTH_TOKEN=dummy_token
+TWILIO_PHONE_NUMBER=+1234567890
+
+# Email Notifications (Optional - SendGrid or standard SMTP)
+SENDGRID_API_KEY=your_sendgrid_key
+SENDGRID_FROM_EMAIL=support@krishisetu.in
+
+# Government Mandi & Weather APIs (Optional - falls back to Bangalore APMC curated dataset)
+AGMARKNET_API_KEY=dummy_key_for_now
+AGMARKNET_RESOURCE_ID=9ef84268-d588-465a-a308-a864a43d0070
+OPENWEATHER_API_KEY=dummy_key_for_now
 ```
 
 ## Setup & Installation
