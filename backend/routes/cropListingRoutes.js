@@ -21,7 +21,7 @@ router.get('/', authorize('farmer', 'trader', 'admin'), getAllListings);
 router.get('/:id', authorize('farmer', 'trader', 'admin'), getListingById);
 router.get('/:id/lot-sheet', authorize('farmer', 'trader', 'admin'), getLotSheet);
 router.post('/', authorize('farmer'), upload.array('images', 5), createCropListing);
-router.put('/:id', authorize('farmer'), updateCropListing);
+router.put('/:id', authorize('farmer'), upload.array('images', 5), updateCropListing);
 router.delete('/:id', authorize('farmer'), deleteCropListing);
 
 module.exports = router;

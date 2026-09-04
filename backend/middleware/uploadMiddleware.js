@@ -18,10 +18,20 @@ if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && !proc
 
   storage = new CloudinaryStorage({
     cloudinary: cloudinary,
-    params: {
-      folder: 'krishisetu_crops',
-      allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
-      transformation: [{ width: 800, height: 800, crop: 'limit' }]
+    params: async (req, file) => {
+      let folder = 'krishisetu_crops';
+      if (file.fieldname === 'vehiclePhoto') {
+        folder = 'krishisetu_trucks';
+      } else if (file.fieldname === 'proofPhotos') {
+        folder = 'krishisetu_disputes';
+      } else if (file.fieldname === 'profileImage' || file.fieldname === 'avatar') {
+        folder = 'krishisetu_profiles';
+      }
+      return {
+        folder: folder,
+        allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+        transformation: [{ width: 1200, height: 1200, crop: 'limit' }]
+      };
     },
   });
 } else {
@@ -47,5 +57,7 @@ const upload = multer({
   storage: storage,
   limits: { fileSize: 10 * 1024 * 1024 }
 });
+
+upload.cloudinary = cloudinary;
 
 module.exports = upload;
