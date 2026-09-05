@@ -1,5 +1,3 @@
-const Razorpay = require('razorpay');
-const crypto = require('crypto');
 const Transaction = require('../models/Transaction');
 const Bid = require('../models/Bid');
 const Crop = require('../models/Crop');
@@ -8,106 +6,7 @@ const { paginate } = require('../utils/paginate');
 const { createNotification } = require('../utils/createNotification');
 const logger = require('../utils/logger');
 
-const createRazorpayOrder = async (req, res, next) => {
-  try {
-    const { cropListing, bid, amount, farmerId } = req.body;
-    
-    // Validate bid exists and is accepted
-    const existingBid = await Bid.findById(bid);
-    if (!existingBid || existingBid.status !== 'accepted') {
-      return res.status(400).json({ message: 'Can only pay for accepted bids.' });
-    }
 
-    const existingTx = await Transaction.findOne({ bid });
-    if (existingTx) {
-      return res.status(400).json({ message: 'A transaction for this bid already exists.' });
-    }
-
-    const razorpayInstance = new Razorpay({
-      key_id: process.env.RAZORPAY_KEY_ID || 'dummy_key_id',
-      key_secret: process.env.RAZORPAY_KEY_SECRET || 'dummy_key_secret',
-    });
-
-    const options = {
-      amount: Math.round(amount * 100), // amount in the smallest currency unit (paise)
-      currency: "INR",
-      receipt: `receipt_${Date.now()}`
-    };
-
-    let order;
-    if (process.env.NODE_ENV === 'development' && (!process.env.RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID.includes('dummy'))) {
-      // Dev Mock for Razorpay
-      logger.info('[DEV MOCK] Generating fake Razorpay order...');
-      order = { id: `order_dev_${Date.now()}`, amount: options.amount, currency: "INR" };
-    } else {
-      order = await razorpayInstance.orders.create(options);
-    }
-
-    const transaction = await Transaction.create({
-      farmer: farmerId,
-      trader: req.user.id,
-      cropListing,
-      bid,
-      amount,
-      paymentMethod: 'razorpay',
-      paymentStatus: 'initiated',
-      paymentGatewayId: order.id
-    });
-
-    res.status(201).json({ order, transactionId: transaction._id });
-  } catch (error) {
-    next(error);
-  }
-};
-
-const verifyRazorpayPayment = async (req, res, next) => {
-  try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, transactionId } = req.body;
-
-    const secret = process.env.RAZORPAY_KEY_SECRET || 'dummy_key_secret';
-
-    let isAuthentic = false;
-    
-    if (process.env.NODE_ENV === 'development' && razorpay_order_id.startsWith('order_dev_')) {
-      // Bypass signature check in Dev Mock
-      isAuthentic = true;
-    } else {
-      const body = razorpay_order_id + "|" + razorpay_payment_id;
-      const expectedSignature = crypto
-        .createHmac("sha256", secret)
-        .update(body.toString())
-        .digest("hex");
-      isAuthentic = expectedSignature === razorpay_signature;
-    }
-
-    if (isAuthentic) {
-      const tx = await Transaction.findByIdAndUpdate(transactionId, {
-        paymentStatus: 'held_in_escrow'
-      }, { new: true }).populate('trader');
-      
-      createNotification(
-        tx.farmer,
-        'Farmer',
-        'Payment in Escrow',
-        `Payment of ₹${tx.amount} has been successfully placed in escrow by ${tx.trader?.name || 'a trader'}. Please prepare the crop for pickup/delivery.`
-      );
-
-      res.status(200).json({ message: 'Payment verified and held in escrow' });
-    } else {
-      const tx = await Transaction.findByIdAndUpdate(transactionId, {
-        paymentStatus: 'failed'
-      });
-      
-      // Rollback crop and bid statuses
-      await Bid.findByIdAndUpdate(tx.bid, { status: 'pending' });
-      await Crop.findByIdAndUpdate(tx.cropListing, { status: 'available' });
-
-      res.status(400).json({ message: 'Invalid payment signature, transaction failed and rolled back' });
-    }
-  } catch (error) {
-    next(error);
-  }
-};
 
 const recordManualTransaction = async (req, res, next) => {
   try {
@@ -621,8 +520,6 @@ const disputeTransaction = async (req, res, next) => {
 };
 
 module.exports = {
-  createRazorpayOrder,
-  verifyRazorpayPayment,
   recordManualTransaction,
   getMyTransactions,
   getTransactionById,

@@ -4,7 +4,6 @@ import { useAuth } from '@/hooks/useAuth'
 import notificationService from '@/services/notificationService'
 import { Button } from '@/components/ui/button'
 import toast from 'react-hot-toast'
-import SMSNotificationPreview from '@/components/common/SMSNotificationPreview'
 import { 
   Bell, 
   CheckCheck, 
@@ -31,9 +30,6 @@ export const FarmerNotifications = () => {
   const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeFilter, setActiveFilter] = useState('all') // 'all' | 'unread' | 'bids' | 'payment' | 'logistics' | 'weather'
-  const [selectedSmsLanguage, setSelectedSmsLanguage] = useState('kn') // 'kn' | 'en'
-  const [showSmsModal, setShowSmsModal] = useState(false)
-  const [selectedNotifForSms, setSelectedNotifForSms] = useState(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
 
   const loadNotifications = async () => {
@@ -56,7 +52,7 @@ export const FarmerNotifications = () => {
     setIsRefreshing(true)
     await loadNotifications()
     setIsRefreshing(false)
-    toast.success('Live notification feeds and SMS push alerts updated! ⚡')
+    toast.success('Live notification feeds updated! ⚡')
   }
 
   const handleMarkAsRead = async (id) => {
@@ -74,11 +70,6 @@ export const FarmerNotifications = () => {
     const updated = await notificationService.deleteNotification(id, 'farmer')
     setNotifications(updated)
     toast.success('Notification removed.')
-  }
-
-  const handlePreviewSMS = (notif) => {
-    setSelectedNotifForSms(notif)
-    setShowSmsModal(true)
   }
 
   const unreadCount = notifications.filter((n) => !n.isRead && n.unread !== false).length
@@ -121,7 +112,7 @@ export const FarmerNotifications = () => {
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold border border-primary/20 mb-2">
             <Radio className="w-3.5 h-3.5 animate-pulse" />
-            <span>Dual-Channel Push Telemetry (Web & SMS Gateway)</span>
+            <span>Real-Time In-App Notification Telemetry</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
             Alerts & Push Notifications

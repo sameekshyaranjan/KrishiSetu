@@ -141,10 +141,10 @@ const seedDatabase = async () => {
           cropListing: crop._id,
           bid: bid._id,
           amount: bidAmount * crop.quantity,
-          paymentMethod: 'razorpay',
+          paymentMethod: 'escrow',
           paymentStatus: i < 5 ? 'held_in_escrow' : 'payout_released',
           logisticsStatus: i < 5 ? 'in_transit' : 'delivered',
-          paymentGatewayId: `pay_${faker.string.alphanumeric(14)}`
+          paymentGatewayId: `escrow_${faker.string.alphanumeric(14)}`
         });
         txCount++;
       }

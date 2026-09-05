@@ -57,23 +57,6 @@ export const priceService = {
       console.warn('[priceService] Error fetching price trend:', err.message)
       return []
     }
-  },
-
-  /**
-   * Subscribe to SMS Mandi Price Alert
-   */
-  subscribePriceAlert: async ({ mobile, commodity, targetPrice, district }) => {
-    try {
-      const res = await api.post('/sms/subscribe', {
-        mobile,
-        commodity,
-        targetPrice,
-        district
-      })
-      return res?.data || res
-    } catch (err) {
-      throw err
-    }
   }
 }
 

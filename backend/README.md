@@ -38,19 +38,12 @@ JWT_REFRESH_SECRET=super_secret_refresh_jwt_key_krishisetu_2026
 USE_REDIS=false
 REDIS_URL=redis://127.0.0.1:6379
 
-# Payment Gateway (Optional - falls back to sandbox mock orders in development)
-RAZORPAY_KEY_ID=dummy_key_id
-RAZORPAY_KEY_SECRET=dummy_key_secret
 
 # Media Storage (Optional - falls back to local disk uploads in development)
 CLOUDINARY_CLOUD_NAME=dummy_cloud
 CLOUDINARY_API_KEY=dummy_key
 CLOUDINARY_API_SECRET=dummy_secret
 
-# SMS & OTP Notifications (Optional - falls back to console logging in development)
-TWILIO_ACCOUNT_SID=dummy_sid
-TWILIO_AUTH_TOKEN=dummy_token
-TWILIO_PHONE_NUMBER=+1234567890
 
 # Email Notifications (Optional - SendGrid or standard SMTP)
 SENDGRID_API_KEY=your_sendgrid_key
@@ -85,7 +78,7 @@ The server will start on port 5000 and connect to MongoDB and Redis.
 ## Architecture Highlights
 - **Role-Based Access:** Dual collections (`Farmers` and `Traders`) protected via robust JWT middlewares.
 - **Two-Tier Realtime Messaging:** Polymorphic `Conversation` and `Message` models integrated with WebSockets (`Socket.IO`).
-- **Background Processing:** Heavy tasks (SMS, Harvest Reminders, Price Alerts) offloaded to `BullMQ` + `Redis`.
+- **Background Processing:** Heavy tasks (Harvest Reminders, Price Alerts, Email OTP) offloaded to `BullMQ` + `Redis`.
 - **Geospatial Queries:** MongoDB `2dsphere` indexes allow users to query nearby Cold Storage facilities by radius.
 - **Centralized Pagination:** The custom `paginate.js` utility standardizes offset pagination for admin dashboards and marketplace feeds.
 

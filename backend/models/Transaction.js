@@ -50,7 +50,8 @@ const transactionSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['razorpay', 'manual']
+    enum: ['wallet', 'escrow', 'manual', 'bank_transfer', 'upi'],
+    default: 'escrow'
   },
   paymentGatewayId: {
     type: String

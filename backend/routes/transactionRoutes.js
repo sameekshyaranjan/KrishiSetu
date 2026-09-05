@@ -1,8 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const {
-  createRazorpayOrder,
-  verifyRazorpayPayment,
   recordManualTransaction,
   getMyTransactions,
   getTransactionById,
@@ -17,8 +15,6 @@ const upload = require('../middleware/uploadMiddleware');
 
 router.use(protect);
 
-router.post('/razorpay/order', createRazorpayOrder);
-router.post('/razorpay/verify', verifyRazorpayPayment);
 router.post('/manual', recordManualTransaction);
 router.get('/my-transactions', getMyTransactions);
 router.get('/:id', getTransactionById);

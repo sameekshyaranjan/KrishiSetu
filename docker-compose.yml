@@ -1,0 +1,48 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: krishisetu-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  backend:
+    build:
+      context: ./backend
+    container_name: krishisetu-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      PORT: 5000
+      USE_REDIS: "true"
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "5000:5000"
+    depends_on:
+      - redis
+
+  worker:
+    build:
+      context: ./backend
+    container_name: krishisetu-worker
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      USE_REDIS: "true"
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      - redis
+      - backend
+    command: ["node", "workers/cronWorker.js"]
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: krishisetu-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend

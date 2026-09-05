@@ -62,22 +62,6 @@ export const escrowService = {
     const res = await api.put(`/transactions/${txId}/logistics`, { status: 'delivered' })
     const data = res?.data || res
     return data
-  },
-
-  /**
-   * Create Razorpay order for production payment gateway integration
-   */
-  createDepositOrder: async (amount) => {
-    const res = await api.post('/transactions/razorpay/order', { amount: Number(amount) })
-    return res?.data || res
-  },
-
-  /**
-   * Verify Razorpay production payment signature
-   */
-  verifyDepositPayment: async (paymentDetails) => {
-    const res = await api.post('/transactions/razorpay/verify', paymentDetails)
-    return res?.data || res
   }
 }
 

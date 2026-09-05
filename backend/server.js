@@ -17,7 +17,6 @@ const priceRoutes = require('./routes/priceRoutes');
 const schemeRoutes = require('./routes/schemeRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const adminRoutes = require('./routes/adminRoutes');
-const smsRoutes = require('./routes/smsRoutes');
 const transactionRoutes = require('./routes/transactionRoutes');
 const storageRoutes = require('./routes/storageRoutes');
 const messageRoutes = require('./routes/messageRoutes');
@@ -239,7 +238,6 @@ const registerRoutes = (prefix) => {
   app.use(`${prefix}/schemes`, schemeRoutes);
   app.use(`${prefix}/notifications`, notificationRoutes);
   app.use(`${prefix}/admin`, adminRoutes);
-  app.use(`${prefix}/sms`, smsRoutes);
   app.use(`${prefix}/transactions`, transactionRoutes);
   app.use(`${prefix}/storage`, storageRoutes);
   app.use(`${prefix}/messages`, messageRoutes);

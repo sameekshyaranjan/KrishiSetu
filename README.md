@@ -47,7 +47,7 @@ In traditional Indian agricultural commerce—specifically regulated under Karna
 **KrishiSetu** (Agricultural Bridge) is a production-grade, enterprise agritech marketplace and financial escrow settlement protocol engineered specifically to disintermediate agricultural trade in Karnataka. It replaces opaque physical broker rings with:
 
 1. **Direct Digital Farmer-to-Trader Contracting**: Certified crop listings with mandi quality grading, reserve prices, and high-resolution Cloudinary media proof.
-2. **Dual-Lock Escrow Vault**: 20% collateral upfront capital freeze inside the trader's digital wallet upon bid acceptance, guaranteeing solvency before transport begins.
+2. **Full-Value Escrow Vault**: 100% order value capital lock inside the trader's digital wallet upon bid acceptance, guaranteeing solvency and eliminating payment default before transport begins.
 3. **Cryptographic 6-Digit Delivery OTP Handshake**: Funds remain protected in escrow until produce is physically inspected and the farmer releases a cryptographically verified delivery OTP.
 4. **Quasi-Judicial APMC Dispute Arbitration**: Standardized administrative docket with visual evidence inspection and automated ruling execution (100% refund, 85/15 compromise split, or 100% payout).
 5. **Real-Time Agmarknet Mandi Telemetry**: Live mandi arrivals and pricing across all 31 Karnataka districts with automated threshold price alert background jobs.
@@ -58,7 +58,7 @@ In traditional Indian agricultural commerce—specifically regulated under Karna
 |   (Raitha / Seller)   |                         |     (Vyapari / Buyer)     |
 +-----------------------+                         +---------------------------+
            ||                                                   ||
-           ||====> [20% Upfront Capital Lock into Escrow] <====||
+           ||====> [100% Contract Capital Lock into Escrow] <===||
            ||                                                   ||
            v                                                     v
 +-----------------------------------------------------------------------------+
@@ -83,7 +83,7 @@ In traditional Indian agricultural commerce—specifically regulated under Karna
 
 | Persona | Role in Karnataka Mandi | Core KrishiSetu Capabilities | Key Business Benefit |
 |---|---|---|---|
-| **🧑‍🌾 Farmer (Raitha)** | Crop producer & seller across Karnataka's rural agro-climatic belts | • List crops with photo proof, weight, grade, & reserve price<br>• Real-time bilateral bidding & counter-negotiation<br>• Track logistics & dispatch produce<br>• Verify delivery via 6-digit cryptographic OTP<br>• Receive multilingual SMS (Kannada, Hindi, English) | Guaranteed payout, zero middleman cuts, real-time APMC price transparency, protection against post-delivery renegotiations. |
+| **🧑‍🌾 Farmer (Raitha)** | Crop producer & seller across Karnataka's rural agro-climatic belts | • List crops with photo proof, weight, grade, & reserve price<br>• Real-time bilateral bidding & counter-negotiation<br>• Track logistics & dispatch produce<br>• Verify delivery via 6-digit cryptographic OTP<br>• Receive real-time push alerts and email notifications | Guaranteed payout, zero middleman cuts, real-time APMC price transparency, protection against post-delivery renegotiations. |
 | **🏢 Trader (Vyapari)** | Licensed bulk buyer, food processor, or mandi wholesale merchant | • Search & filter verified crop lots by district and grade<br>• Fund multi-tier digital wallet via UPI/Netbanking simulation<br>• Submit binding bids and counter-offers<br>• Assign transporter & submit vehicle details<br>• Raise quality disputes with photo evidence | Direct sourcing from farm gate, verified harvest batches, transparent escrow protection, automated logistics coordination. |
 | **⚖️ APMC Admin & Arbiter** | Karnataka state market yard regulatory officer & quality inspector | • Quasi-judicial dispute arbitration docket<br>• Review high-resolution visual evidence & inspection logs<br>• Issue binding rulings (100% refund, 85/15 split, 100% release)<br>• Broadcast government schemes (PM-KISAN, Raitha Siri)<br>• Monitor district-level mandi trade turnover analytics | Complete auditability, elimination of unlawful physical market cartelization, regulatory compliance, dispute resolution SLA < 48 hours. |
 
@@ -107,9 +107,9 @@ In traditional Indian agricultural commerce—specifically regulated under Karna
 * **Two-Tier Balance Architecture**:
   * `availableBalance`: Liquid capital available for new bids, withdrawals, or top-ups.
   * `lockedBalance`: Capital legally locked in escrow under active purchase contracts.
-* **20% Upfront Escrow Collateral**: Upon bid acceptance, 20% of the total order value is atomically transferred from `availableBalance` to `lockedBalance`.
-* **Double-Entry Financial Journal**: Every balance alteration is backed by an immutable record in `WalletLedger` with audit tags (`DEPOSIT`, `ESCROW_LOCK`, `ESCROW_RELEASE`, `ESCROW_REFUND`, `PENALTY`).
-* **Atomic MongoDB Arithmetic**: All monetary transactions use `$inc` with balance precondition assertions to mathematically prevent double-spending and overdrafts.
+* **100% Full-Value Escrow Lock**: Upon bid acceptance, 100% of the total order value (`agreedRate * cropQuantity`) is atomically transferred from trader's `availableBalance` to `lockedBalance` (`ESCROW_LOCK`).
+* **Double-Entry Financial Journal**: Every balance alteration is backed by an immutable record in `WalletLedger` with audit tags (`TOP_UP`, `BID_LOCK`, `BID_RELEASE`, `ESCROW_LOCK`, `PAYOUT_DISBURSED`, `REFUND`).
+* **Atomic MongoDB Arithmetic**: All monetary transactions use `$inc` with balance precondition assertions (`$gte`) to mathematically prevent double-spending and overdrafts.
 
 ### 4.4 Geo-Logistics, Transporter Assignment & 6-Digit OTP Handshake
 * **Transporter Assignment**: Trader assigns logistics partner with driver name, contact phone number, vehicle registration number, and estimated arrival date.
@@ -128,13 +128,13 @@ In traditional Indian agricultural commerce—specifically regulated under Karna
 ### 4.6 Live Agmarknet Mandi Pricing & Price Alerts
 * **Govt API Integration**: Ingests real-time agricultural mandi arrivals and price points (Minimum, Maximum, Modal) from `data.gov.in` across Karnataka APMCs.
 * **Compound Deduplication**: Indexed by `(market, commodity, variety, arrivalDate)` to maintain historical price curves without duplicate records.
-* **Automated Price Alerts**: Farmers set price thresholds on specific crops. A recurring BullMQ cron evaluates real-time market arrivals and triggers instant in-app and SMS notifications when market rates exceed the farmer's target.
+* **Automated Price Alerts**: Farmers set price thresholds on specific crops. A recurring BullMQ cron evaluates real-time market arrivals and triggers instant in-app and email notifications when market rates exceed the farmer's target.
 
-### 4.7 Multilingual SMS Engine & Real-Time Alerts
-* **Twilio SMS Gateway**: Production SMS dispatch supporting regional languages:
-  * 🟡 **Kannada (ಕನ್ನಡ)**: Localized templates for Karnataka farmers.
-  * 🔵 **Hindi (हिंदी)**: Standard national agricultural terminology.
-  * ⚪ **English**: Formal trade receipts and administrative notices.
+### 4.7 Email Delivery Engine & Real-Time Alerts
+* **SendGrid Email Gateway**: High-deliverability transactional email dispatch:
+  * 🟡 **One-Time Passwords (OTP)**: Cryptographic 6-digit codes for secure account verification and login.
+  * 🔵 **Trade Confirmations**: Immediate transaction receipts and dispute resolutions.
+  * ⚪ **Account Security**: Password resets and verified trader onboarding alerts.
 * **Dual In-App Notification Center**: WebSocket push alerts with persistent MongoDB storage, unread counters, and mark-as-read toggles.
 
 ### 4.8 Government Schemes & Subsidies Registry
@@ -177,7 +177,7 @@ KrishiSetu is structured as a high-performance decoupled client-server architect
           v                                  v                           v
 +--------------------+            +--------------------+        +-------------------+
 |   PERSISTENCE      |            |   CACHE & QUEUE    |        | EXTERNAL SERVICES |
-|  MongoDB 7.0+      |            |  Redis 7.0+        |        |  * Twilio SMS     |
+|  MongoDB 7.0+      |            |  Redis 7.0+        |        |  * SendGrid Email |
 |  * Mongoose 9.6    |            |  * BullMQ 5.79     |        |  * Cloudinary CDN |
 |  * 2dsphere Geo    |            |  * Repeatable Jobs |        |  * Data.gov.in    |
 |  * Double Ledger   |            |  * Fallback Mock   |        |  * OpenWeatherMap |
@@ -193,7 +193,7 @@ KrishiSetu implements a dual-routing architecture in `backend/server.js`. All se
 To ensure sub-second API response times and zero blocking on long-running tasks, KrishiSetu delegates heavy compute to BullMQ distributed queues:
 1. `priceAlertQueue`: Executes every 30 minutes, evaluating active farmer price alerts against Agmarknet mandi arrivals.
 2. `bidExpiryQueue`: Scans accepted bids every 60 minutes. Cancels unpaid contracts exceeding 48 hours and penalizes non-compliant traders.
-3. `smsNotificationQueue`: Handles asynchronous SMS dispatch with retry backoff to prevent third-party gateway latency from stalling HTTP request threads.
+3. `emailNotificationQueue`: Handles asynchronous email and OTP dispatch with retry backoff to prevent third-party gateway latency from stalling HTTP request threads.
 4. *Graceful In-Memory Fallback*: If external Redis is unreachable, `ioredis-mock` automatically activates, ensuring 100% development continuity without crashing.
 
 ---
@@ -225,7 +225,7 @@ sequenceDiagram
     Trader->>Farmer: 10. Inspect produce & Request Delivery OTP
     Trader->>Platform: 11. Submit Delivery OTP for Verification
     Platform->>Escrow: 12. Unlock 20% Collateral + Settle 100% to Farmer Wallet
-    Platform-->>Farmer: 13. Payout Confirmed (SMS in Kannada + Push Alert)
+    Platform-->>Farmer: 13. Payout Confirmed (Email / Push Alert)
 ```
 
 ### 6.2 Dispute Arbitration State Machine
@@ -265,7 +265,7 @@ When produce grade, weight, or quality does not match contract specifications:
 | **Distributed Queue** | BullMQ | `^5.79.2` | Redis-backed distributed task queue with cron scheduling, automatic retries, backoff strategies, and concurrency control. |
 | **WebSocket Engine** | Socket.io | `^4.8.3` | Sub-50ms bidirectional transport with automated fallback to HTTP long-polling and granular room isolation. |
 | **Media Storage** | Cloudinary SDK | `^2.9.0` | Offloaded image transformations, WebP compression, secure signed uploads, and global CDN delivery. |
-| **SMS Gateway** | Twilio SDK | `^5.12.0` | Carrier-grade SMS delivery with international unicode support for native Kannada (ಕನ್ನಡ) script. |
+| **Email / OTP Engine** | SendGrid API v3 | `^8.1.6` | High-deliverability transactional email delivery with responsive HTML OTP security templates. |
 | **API Documentation** | Swagger UI Express | `^5.0.1` | Interactive OpenAPI 3.0 documentation generated dynamically from JSDoc specifications at `/api-docs`. |
 
 ---
@@ -452,14 +452,11 @@ CLIENT_URL=http://localhost:5173
 SERVER_URL=http://localhost:5000
 USE_REDIS=false
 REDIS_URL=redis://127.0.0.1:6379
-RAZORPAY_KEY_ID=dummy_key_id
-RAZORPAY_KEY_SECRET=dummy_key_secret
 CLOUDINARY_CLOUD_NAME=dummy_cloud
 CLOUDINARY_API_KEY=dummy_key
 CLOUDINARY_API_SECRET=dummy_secret
-TWILIO_ACCOUNT_SID=dummy_sid
-TWILIO_AUTH_TOKEN=dummy_token
-TWILIO_PHONE_NUMBER=+1234567890
+SENDGRID_API_KEY=dummy_sendgrid_key
+SENDGRID_FROM_EMAIL=support@krishisetu.in
 AGMARKNET_API_KEY=dummy_key_for_now
 EOF
 ```

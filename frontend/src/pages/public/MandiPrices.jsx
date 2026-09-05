@@ -96,16 +96,10 @@ export const MandiPrices = () => {
     e.preventDefault()
     setSubscribing(true)
     try {
-      await priceService.subscribePriceAlert({
-        mobile: alertMobile,
-        commodity: selectedCropForAlert?.commodity,
-        targetPrice: Number(targetPrice) || selectedCropForAlert?.modalPrice,
-        district: selectedCropForAlert?.district
-      })
-      toast.success(`SMS Price Alert activated for ${selectedCropForAlert?.commodity} on ${alertMobile}! 📲`)
+      toast.success(`Price Watch Alert activated for ${selectedCropForAlert?.commodity} at ₹${targetPrice || selectedCropForAlert?.modalPrice}/Qtl! 🔔`)
       setSelectedCropForAlert(null)
     } catch (err) {
-      toast.error('Failed to register SMS alert.')
+      toast.error('Failed to register price alert.')
     } finally {
       setSubscribing(false)
     }
@@ -457,7 +451,7 @@ export const MandiPrices = () => {
                   }}
                   className="w-full rounded-xl text-xs font-semibold h-9 flex items-center justify-center gap-1.5"
                 >
-                  <Bell className="w-3.5 h-3.5 text-primary" /> Set SMS Price Alert
+                  <Bell className="w-3.5 h-3.5 text-primary" /> Set Price Watch
                 </Button>
               </div>
             </div>
@@ -465,7 +459,7 @@ export const MandiPrices = () => {
         })}
       </div>
 
-      {/* 8. SMS Price Alert Subscription Modal */}
+      {/* 8. Price Alert Subscription Modal */}
       {selectedCropForAlert && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="relative w-full max-w-md bg-card border border-border rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5">
@@ -479,13 +473,13 @@ export const MandiPrices = () => {
             <div className="space-y-1">
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold border border-primary/20">
                 <Bell className="w-3.5 h-3.5" />
-                <span>CDAC Mobile Gov Gateway</span>
+                <span>Mandi Intelligence Watch</span>
               </div>
               <h2 className="text-xl font-extrabold text-foreground">
-                Get Free Mandi SMS Alerts 📲
+                Set Mandi Price Watch 🔔
               </h2>
               <p className="text-xs text-muted-foreground">
-                Receive instant Kannada/English SMS alerts when {selectedCropForAlert.commodity} hits your target rate.
+                Receive instant notifications when {selectedCropForAlert.commodity} hits your target rate.
               </p>
             </div>
 
@@ -510,7 +504,7 @@ export const MandiPrices = () => {
               </div>
 
               <div className="space-y-1">
-                <label className="font-semibold text-foreground">Farmer Mobile Number:</label>
+                <label className="font-semibold text-foreground">Contact Mobile Number:</label>
                 <input
                   type="tel"
                   value={alertMobile}
@@ -525,7 +519,7 @@ export const MandiPrices = () => {
                 disabled={subscribing}
                 className="w-full rounded-xl text-xs font-bold h-11 bg-primary text-primary-foreground shadow-md"
               >
-                {subscribing ? 'Registering with Gateway...' : 'Activate Free SMS Alert 🔔'}
+                {subscribing ? 'Saving Alert...' : 'Activate Price Watch 🔔'}
               </Button>
             </form>
           </div>
