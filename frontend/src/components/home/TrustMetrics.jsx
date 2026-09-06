@@ -1,4 +1,5 @@
 import { Building2, DollarSign, Sprout, ShieldCheck } from 'lucide-react'
+import { ScrollReveal } from '@/components/common/ScrollReveal'
 
 export const TrustMetrics = () => {
   const metrics = [
@@ -37,15 +38,18 @@ export const TrustMetrics = () => {
   ]
 
   return (
-    <section className="container max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 my-10 sm:my-14">
-      <div className="bg-card rounded-2xl border border-border p-6 sm:p-8 shadow-sm grid grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 divide-y lg:divide-y-0 lg:divide-x divide-border/60">
+    <section className="container max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="bg-card rounded-2xl border border-border p-6 sm:p-8 shadow-sm grid grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 divide-y sm:divide-y-0 lg:divide-x divide-border/60">
         {metrics.map((m, idx) => {
           const Icon = m.icon
           return (
-            <div 
-              key={m.id} 
+            <ScrollReveal
+              key={m.id}
+              variant="fade-up"
+              delay={idx * 100}
+              duration={650}
               className={`space-y-2 text-center flex flex-col items-center justify-center ${
-                idx > 0 && idx % 2 === 0 ? 'pt-6 lg:pt-0' : idx === 1 ? 'pt-0' : idx > 1 ? 'pt-6 lg:pt-0' : ''
+                idx > 0 && idx % 2 === 0 ? 'pt-6 sm:pt-0' : idx === 1 ? 'pt-0' : idx > 1 ? 'pt-6 sm:pt-0' : ''
               }`}
             >
               <div className="w-8 h-8 rounded-lg bg-muted/60 flex items-center justify-center text-muted-foreground mb-1">
@@ -60,7 +64,7 @@ export const TrustMetrics = () => {
               <p className="text-[11px] sm:text-xs text-muted-foreground max-w-[180px] leading-relaxed">
                 {m.subtext}
               </p>
-            </div>
+            </ScrollReveal>
           )
         })}
       </div>

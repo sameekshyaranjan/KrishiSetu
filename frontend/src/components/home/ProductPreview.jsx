@@ -13,13 +13,15 @@ import {
   Lock
 } from 'lucide-react'
 
+import { ScrollReveal } from '@/components/common/ScrollReveal'
+
 export const ProductPreview = () => {
   const [bidAccepted, setBidAccepted] = useState(false)
   const [counterOpen, setCounterOpen] = useState(false)
   const [counterPrice, setCounterPrice] = useState(2190)
 
   return (
-    <div className="w-full max-w-5xl mx-auto mt-12 transition-all duration-300">
+    <ScrollReveal variant="scale-up" duration={650} className="w-full max-w-5xl mx-auto">
       {/* Outer Application Frame */}
       <div className="bg-card rounded-2xl sm:rounded-3xl border border-border/90 shadow-2xl overflow-hidden backdrop-blur-sm">
         
@@ -118,19 +120,26 @@ export const ProductPreview = () => {
             </div>
 
             {/* Active Lot Preview Card */}
-            <div className="p-3.5 sm:p-4 rounded-2xl bg-card border border-border flex items-center justify-between gap-3">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-foreground">40 Quintals • Hybrid Grade-A Tomato</span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold">
-                    Ready for Dispatch
-                  </span>
+            <div className="p-3 sm:p-3.5 rounded-2xl bg-card border border-border flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <img 
+                  src="/images/farmer_harvest_hero.jpg" 
+                  alt="Tomato Harvest Lot" 
+                  className="w-12 h-12 rounded-xl object-cover border border-border shrink-0" 
+                />
+                <div className="space-y-0.5 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-foreground truncate">40 Qtl • Hybrid Grade-A Tomato</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold shrink-0">
+                      Ready for Dispatch
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground flex items-center gap-1.5 truncate">
+                    <span>Farmer: Ramesh Patel, Hosakote</span>
+                    <span>•</span>
+                    <span>Reserve: ₹2,100/Qtl</span>
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                  <span>Farmer: Ramesh Patel, Hosakote Taluk</span>
-                  <span>•</span>
-                  <span>Reserve: ₹2,100/Qtl</span>
-                </p>
               </div>
               <Link 
                 to="/mandi-prices" 
@@ -213,7 +222,7 @@ export const ProductPreview = () => {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setBidAccepted(true)}
-                    className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-extrabold shadow-sm transition-all flex items-center justify-center gap-1.5"
+                    className="flex-1 py-2.5 px-3 min-h-[44px] rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-extrabold shadow-sm transition-all flex items-center justify-center gap-1.5"
                   >
                     <CheckCircle2 className="w-4 h-4" />
                     <span>Accept Bid <span lang="kn" className="font-normal opacity-90">(ಸ್ವೀಕರಿಸಿ)</span></span>
@@ -221,7 +230,7 @@ export const ProductPreview = () => {
 
                   <button
                     onClick={() => setCounterOpen(!counterOpen)}
-                    className="py-2.5 px-3 rounded-xl bg-card hover:bg-muted border border-border text-foreground text-xs font-bold transition-all"
+                    className="py-2.5 px-3 min-h-[44px] rounded-xl bg-card hover:bg-muted border border-border text-foreground text-xs font-bold transition-all flex items-center justify-center"
                   >
                     Counter Offer
                   </button>
@@ -270,7 +279,7 @@ export const ProductPreview = () => {
           </div>
         </div>
       </div>
-    </div>
+    </ScrollReveal>
   )
 }
 
