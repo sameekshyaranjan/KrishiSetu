@@ -3,9 +3,7 @@ const router = express.Router();
 const { getAllStorage, getNearbyStorage } = require('../controllers/storageController');
 const { protect } = require('../middleware/authMiddleware');
 
-// We protect these routes so only registered users can query cold storage
-router.use(protect);
-
+// Public discovery endpoints: anyone (farmers, traders, guests) can view cold storages
 router.get('/', getAllStorage);
 router.get('/nearby', getNearbyStorage);
 

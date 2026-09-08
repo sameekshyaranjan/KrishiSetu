@@ -11,6 +11,7 @@ import AdminLayout from '@/components/admin/AdminLayout'
 import Home from '@/pages/public/Home'
 import MandiPrices from '@/pages/public/MandiPrices'
 import Schemes from '@/pages/public/Schemes'
+import ColdStorage from '@/pages/public/ColdStorage'
 import Login from '@/pages/auth/Login'
 import Register from '@/pages/auth/Register'
 import FarmerRegister from '@/pages/auth/FarmerRegister'
@@ -52,6 +53,7 @@ export const AppRoutes = () => {
         <Route path="/" element={<Home />} />
         <Route path="/mandi-prices" element={<MandiPrices />} />
         <Route path="/schemes" element={<Schemes />} />
+        <Route path="/cold-storage" element={<ColdStorage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/register" element={<Register />} />

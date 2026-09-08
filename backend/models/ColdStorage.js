@@ -48,6 +48,40 @@ const coldStorageSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  chamberType: {
+    type: String,
+    default: 'Multi-Commodity'
+  },
+  temperatureRange: {
+    type: String,
+    default: '2°C to 8°C'
+  },
+  commoditiesSupported: {
+    type: [String],
+    default: ['Potatoes', 'Onions', 'Vegetables', 'Fruits']
+  },
+  availableCapacity: {
+    type: Number, // In Metric Tons
+    default: function() {
+      return Math.round(this.capacity * 0.75);
+    }
+  },
+  isSolarPowered: {
+    type: Boolean,
+    default: false
+  },
+  managerName: {
+    type: String,
+    default: 'Facility Operations Desk'
+  },
+  operatingHours: {
+    type: String,
+    default: '24/7 Operations'
+  },
+  rating: {
+    type: Number,
+    default: 4.6
+  },
   location: {
     type: {
       type: String,

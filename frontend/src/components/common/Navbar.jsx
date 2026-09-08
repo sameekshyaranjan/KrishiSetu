@@ -13,7 +13,8 @@ import {
   LayoutDashboard, 
   ShieldCheck, 
   Briefcase,
-  CloudSun
+  CloudSun,
+  Snowflake
 } from 'lucide-react'
 
 export const Navbar = () => {
@@ -71,6 +72,12 @@ export const Navbar = () => {
             <span className="flex items-center gap-1.5">
               <BookOpen className="w-4 h-4 text-amber-500" />
               Govt Schemes
+            </span>
+          </NavLink>
+          <NavLink to="/cold-storage" className={navLinkClasses}>
+            <span className="flex items-center gap-1.5">
+              <Snowflake className="w-4 h-4 text-cyan-500" />
+              Cold Storage
             </span>
           </NavLink>
           <NavLink to="/farmer/weather" className={navLinkClasses}>
@@ -164,6 +171,14 @@ export const Navbar = () => {
               className="px-3 py-2 rounded-lg text-sm font-medium text-foreground hover:bg-muted"
             >
               Government Schemes
+            </Link>
+            <Link
+              to="/cold-storage"
+              onClick={() => setIsOpen(false)}
+              className="px-3 py-2 rounded-lg text-sm font-medium text-foreground hover:bg-muted flex items-center gap-2"
+            >
+              <Snowflake className="w-4 h-4 text-cyan-500" />
+              <span>Cold Storage Network</span>
             </Link>
             <Link
               to="/farmer/weather"

@@ -48,6 +48,11 @@ export const Footer = () => {
                 </Link>
               </li>
               <li>
+                <Link to="/cold-storage" className="hover:text-primary transition-colors">
+                  Cold Storage & Warehouses
+                </Link>
+              </li>
+              <li>
                 <Link to="/register" className="hover:text-primary transition-colors">
                   Farmer / Trader Onboarding
                 </Link>
