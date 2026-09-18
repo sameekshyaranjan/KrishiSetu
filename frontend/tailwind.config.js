@@ -50,8 +50,27 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // KrishiSetu semantic tokens — driven from CSS vars to match Lovable exactly
+        trader: {
+          DEFAULT: "hsl(var(--trader))",
+          foreground: "hsl(var(--trader-foreground))",
+        },
+        market: {
+          DEFAULT: "hsl(var(--market))",
+          foreground: "hsl(var(--market-foreground))",
+        },
+        "surface-strong": {
+          DEFAULT: "hsl(var(--surface-strong))",
+          foreground: "hsl(var(--surface-strong-foreground))",
+        },
+      },
+      fontFamily: {
+        // Matches Lovable: --font-display: "Newsreader", --font-sans: "Manrope"
+        display: ["Newsreader", "serif"],
+        sans: ["Manrope", "sans-serif"],
       },
       borderRadius: {
+        // --radius: 0.375rem (Lovable), derived values match Lovable @theme inline
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
@@ -65,10 +84,20 @@ export default {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        // Lovable persona section animation
+        "fade-in": {
+          from: { opacity: "0", transform: "translateY(8px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "fade-in": "fade-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both",
+      },
+      // h-18 utility used in header (Lovable: grid h-18)
+      height: {
+        "18": "4.5rem",
       },
     },
   },

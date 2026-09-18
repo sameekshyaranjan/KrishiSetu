@@ -3,28 +3,69 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Design tokens — ported from Lovable KrishiSetu Connect styles.css.
+ * Lovable uses Tailwind v4 oklch values; translated to HSL for Tailwind v3.
+ * oklch source values preserved as comments.
+ */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* --radius: 0.375rem */
+    --radius: 0.375rem;
+
+    /* --background: oklch(0.985 0.006 95) → warm near-white */
+    --background: 48 40% 97%;
+    /* --foreground: oklch(0.2 0.025 145) → very dark green */
+    --foreground: 145 11% 14%;
+
+    /* --card: oklch(1 0 0) → pure white */
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 145 11% 14%;
+
+    /* --popover: oklch(1 0 0) */
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 158 64% 32%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
+
+    /* --primary: oklch(0.46 0.16 145) → forest green */
+    --primary: 145 55% 28%;
+    /* --primary-foreground: oklch(0.985 0.006 95) */
+    --primary-foreground: 48 40% 97%;
+
+    /* --secondary: oklch(0.95 0.02 97) → warm off-white */
+    --secondary: 54 38% 93%;
+    /* --secondary-foreground: oklch(0.25 0.05 140) */
+    --secondary-foreground: 140 18% 16%;
+
+    /* --muted: oklch(0.955 0.008 95) */
+    --muted: 50 25% 94%;
+    /* --muted-foreground: oklch(0.48 0.025 145) */
+    --muted-foreground: 145 10% 40%;
+
+    /* --accent: oklch(0.94 0.035 90) */
+    --accent: 50 50% 91%;
+    --accent-foreground: 140 17% 18%;
+
+    /* --destructive: oklch(0.577 0.245 27.325) */
+    --destructive: 0 72% 51%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 158 64% 32%;
-    --radius: 0.75rem;
+
+    /* --border: oklch(0.91 0.012 245) → cool light grey */
+    --border: 214 20% 88%;
+    --input: 214 20% 88%;
+    --ring: 145 55% 28%;
+
+    /* --trader: oklch(0.77 0.17 70) → amber/golden-orange */
+    --trader: 38 90% 58%;
+    --trader-foreground: 30 30% 14%;
+
+    /* --market: oklch(0.93 0.04 145) → light mint green */
+    --market: 145 50% 90%;
+    --market-foreground: 145 52% 25%;
+
+    /* --surface-strong: oklch(0.22 0.05 145) → near-black forest green.
+       Calibrated against Lovable screenshot: deep dark green overlay on hero. */
+    --surface-strong: 145 32% 11%;
+    --surface-strong-foreground: 48 40% 97%;
   }
 
   .dark {
@@ -34,7 +75,7 @@
     --card-foreground: 210 40% 98%;
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
-    --primary: 158 64% 42%;
+    --primary: 145 55% 38%;
     --primary-foreground: 222.2 47.4% 11.2%;
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
@@ -46,7 +87,13 @@
     --destructive-foreground: 210 40% 98%;
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 158 64% 42%;
+    --ring: 145 55% 38%;
+    --trader: 38 90% 58%;
+    --trader-foreground: 30 30% 14%;
+    --market: 145 50% 90%;
+    --market-foreground: 145 52% 25%;
+    --surface-strong: 145 32% 11%;
+    --surface-strong-foreground: 48 40% 97%;
   }
 }
 
@@ -56,12 +103,87 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
+    font-family: "Manrope", sans-serif;
+    letter-spacing: 0;
+    text-rendering: optimizeLegibility;
     overflow-x: hidden;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  ::selection {
+    background: hsl(var(--primary) / 0.24);
   }
 }
 
 /* ============================================================
-   PREMIUM VIEWPORT SCROLL REVEAL (STRIPE / APPLE SPECIFICATION)
+   LOVABLE EDITORIAL DESIGN SYSTEM UTILITIES
+   ============================================================ */
+
+.font-display {
+  font-family: "Newsreader", serif;
+}
+
+/* Vertical grid lines — market section background */
+.market-grid {
+  background-image: linear-gradient(
+    to right,
+    hsl(var(--border) / 0.42) 1px,
+    transparent 1px
+  );
+  background-size: 25% 100%;
+}
+
+/* Hero overlay gradient.
+   Matches Lovable screenshot: left side nearly fully dark (farmer text area),
+   fades to transparent on the right (farmer face + tomatoes visible).
+   Source: Lovable styles.css @utility hero-shade, with calibrated stop values. */
+.hero-shade {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--surface-strong) / 0.96) 0%,
+    hsl(var(--surface-strong) / 0.92) 28%,
+    hsl(var(--surface-strong) / 0.70) 50%,
+    hsl(var(--surface-strong) / 0.08) 76%,
+    transparent 88%
+  );
+}
+
+/* Mandi rates ticker */
+@keyframes ticker {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.ticker-track {
+  width: max-content;
+  display: flex;
+  animation: ticker 30s linear infinite;
+}
+
+.ticker-track:hover {
+  animation-play-state: paused;
+}
+
+/* Persona section fade-in */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ============================================================
+   SCROLL REVEAL & PROGRESSIVE DISCLOSURE SYSTEM
    ============================================================ */
 .sr-item {
   opacity: 0;
@@ -91,3 +213,76 @@
 .sr-item.sr-fade.sr-visible {
   transform: none !important;
 }
+
+/* Modern progressive scroll classes */
+.reveal-init {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+.reveal-active {
+  opacity: 1 !important;
+  transform: translateY(0) !important;
+}
+
+.reveal-scale-init {
+  opacity: 0;
+  transform: translateY(24px) scale(0.96);
+  transition: opacity 0.85s cubic-bezier(0.16, 1, 0.3, 1), transform 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+.reveal-scale-active {
+  opacity: 1 !important;
+  transform: translateY(0) scale(1) !important;
+}
+
+.reveal-slide-left-init {
+  opacity: 0;
+  transform: translateX(-32px);
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+.reveal-slide-left-active {
+  opacity: 1 !important;
+  transform: translateX(0) !important;
+}
+
+.reveal-slide-right-init {
+  opacity: 0;
+  transform: translateX(32px);
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+.reveal-slide-right-active {
+  opacity: 1 !important;
+  transform: translateX(0) !important;
+}
+
+/* ============================================================
+   SCROLL POPPING SYSTEM — Items pop into view progressively
+   ============================================================ */
+.scroll-pop {
+  opacity: 0;
+  transform: scale(0.88) translateY(32px);
+  transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1), transform 0.65s cubic-bezier(0.34, 1.45, 0.64, 1);
+  will-change: opacity, transform;
+}
+
+.scroll-pop.is-popped {
+  opacity: 1 !important;
+  transform: scale(1) translateY(0) !important;
+}
+
+.pop-delay-1 { transition-delay: 75ms; }
+.pop-delay-2 { transition-delay: 150ms; }
+.pop-delay-3 { transition-delay: 225ms; }
+.pop-delay-4 { transition-delay: 300ms; }
+.pop-delay-5 { transition-delay: 375ms; }
+
+
+
