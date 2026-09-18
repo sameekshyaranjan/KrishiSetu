@@ -167,17 +167,17 @@ export const TraderRegister = () => {
         </Link>
       </div>
 
-      <div className="bg-card border border-border rounded-3xl p-6 sm:p-10 shadow-xl space-y-8">
+      <div className="bg-card border border-border rounded-md p-6 sm:p-8 shadow-xs space-y-6">
         
         {/* Header */}
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 border border-amber-500/20 mb-1">
-            <Briefcase className="w-6 h-6" />
+          <div className="size-9 rounded-sm bg-trader/15 text-trader flex items-center justify-center mx-auto">
+            <Briefcase className="size-5" />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
+          <h1 className="font-display text-3xl font-normal text-foreground">
             Trader & Buyer Registration
           </h1>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground max-w-sm mx-auto">
             {step === 1 
               ? 'Register your trading firm to participate in direct farm-gate crop auctions' 
               : `Enter the 6-digit verification code sent to ${submittedEmail}`
@@ -191,23 +191,23 @@ export const TraderRegister = () => {
             
             {/* 1. Authorised Representative */}
             <div className="space-y-4">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5 border-b border-border pb-2">
-                <User className="w-4 h-4 text-amber-600" /> 1. Authorised Representative
+              <h3 className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground flex items-center gap-1.5 border-b border-border pb-2">
+                <User className="size-3.5 text-trader" /> 1. Authorised Representative
               </h3>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground">Contact Person Name *</label>
+                  <label className="text-xs font-semibold text-foreground">Contact Person Name *</label>
                   <input
                     {...register('name', { required: 'Name is required' })}
                     placeholder="e.g. Suresh Hegde"
-                    className="w-full h-10 px-3 rounded-xl bg-background border border-border text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+                    className="w-full h-10 px-3 rounded-md bg-background border border-border text-xs focus:outline-none focus:ring-1 focus:ring-trader font-medium"
                   />
-                  {errors.name && <p className="text-[11px] text-rose-500">{errors.name.message}</p>}
+                  {errors.name && <p className="text-[11px] text-destructive">{errors.name.message}</p>}
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground">Mobile Phone Number *</label>
+                  <label className="text-xs font-semibold text-foreground">Mobile Phone Number *</label>
                   <div className="relative">
                     <span className="absolute left-3 top-2.5 text-xs text-muted-foreground font-mono">+91</span>
                     <input
@@ -217,16 +217,16 @@ export const TraderRegister = () => {
                       })}
                       placeholder="9876543210"
                       maxLength={10}
-                      className="w-full h-10 pl-12 pr-3 rounded-xl bg-background border border-border text-sm font-mono focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+                      className="w-full h-10 pl-11 pr-3 rounded-md bg-background border border-border text-xs font-mono focus:outline-none focus:ring-1 focus:ring-trader"
                     />
                   </div>
-                  {errors.phone && <p className="text-[11px] text-rose-500">{errors.phone.message}</p>}
+                  {errors.phone && <p className="text-[11px] text-destructive">{errors.phone.message}</p>}
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground">Official Email Address *</label>
+                  <label className="text-xs font-semibold text-foreground">Official Email Address *</label>
                   <input
                     type="email"
                     {...register('email', { 
@@ -234,13 +234,13 @@ export const TraderRegister = () => {
                       pattern: { value: /^\S+@\S+$/i, message: 'Enter valid email' }
                     })}
                     placeholder="trader@company.com"
-                    className="w-full h-10 px-3 rounded-xl bg-background border border-border text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+                    className="w-full h-10 px-3 rounded-md bg-background border border-border text-xs focus:outline-none focus:ring-1 focus:ring-trader"
                   />
-                  {errors.email && <p className="text-[11px] text-rose-500">{errors.email.message}</p>}
+                  {errors.email && <p className="text-[11px] text-destructive">{errors.email.message}</p>}
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground">Password (min 6 chars) *</label>
+                  <label className="text-xs font-semibold text-foreground">Password (min 6 chars) *</label>
                   <input
                     type="password"
                     {...register('password', { 
@@ -248,32 +248,32 @@ export const TraderRegister = () => {
                       minLength: { value: 6, message: 'Minimum 6 characters' }
                     })}
                     placeholder="••••••••"
-                    className="w-full h-10 px-3 rounded-xl bg-background border border-border text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+                    className="w-full h-10 px-3 rounded-md bg-background border border-border text-xs focus:outline-none focus:ring-1 focus:ring-trader font-mono"
                   />
-                  {errors.password && <p className="text-[11px] text-rose-500">{errors.password.message}</p>}
+                  {errors.password && <p className="text-[11px] text-destructive">{errors.password.message}</p>}
                 </div>
               </div>
             </div>
 
             {/* 2. Business & APMC Details */}
             <div className="space-y-4 pt-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5 border-b border-border pb-2">
-                <Building2 className="w-4 h-4 text-amber-600" /> 2. Business & License Details
+              <h3 className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground flex items-center gap-1.5 border-b border-border pb-2">
+                <Building2 className="size-3.5 text-trader" /> 2. Business & License Details
               </h3>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-foreground">Trading Firm / Company Name *</label>
+                <label className="text-xs font-semibold text-foreground">Trading Firm / Company Name *</label>
                 <input
                   {...register('companyName', { required: 'Company name is required' })}
                   placeholder="e.g. Karnataka Agro Traders Pvt Ltd"
-                  className="w-full h-10 px-3 rounded-xl bg-background border border-border text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+                  className="w-full h-10 px-3 rounded-md bg-background border border-border text-xs focus:outline-none focus:ring-1 focus:ring-trader font-medium"
                 />
-                {errors.companyName && <p className="text-[11px] text-rose-500">{errors.companyName.message}</p>}
+                {errors.companyName && <p className="text-[11px] text-destructive">{errors.companyName.message}</p>}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground">GSTIN Number *</label>
+                  <label className="text-xs font-semibold text-foreground">GSTIN Number *</label>
                   <input
                     {...register('gstNumber', { 
                       required: 'GSTIN is required',
@@ -283,41 +283,41 @@ export const TraderRegister = () => {
                       }
                     })}
                     placeholder="29AAAAA0000A1Z5"
-                    className="w-full h-10 px-3 rounded-xl bg-background border border-border text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+                    className="w-full h-10 px-3 rounded-md bg-background border border-border text-xs font-mono uppercase focus:outline-none focus:ring-1 focus:ring-trader"
                   />
-                  {errors.gstNumber && <p className="text-[11px] text-rose-500">{errors.gstNumber.message}</p>}
+                  {errors.gstNumber && <p className="text-[11px] text-destructive">{errors.gstNumber.message}</p>}
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground">APMC License Number *</label>
+                  <label className="text-xs font-semibold text-foreground">APMC License Number *</label>
                   <input
                     {...register('licenseNumber', { required: 'APMC License number is required' })}
                     placeholder="e.g. APMC-HUB-2024-884"
-                    className="w-full h-10 px-3 rounded-xl bg-background border border-border text-sm font-mono focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+                    className="w-full h-10 px-3 rounded-md bg-background border border-border text-xs font-mono focus:outline-none focus:ring-1 focus:ring-trader"
                   />
-                  {errors.licenseNumber && <p className="text-[11px] text-rose-500">{errors.licenseNumber.message}</p>}
+                  {errors.licenseNumber && <p className="text-[11px] text-destructive">{errors.licenseNumber.message}</p>}
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-foreground">Registered Business Address *</label>
+                <label className="text-xs font-semibold text-foreground">Registered Business Address *</label>
                 <input
                   {...register('businessAddress', { required: 'Business address is required' })}
                   placeholder="e.g. Shop #42, APMC Yard, Amargol, Hubli, Karnataka"
-                  className="w-full h-10 px-3 rounded-xl bg-background border border-border text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+                  className="w-full h-10 px-3 rounded-md bg-background border border-border text-xs focus:outline-none focus:ring-1 focus:ring-trader font-medium"
                 />
-                {errors.businessAddress && <p className="text-[11px] text-rose-500">{errors.businessAddress.message}</p>}
+                {errors.businessAddress && <p className="text-[11px] text-destructive">{errors.businessAddress.message}</p>}
               </div>
             </div>
 
             {/* 3. Operating APMC Mandis */}
             <div className="space-y-3 pt-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5 border-b border-border pb-2">
-                <MapPin className="w-4 h-4 text-amber-600" /> 3. Operating APMC Markets
+              <h3 className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground flex items-center gap-1.5 border-b border-border pb-2">
+                <MapPin className="size-3.5 text-trader" /> 3. Operating APMC Markets
               </h3>
 
               <div className="space-y-2">
-                <label className="text-xs font-medium text-foreground block">
+                <label className="text-xs font-semibold text-foreground block">
                   Select Primary APMC Markets (Tap to toggle):
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -328,9 +328,9 @@ export const TraderRegister = () => {
                         type="button"
                         key={district}
                         onClick={() => toggleDistrict(district)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                        className={`px-3 py-1.5 rounded-sm text-xs font-semibold transition-all cursor-pointer ${
                           isSelected
-                            ? 'bg-amber-500 text-white font-semibold shadow-sm scale-105'
+                            ? 'bg-trader text-trader-foreground shadow-xs'
                             : 'bg-muted/70 text-muted-foreground hover:bg-muted border border-border'
                         }`}
                       >
@@ -346,11 +346,13 @@ export const TraderRegister = () => {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full h-12 rounded-2xl text-base font-bold shadow-lg mt-6 bg-amber-500 text-white hover:bg-amber-600"
+              variant="trader"
+              size="lg"
+              className="w-full h-10 rounded-sm text-xs font-bold shadow-xs mt-6"
             >
               {loading ? (
                 <span className="flex items-center gap-2">
-                  <Loader2 className="w-5 h-5 animate-spin" /> Submitting Verification Details...
+                  <Loader2 className="size-4 animate-spin" /> Submitting Verification Details...
                 </span>
               ) : (
                 'Send Verification OTP'
@@ -363,7 +365,7 @@ export const TraderRegister = () => {
         {step === 2 && (
           <form onSubmit={onOtpSubmit} className="space-y-6 max-w-sm mx-auto">
             <div className="space-y-2 text-center">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block">
                 Enter 6-Digit OTP Code
               </label>
               <input
@@ -373,29 +375,31 @@ export const TraderRegister = () => {
                 placeholder="123456"
                 maxLength={6}
                 autoFocus
-                className="w-full h-14 text-center tracking-[0.5em] text-2xl font-mono font-extrabold rounded-2xl bg-background border-2 border-amber-500/50 focus:outline-none focus:ring-4 focus:ring-amber-500/20 shadow-inner"
+                className="w-full h-12 text-center tracking-[0.5em] text-xl font-mono font-bold rounded-md bg-background border border-trader/40 focus:outline-none focus:ring-1 focus:ring-trader"
               />
             </div>
 
             <Button
               type="submit"
               disabled={loading || otp.length < 6}
-              className="w-full h-12 rounded-2xl font-bold shadow-lg bg-amber-500 text-white hover:bg-amber-600"
+              variant="trader"
+              size="lg"
+              className="w-full h-10 rounded-sm text-xs font-bold shadow-xs"
             >
               {loading ? (
                 <span className="flex items-center gap-2">
-                  <Loader2 className="w-5 h-5 animate-spin" /> Activating Trader Account...
+                  <Loader2 className="size-4 animate-spin" /> Activating Trader Account...
                 </span>
               ) : (
                 'Verify & Complete Registration'
               )}
             </Button>
 
-            <div className="flex items-center justify-between text-xs pt-2">
+            <div className="flex items-center justify-between text-xs pt-2 border-t border-border">
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className="text-muted-foreground hover:text-foreground font-medium"
+                className="text-muted-foreground hover:text-foreground underline cursor-pointer"
               >
                 ← Change Form Details
               </button>
@@ -405,7 +409,7 @@ export const TraderRegister = () => {
                 onClick={handleResendOtp}
                 disabled={!canResend || loading}
                 className={`font-semibold ${
-                  canResend ? 'text-amber-600 hover:underline' : 'text-muted-foreground/60 cursor-not-allowed'
+                  canResend ? 'text-trader hover:underline cursor-pointer' : 'text-muted-foreground/60 cursor-not-allowed'
                 }`}
               >
                 {canResend ? 'Resend OTP' : `Resend in ${resendTimer}s`}

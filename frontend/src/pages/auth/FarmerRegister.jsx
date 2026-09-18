@@ -179,14 +179,14 @@ export const FarmerRegister = () => {
       </div>
 
       {/* Main Card Container */}
-      <div className="bg-card border border-border rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
+      <div className="bg-card border border-border rounded-md p-6 sm:p-8 shadow-xs space-y-6">
         
         {/* Header */}
         <div className="text-center space-y-2">
-          <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mx-auto">
-            <Sprout className="w-6 h-6" />
+          <div className="size-9 rounded-sm bg-primary text-primary-foreground flex items-center justify-center mx-auto">
+            <Sprout className="size-5" />
           </div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-foreground">
+          <h1 className="font-display text-3xl font-normal text-foreground">
             {step === 1 ? 'Register as Farmer (ರೈತ)' : 'Verify Mobile / Email OTP'}
           </h1>
           <p className="text-xs text-muted-foreground max-w-sm mx-auto">
@@ -203,23 +203,23 @@ export const FarmerRegister = () => {
             
             {/* 1. Personal & Contact Details */}
             <div className="space-y-4">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5 border-b border-border pb-2">
-                <User className="w-4 h-4 text-primary" /> 1. Personal Information
+              <h3 className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground flex items-center gap-1.5 border-b border-border pb-2">
+                <User className="size-3.5 text-primary" /> 1. Personal Information
               </h3>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground">Full Name (ರೈತರ ಹೆಸರು) *</label>
+                  <label className="text-xs font-semibold text-foreground">Full Name (ರೈತರ ಹೆಸರು) *</label>
                   <input
                     {...register('name', { required: 'Full name is required' })}
                     placeholder="e.g. Ramesh Gowda"
-                    className="w-full h-10 px-3 rounded-xl bg-background border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    className="w-full h-10 px-3 rounded-md bg-background border border-border text-xs focus:outline-none focus:ring-1 focus:ring-primary font-medium"
                   />
-                  {errors.name && <p className="text-[11px] text-rose-500">{errors.name.message}</p>}
+                  {errors.name && <p className="text-[11px] text-destructive">{errors.name.message}</p>}
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground">Phone Number *</label>
+                  <label className="text-xs font-semibold text-foreground">Phone Number *</label>
                   <div className="relative">
                     <span className="absolute left-3 top-2.5 text-xs text-muted-foreground font-mono">+91</span>
                     <input
@@ -229,16 +229,16 @@ export const FarmerRegister = () => {
                       })}
                       placeholder="9845123456"
                       maxLength={10}
-                      className="w-full h-10 pl-12 pr-3 rounded-xl bg-background border border-border text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/40"
+                      className="w-full h-10 pl-11 pr-3 rounded-md bg-background border border-border text-xs font-mono focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                   </div>
-                  {errors.phone && <p className="text-[11px] text-rose-500">{errors.phone.message}</p>}
+                  {errors.phone && <p className="text-[11px] text-destructive">{errors.phone.message}</p>}
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground">Email Address *</label>
+                  <label className="text-xs font-semibold text-foreground">Email Address *</label>
                   <input
                     type="email"
                     {...register('email', { 
@@ -246,13 +246,13 @@ export const FarmerRegister = () => {
                       pattern: { value: /^\S+@\S+$/i, message: 'Enter valid email' }
                     })}
                     placeholder="farmer@example.com"
-                    className="w-full h-10 px-3 rounded-xl bg-background border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    className="w-full h-10 px-3 rounded-md bg-background border border-border text-xs focus:outline-none focus:ring-1 focus:ring-primary"
                   />
-                  {errors.email && <p className="text-[11px] text-rose-500">{errors.email.message}</p>}
+                  {errors.email && <p className="text-[11px] text-destructive">{errors.email.message}</p>}
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground">Password (min 6 chars) *</label>
+                  <label className="text-xs font-semibold text-foreground">Password (min 6 chars) *</label>
                   <input
                     type="password"
                     {...register('password', { 
@@ -260,34 +260,34 @@ export const FarmerRegister = () => {
                       minLength: { value: 6, message: 'Minimum 6 characters' }
                     })}
                     placeholder="••••••••"
-                    className="w-full h-10 px-3 rounded-xl bg-background border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    className="w-full h-10 px-3 rounded-md bg-background border border-border text-xs focus:outline-none focus:ring-1 focus:ring-primary font-mono"
                   />
-                  {errors.password && <p className="text-[11px] text-rose-500">{errors.password.message}</p>}
+                  {errors.password && <p className="text-[11px] text-destructive">{errors.password.message}</p>}
                 </div>
               </div>
             </div>
 
             {/* 2. Farm Location */}
             <div className="space-y-4 pt-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5 border-b border-border pb-2">
-                <MapPin className="w-4 h-4 text-primary" /> 2. Farm Location & Bhoomi Land Registry
+              <h3 className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground flex items-center gap-1.5 border-b border-border pb-2">
+                <MapPin className="size-3.5 text-primary" /> 2. Farm Location & Bhoomi Land Registry
               </h3>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground">State</label>
+                  <label className="text-xs font-semibold text-foreground">State</label>
                   <input
                     {...register('state')}
                     readOnly
-                    className="w-full h-10 px-3 rounded-xl bg-muted/50 border border-border text-sm font-medium text-muted-foreground cursor-not-allowed"
+                    className="w-full h-10 px-3 rounded-md bg-muted/50 border border-border text-xs font-medium text-muted-foreground cursor-not-allowed"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground">District *</label>
+                  <label className="text-xs font-semibold text-foreground">District *</label>
                   <select
                     {...register('district', { required: 'Select district' })}
-                    className="w-full h-10 px-3 rounded-xl bg-background border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    className="w-full h-10 px-3 rounded-md bg-background border border-border text-xs focus:outline-none focus:ring-1 focus:ring-primary font-medium"
                   >
                     {KARNATAKA_DISTRICTS.map((d) => (
                       <option key={d} value={d}>{d}</option>
@@ -296,30 +296,30 @@ export const FarmerRegister = () => {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground">Taluk *</label>
+                  <label className="text-xs font-semibold text-foreground">Taluk *</label>
                   <input
                     {...register('taluk', { required: 'Taluk is required' })}
                     placeholder="e.g. Belur"
-                    className="w-full h-10 px-3 rounded-xl bg-background border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    className="w-full h-10 px-3 rounded-md bg-background border border-border text-xs focus:outline-none focus:ring-1 focus:ring-primary font-medium"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground">Village / Locality *</label>
+                  <label className="text-xs font-semibold text-foreground">Village / Locality *</label>
                   <input
                     {...register('village', { required: 'Village name is required' })}
                     placeholder="e.g. Navalgund Village"
-                    className="w-full h-10 px-3 rounded-xl bg-background border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    className="w-full h-10 px-3 rounded-md bg-background border border-border text-xs focus:outline-none focus:ring-1 focus:ring-primary font-medium"
                   />
                 </div>
 
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-medium text-foreground">Bhoomi RTC Survey #</label>
-                    <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
-                      <ShieldCheck className="w-3 h-3" /> Bhoomi Verified 🟢
+                    <label className="text-xs font-semibold text-foreground">Bhoomi RTC Survey #</label>
+                    <span className="text-[10px] text-primary font-bold flex items-center gap-1">
+                      <ShieldCheck className="size-3 text-primary" /> Bhoomi Verified
                     </span>
                   </div>
                   <input
@@ -330,7 +330,7 @@ export const FarmerRegister = () => {
                       setBhoomiVerified(e.target.value.length > 5)
                     }}
                     placeholder="e.g. RTC-HSN-88192"
-                    className="w-full h-10 px-3 rounded-xl bg-background border border-border text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    className="w-full h-10 px-3 rounded-md bg-background border border-border text-xs font-mono focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                 </div>
               </div>
@@ -338,27 +338,27 @@ export const FarmerRegister = () => {
 
             {/* 3. Crop & Farm Profile */}
             <div className="space-y-4 pt-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5 border-b border-border pb-2">
-                <Trees className="w-4 h-4 text-primary" /> 3. Crop & Land Details
+              <h3 className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground flex items-center gap-1.5 border-b border-border pb-2">
+                <Trees className="size-3.5 text-primary" /> 3. Crop & Land Details
               </h3>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground">Total Land Size (Acres) *</label>
+                  <label className="text-xs font-semibold text-foreground">Total Land Size (Acres) *</label>
                   <input
                     type="number"
                     step="0.5"
                     min="0.5"
                     {...register('landSizeAcres', { required: 'Enter land size' })}
-                    className="w-full h-10 px-3 rounded-xl bg-background border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    className="w-full h-10 px-3 rounded-md bg-background border border-border text-xs focus:outline-none focus:ring-1 focus:ring-primary font-medium"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground">Preferred SMS Language</label>
+                  <label className="text-xs font-semibold text-foreground">Preferred SMS Language</label>
                   <select
                     {...register('preferredLanguage')}
-                    className="w-full h-10 px-3 rounded-xl bg-background border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    className="w-full h-10 px-3 rounded-md bg-background border border-border text-xs focus:outline-none focus:ring-1 focus:ring-primary font-medium"
                   >
                     <option value="kannada">ಕನ್ನಡ (Kannada)</option>
                     <option value="hindi">हिन्दी (Hindi)</option>
@@ -368,7 +368,7 @@ export const FarmerRegister = () => {
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-medium text-foreground block">
+                <label className="text-xs font-semibold text-foreground block">
                   Select Crops Grown (Tap to toggle):
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -379,9 +379,9 @@ export const FarmerRegister = () => {
                         type="button"
                         key={crop}
                         onClick={() => toggleCrop(crop)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                        className={`px-3 py-1.5 rounded-sm text-xs font-semibold transition-all cursor-pointer ${
                           isSelected
-                            ? 'bg-primary text-primary-foreground font-semibold shadow-sm scale-105'
+                            ? 'bg-primary text-primary-foreground shadow-xs'
                             : 'bg-muted/70 text-muted-foreground hover:bg-muted border border-border'
                         }`}
                       >
@@ -397,11 +397,13 @@ export const FarmerRegister = () => {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full h-12 rounded-2xl text-base font-bold shadow-lg mt-6"
+              variant="farmer"
+              size="lg"
+              className="w-full h-10 rounded-sm text-xs font-bold shadow-xs mt-6"
             >
               {loading ? (
                 <span className="flex items-center gap-2">
-                  <Loader2 className="w-5 h-5 animate-spin" /> Sending Verification Code...
+                  <Loader2 className="size-4 animate-spin" /> Sending Verification Code...
                 </span>
               ) : (
                 'Send Verification OTP'
@@ -414,7 +416,7 @@ export const FarmerRegister = () => {
         {step === 2 && (
           <form onSubmit={onOtpSubmit} className="space-y-6 max-w-sm mx-auto">
             <div className="space-y-2 text-center">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block">
                 Enter 6-Digit OTP Code
               </label>
               <input
@@ -424,18 +426,20 @@ export const FarmerRegister = () => {
                 onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                 placeholder="123456"
                 autoFocus
-                className="w-full h-14 text-center text-2xl font-mono font-black tracking-widest rounded-2xl bg-background border-2 border-primary/40 focus:border-primary focus:outline-none"
+                className="w-full h-12 text-center text-xl font-mono font-bold tracking-[0.5em] rounded-md bg-background border border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary"
               />
             </div>
 
             <Button
               type="submit"
               disabled={loading || otp.length < 6}
-              className="w-full h-12 rounded-2xl text-base font-bold shadow-lg"
+              variant="farmer"
+              size="lg"
+              className="w-full h-10 rounded-sm text-xs font-bold shadow-xs"
             >
               {loading ? (
                 <span className="flex items-center gap-2">
-                  <Loader2 className="w-5 h-5 animate-spin" /> Verifying Account...
+                  <Loader2 className="size-4 animate-spin" /> Verifying Account...
                 </span>
               ) : (
                 'Verify & Complete Registration'
@@ -443,13 +447,13 @@ export const FarmerRegister = () => {
             </Button>
 
             {/* Resend & Back controls */}
-            <div className="flex items-center justify-between text-xs text-muted-foreground pt-2">
+            <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border">
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className="hover:text-foreground underline transition-colors"
+                className="hover:text-foreground underline transition-colors cursor-pointer"
               >
-                Edit registration details
+                ← Edit registration details
               </button>
 
               <button
