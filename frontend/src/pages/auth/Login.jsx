@@ -169,39 +169,45 @@ export const Login = () => {
   }
 
   return (
-    <div className="py-12 px-4 sm:px-6 lg:px-8 max-w-md mx-auto">
-      <div className="bg-card border border-border rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
+    <div className="py-16 px-4 sm:px-6 lg:px-8 max-w-md mx-auto">
+      <div className="bg-card border border-border rounded-md p-6 sm:p-8 shadow-xs space-y-6">
         
-        {/* Header */}
-        <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-primary/10 text-primary border border-primary/20 mb-1">
-            {authMode === 'admin' ? (
-              <ShieldCheck className="w-6 h-6 text-purple-600" />
-            ) : authMode === 'otp' ? (
-              <Radio className="w-6 h-6 text-amber-500" />
-            ) : (
-              <Sprout className="w-6 h-6 text-primary" />
-            )}
+        {/* Exact Landing Page Brand Header */}
+        <div className="text-center space-y-3">
+          <div className="flex justify-center">
+            <Link to="/" className="flex items-center gap-3" aria-label="KrishiSetu home">
+              <span className="grid size-9 shrink-0 place-items-center rounded-sm bg-primary text-primary-foreground">
+                <Sprout className="size-5" />
+              </span>
+              <div className="text-left">
+                <strong className="block font-display text-2xl leading-none">KrishiSetu</strong>
+                <span className="mt-1 block text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                  Karnataka Agri Exchange
+                </span>
+              </div>
+            </Link>
           </div>
           
-          <h1 className="text-2xl font-extrabold text-foreground tracking-tight">
-            {authMode === 'admin' ? 'Admin Portal Access' : 'Sign in to KrishiSetu'}
-          </h1>
-          <p className="text-xs text-muted-foreground">
-            {authMode === 'admin' 
-              ? 'Restricted access for system administrators & APMC moderators' 
-              : 'Direct Farmer-Trader Marketplace & Mandi Rates'
-            }
-          </p>
+          <div>
+            <h1 className="font-display text-3xl font-normal text-foreground">
+              {authMode === 'admin' ? 'Admin Portal Access' : 'Sign in to KrishiSetu'}
+            </h1>
+            <p className="text-xs text-muted-foreground mt-1">
+              {authMode === 'admin' 
+                ? 'Restricted access for system administrators & APMC moderators' 
+                : 'Direct Farmer-Trader Marketplace & Mandi Rates'
+              }
+            </p>
+          </div>
         </div>
 
         {/* Auth Mode Tabs */}
-        <div className="grid grid-cols-3 gap-1 bg-muted/60 p-1 rounded-xl border border-border text-xs font-semibold">
+        <div className="grid grid-cols-3 gap-1 bg-muted/60 p-1 rounded-sm border border-border text-xs font-semibold">
           <button
             type="button"
             onClick={() => { setAuthMode('password'); setOtpSent(false); }}
-            className={`py-1.5 rounded-lg transition-all ${
-              authMode === 'password' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            className={`py-1.5 rounded-sm transition-all cursor-pointer ${
+              authMode === 'password' ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             Password
@@ -209,8 +215,8 @@ export const Login = () => {
           <button
             type="button"
             onClick={() => { setAuthMode('otp'); setOtpSent(false); }}
-            className={`py-1.5 rounded-lg transition-all ${
-              authMode === 'otp' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            className={`py-1.5 rounded-sm transition-all cursor-pointer ${
+              authMode === 'otp' ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             OTP Login
@@ -218,11 +224,11 @@ export const Login = () => {
           <button
             type="button"
             onClick={() => { setAuthMode('admin'); setOtpSent(false); }}
-            className={`py-1.5 rounded-lg transition-all ${
-              authMode === 'admin' ? 'bg-card text-purple-600 shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            className={`py-1.5 rounded-sm transition-all cursor-pointer ${
+              authMode === 'admin' ? 'bg-card text-primary shadow-xs font-bold' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            🛡️ Admin
+            Admin
           </button>
         </div>
 
@@ -230,23 +236,23 @@ export const Login = () => {
         {authMode === 'password' && (
           <form onSubmit={handleSubmit(onPasswordSubmit)} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-foreground">Email Address</label>
+              <label className="text-xs font-semibold text-foreground">Email Address</label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
                 <input
                   type="email"
                   {...register('email', { required: 'Email is required' })}
                   placeholder="farmer1@krishisetu.com"
-                  className="w-full h-10 pl-9 pr-3 rounded-xl bg-background border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  className="w-full h-10 pl-9 pr-3 rounded-md bg-background border border-border text-xs focus:outline-none focus:ring-1 focus:ring-primary"
                 />
               </div>
-              {errors.email && <p className="text-[11px] text-rose-500">{errors.email.message}</p>}
+              {errors.email && <p className="text-[11px] text-destructive">{errors.email.message}</p>}
             </div>
 
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-foreground">Password</label>
-                <Link to="/forgot-password" className="text-[11px] text-primary hover:underline">
+                <label className="text-xs font-semibold text-foreground">Password</label>
+                <Link to="/forgot-password" className="text-[11px] text-primary hover:underline font-medium">
                   Forgot password?
                 </Link>
               </div>
@@ -256,21 +262,21 @@ export const Login = () => {
                   type={showPassword ? 'text' : 'password'}
                   {...register('password', { required: 'Password is required' })}
                   placeholder="••••••••"
-                  className="w-full h-10 pl-9 pr-10 rounded-xl bg-background border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  className="w-full h-10 pl-9 pr-10 rounded-md bg-background border border-border text-xs focus:outline-none focus:ring-1 focus:ring-primary font-mono"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                 </button>
               </div>
-              {errors.password && <p className="text-[11px] text-rose-500">{errors.password.message}</p>}
+              {errors.password && <p className="text-[11px] text-destructive">{errors.password.message}</p>}
             </div>
 
-            <Button type="submit" disabled={loading} className="w-full h-11 rounded-2xl font-bold shadow-md">
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Sign In to Portal'}
+            <Button type="submit" disabled={loading} variant="farmer" className="w-full h-10 rounded-sm font-semibold shadow-xs text-xs">
+              {loading ? <Loader2 className="size-4 animate-spin" /> : 'Sign In to Portal'}
             </Button>
           </form>
         )}
@@ -281,20 +287,20 @@ export const Login = () => {
             {!otpSent ? (
               <form onSubmit={handleSubmit(handleRequestOtp)} className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground">Registered Email</label>
+                  <label className="text-xs font-semibold text-foreground">Registered Email</label>
                   <div className="relative">
                     <Mail className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
                     <input
                       type="email"
                       {...register('email', { required: 'Email is required' })}
                       placeholder="farmer@example.com"
-                      className="w-full h-10 pl-9 pr-3 rounded-xl bg-background border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                      className="w-full h-10 pl-9 pr-3 rounded-md bg-background border border-border text-xs focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                   </div>
                 </div>
 
-                <Button type="submit" disabled={loading} className="w-full h-11 rounded-2xl font-bold shadow-md">
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Send Login OTP'}
+                <Button type="submit" disabled={loading} variant="farmer" className="w-full h-10 rounded-sm font-semibold shadow-xs text-xs">
+                  {loading ? <Loader2 className="size-4 animate-spin" /> : 'Send Login OTP'}
                 </Button>
               </form>
             ) : (
@@ -310,12 +316,12 @@ export const Login = () => {
                     placeholder="123456"
                     maxLength={6}
                     autoFocus
-                    className="w-full h-12 text-center tracking-[0.5em] text-xl font-mono font-bold rounded-xl bg-background border-2 border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    className="w-full h-11 text-center tracking-[0.5em] text-lg font-mono font-bold rounded-md bg-background border border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                 </div>
 
-                <Button type="submit" disabled={loading || otpValue.length < 6} className="w-full h-11 rounded-2xl font-bold shadow-md">
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Verify & Sign In'}
+                <Button type="submit" disabled={loading || otpValue.length < 6} variant="farmer" className="w-full h-10 rounded-sm font-semibold shadow-xs text-xs">
+                  {loading ? <Loader2 className="size-4 animate-spin" /> : 'Verify & Sign In'}
                 </Button>
 
                 <div className="text-center">
@@ -336,61 +342,61 @@ export const Login = () => {
         {authMode === 'admin' && (
           <form onSubmit={handleSubmit(onAdminSubmit)} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-foreground">Admin Email</label>
+              <label className="text-xs font-semibold text-foreground">Admin Email</label>
               <div className="relative">
-                <ShieldCheck className="w-4 h-4 text-purple-600 absolute left-3 top-3" />
+                <ShieldCheck className="w-4 h-4 text-primary absolute left-3 top-3" />
                 <input
                   type="email"
                   {...register('email', { required: 'Admin email is required' })}
                   placeholder="admin@krishisetu.in"
-                  className="w-full h-10 pl-9 pr-3 rounded-xl bg-background border border-border text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40"
+                  className="w-full h-10 pl-9 pr-3 rounded-md bg-background border border-border text-xs focus:outline-none focus:ring-1 focus:ring-primary"
                 />
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-foreground">Security Password</label>
+              <label className="text-xs font-semibold text-foreground">Security Password</label>
               <div className="relative">
-                <Lock className="w-4 h-4 text-purple-600 absolute left-3 top-3" />
+                <Lock className="w-4 h-4 text-primary absolute left-3 top-3" />
                 <input
                   type="password"
                   {...register('password', { required: 'Password is required' })}
                   placeholder="••••••••"
-                  className="w-full h-10 pl-9 pr-3 rounded-xl bg-background border border-border text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40"
+                  className="w-full h-10 pl-9 pr-3 rounded-md bg-background border border-border text-xs focus:outline-none focus:ring-1 focus:ring-primary font-mono"
                 />
               </div>
             </div>
 
-            <Button type="submit" disabled={loading} className="w-full h-11 rounded-2xl font-bold shadow-md bg-purple-600 hover:bg-purple-700 text-white">
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Authenticate Admin'}
+            <Button type="submit" disabled={loading} variant="default" className="w-full h-10 rounded-sm font-semibold shadow-xs text-xs">
+              {loading ? <Loader2 className="size-4 animate-spin" /> : 'Authenticate Admin'}
             </Button>
           </form>
         )}
 
         {/* 1-Click Quick Demo Autofill & Login Bar */}
-        <div className="pt-2 border-t border-border space-y-2">
-          <p className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
-            <Sparkles className="w-3 h-3 text-amber-500" /> Instant 1-Click Demo Login:
+        <div className="pt-3 border-t border-border space-y-2">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+            <Sparkles className="size-3 text-primary" /> Instant 1-Click Demo Login:
           </p>
-          <div className="grid grid-cols-3 gap-1.5 text-[11px]">
+          <div className="grid grid-cols-3 gap-1.5 text-xs">
             <button
               type="button"
               onClick={() => fillDemoAccount('farmer')}
-              className="py-1 px-2 rounded-lg bg-muted hover:bg-emerald-500/10 hover:text-emerald-600 transition-colors text-muted-foreground border border-border font-bold text-center"
+              className="py-1.5 px-2 rounded-sm bg-muted/60 hover:bg-primary/10 hover:text-primary transition-colors text-muted-foreground border border-border font-semibold text-center cursor-pointer"
             >
               🌾 Farmer
             </button>
             <button
               type="button"
               onClick={() => fillDemoAccount('trader')}
-              className="py-1 px-2 rounded-lg bg-muted hover:bg-amber-500/10 hover:text-amber-600 transition-colors text-muted-foreground border border-border font-bold text-center"
+              className="py-1.5 px-2 rounded-sm bg-muted/60 hover:bg-trader/15 hover:text-trader transition-colors text-muted-foreground border border-border font-semibold text-center cursor-pointer"
             >
               💼 Trader
             </button>
             <button
               type="button"
               onClick={() => fillDemoAccount('admin')}
-              className="py-1 px-2 rounded-lg bg-muted hover:bg-purple-500/10 hover:text-purple-600 transition-colors text-muted-foreground border border-border font-bold text-center"
+              className="py-1.5 px-2 rounded-sm bg-muted/60 hover:bg-primary/10 hover:text-primary transition-colors text-muted-foreground border border-border font-semibold text-center cursor-pointer"
             >
               🛡️ Admin
             </button>
@@ -398,7 +404,7 @@ export const Login = () => {
         </div>
 
         {/* Footer */}
-        <div className="text-center pt-2 text-xs text-muted-foreground">
+        <div className="text-center pt-2 text-xs text-muted-foreground border-t border-border">
           Don&apos;t have an account?{' '}
           <Link to="/register" className="text-primary font-semibold hover:underline">
             Register as Farmer / Trader
