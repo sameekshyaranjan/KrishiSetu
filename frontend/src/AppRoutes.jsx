@@ -48,9 +48,11 @@ import NotFound from '@/pages/public/NotFound'
 export const AppRoutes = () => {
   return (
     <Routes>
-      {/* 1. Public Routes Layout */}
+      {/* 1. Editorial Exchange Landing Page (Lovable Senior Product Design) */}
+      <Route path="/" element={<Home />} />
+
+      {/* 2. Public Platform Utility Routes */}
       <Route element={<PublicLayout />}>
-        <Route path="/" element={<Home />} />
         <Route path="/mandi-prices" element={<MandiPrices />} />
         <Route path="/schemes" element={<Schemes />} />
         <Route path="/cold-storage" element={<ColdStorage />} />
