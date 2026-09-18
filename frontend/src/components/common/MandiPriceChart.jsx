@@ -74,16 +74,16 @@ export const MandiPriceChart = ({ defaultCommodity = 'Tomato' }) => {
   }, [trendData])
 
   return (
-    <div className="rounded-3xl bg-card border border-border p-6 sm:p-8 shadow-sm space-y-6">
+    <div className="rounded-md bg-card border border-border p-6 sm:p-8 shadow-xs space-y-6">
       
       {/* Chart Controls & Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/60 pb-5">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <span className="p-1.5 rounded-xl bg-primary/10 text-primary">
+            <span className="p-1.5 rounded-sm bg-primary/10 text-primary">
               <BarChart3 className="w-4 h-4" />
             </span>
-            <h2 className="text-xl font-extrabold text-foreground tracking-tight">
+            <h2 className="text-xl sm:text-2xl font-display font-normal text-foreground tracking-tight">
               Historical Price Intelligence & Trends
             </h2>
           </div>
