@@ -1,157 +1,67 @@
 import { Link } from 'react-router-dom'
-import { Sprout, ExternalLink, ShieldCheck, Heart } from 'lucide-react'
+import { 
+  Sprout, 
+  BadgeCheck, 
+  IndianRupee, 
+  Scale, 
+  ShieldCheck 
+} from 'lucide-react'
 
 export const Footer = () => {
   return (
-    <footer className="border-t border-border bg-muted/40 text-foreground pt-12 pb-8">
-      <div className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
-        
-        {/* Main 4-Column Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          
-          {/* Column 1: Brand & Mission */}
-          <div className="space-y-4">
-            <Link to="/" className="flex items-center gap-2.5 font-bold text-lg text-foreground">
-              <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
-                <Sprout className="w-4 h-4" />
+    <>
+      {/* ── Institutional Trust Strip (Matching Landing Page) ── */}
+      <section className="border-t border-b border-border bg-background py-8">
+        <div className="mx-auto grid max-w-7xl grid-cols-2 gap-y-6 px-5 md:grid-cols-4 lg:px-8">
+          {[
+            [BadgeCheck, 'APMC license verified'],
+            [IndianRupee, 'Bank-backed escrow'],
+            [Scale, 'Digital weight audit'],
+            [ShieldCheck, 'Dispute resolution'],
+          ].map(([Icon, label], index) => {
+            const TrustIcon = Icon
+            return (
+              <div
+                key={label}
+                className={`flex items-center gap-3 px-3 ${
+                  index > 0 ? 'border-l border-border' : ''
+                }`}
+              >
+                <TrustIcon className="size-5 shrink-0 text-primary" />
+                <span className="text-xs font-bold text-foreground">{label}</span>
               </div>
-              <span>KrishiSetu</span>
-            </Link>
-            <p className="text-muted-foreground text-xs leading-relaxed">
-              Bridging Indian farmers and verified agricultural traders through transparent real-time mandi intelligence, direct harvest discovery, and instant bidding.
-            </p>
-            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-primary/10 border border-primary/20 text-primary text-[11px] font-semibold">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Agmarknet & data.gov.in Integrated</span>
+            )
+          })}
+        </div>
+      </section>
+
+      {/* ── Exact Landing Page Canonical Footer ── */}
+      <footer className="bg-surface-strong py-12 text-surface-strong-foreground">
+        <div className="mx-auto grid max-w-7xl gap-10 px-5 lg:grid-cols-[1fr_auto] lg:px-8">
+          <div>
+            <div className="flex items-center gap-3">
+              <span className="grid size-9 place-items-center bg-primary text-primary-foreground rounded-sm">
+                <Sprout className="size-5" />
+              </span>
+              <span className="font-display text-2xl">KrishiSetu</span>
             </div>
+            <p className="mt-4 max-w-sm text-xs leading-6 text-primary-foreground/55">
+              Direct agricultural commerce for Karnataka farmers and licensed APMC wholesale traders.
+            </p>
           </div>
-
-          {/* Column 2: Quick Links */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">
-              Market Intelligence
-            </h4>
-            <ul className="space-y-2 text-xs text-muted-foreground">
-              <li>
-                <Link to="/" className="hover:text-primary transition-colors">
-                  Home Marketplace
-                </Link>
-              </li>
-              <li>
-                <Link to="/mandi-prices" className="hover:text-primary transition-colors">
-                  Live APMC Mandi Rates
-                </Link>
-              </li>
-              <li>
-                <Link to="/schemes" className="hover:text-primary transition-colors">
-                  Government Welfare Schemes
-                </Link>
-              </li>
-              <li>
-                <Link to="/cold-storage" className="hover:text-primary transition-colors">
-                  Cold Storage & Warehouses
-                </Link>
-              </li>
-              <li>
-                <Link to="/register" className="hover:text-primary transition-colors">
-                  Farmer / Trader Onboarding
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Column 3: Platform Portals */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">
-              User Portals
-            </h4>
-            <ul className="space-y-2 text-xs text-muted-foreground">
-              <li>
-                <Link to="/farmer/dashboard" className="hover:text-primary transition-colors flex items-center gap-1.5">
-                  <span>🌾</span> Farmer Portal
-                </Link>
-              </li>
-              <li>
-                <Link to="/trader/dashboard" className="hover:text-primary transition-colors flex items-center gap-1.5">
-                  <span>💼</span> Trader Procurement Console
-                </Link>
-              </li>
-              <li>
-                <Link to="/admin/dashboard" className="hover:text-primary transition-colors flex items-center gap-1.5">
-                  <span>🛡️</span> Admin Moderation Console
-                </Link>
-              </li>
-              <li>
-                <Link to="/login" className="hover:text-primary transition-colors">
-                  Sign In to Your Account
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Column 4: Official Resources */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">
-              Official Data Sources
-            </h4>
-            <ul className="space-y-2 text-xs text-muted-foreground">
-              <li>
-                <a 
-                  href="https://agmarknet.gov.in" 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="hover:text-primary transition-colors inline-flex items-center gap-1"
-                >
-                  Agmarknet Portal <ExternalLink className="w-3 h-3 text-muted-foreground/60" />
-                </a>
-              </li>
-              <li>
-                <a 
-                  href="https://data.gov.in" 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="hover:text-primary transition-colors inline-flex items-center gap-1"
-                >
-                  Open Government Data (data.gov.in) <ExternalLink className="w-3 h-3 text-muted-foreground/60" />
-                </a>
-              </li>
-              <li>
-                <a 
-                  href="https://enam.gov.in" 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="hover:text-primary transition-colors inline-flex items-center gap-1"
-                >
-                  National Agriculture Market (eNAM) <ExternalLink className="w-3 h-3 text-muted-foreground/60" />
-                </a>
-              </li>
-              <li>
-                <a 
-                  href="https://pmkisan.gov.in" 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="hover:text-primary transition-colors inline-flex items-center gap-1"
-                >
-                  PM-KISAN Samman Nidhi <ExternalLink className="w-3 h-3 text-muted-foreground/60" />
-                </a>
-              </li>
-            </ul>
-          </div>
+          <nav className="grid grid-cols-2 gap-x-10 gap-y-3 text-xs text-primary-foreground/70 sm:grid-cols-4" aria-label="Footer navigation">
+            <Link to="/" className="hover:text-trader transition-colors">Home</Link>
+            <Link to="/mandi-prices" className="hover:text-trader transition-colors">Mandi prices</Link>
+            <Link to="/schemes" className="hover:text-trader transition-colors">Govt schemes</Link>
+            <Link to="/cold-storage" className="hover:text-trader transition-colors">Cold storage</Link>
+          </nav>
         </div>
-
-        {/* Bottom Bar */}
-        <div className="pt-8 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
-          <p>
-            © {new Date().getFullYear()} KrishiSetu. All rights reserved. Direct Agri-Trade Infrastructure.
-          </p>
-          <div className="flex items-center gap-1 text-[11px]">
-            <span>Crafted with</span>
-            <Heart className="w-3 h-3 text-rose-500 fill-rose-500" />
-            <span>for Indian Farmers & APMC Traders</span>
-          </div>
+        <div className="mx-auto mt-10 flex max-w-7xl flex-col gap-2 border-t border-primary-foreground/10 px-5 pt-6 text-[10px] text-primary-foreground/45 sm:flex-row sm:justify-between lg:px-8">
+          <p>Market, facility, scheme, and weather data shown for product demonstration.</p>
+          <p>© 2026 KrishiSetu Exchange</p>
         </div>
-      </div>
-    </footer>
+      </footer>
+    </>
   )
 }
 
