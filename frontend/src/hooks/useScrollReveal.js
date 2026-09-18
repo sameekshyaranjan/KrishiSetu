@@ -12,24 +12,14 @@ import { useEffect, useRef, useState } from 'react'
  * @returns {[React.RefObject, boolean]} [ref, isRevealed]
  */
 export function useScrollReveal({
-  threshold = 0.15,
-  rootMargin = '0px 0px -80px 0px',
+  threshold = 0,
+  rootMargin = '0px 0px -10px 0px',
   once = true
 } = {}) {
   const ref = useRef(null)
-  const [isRevealed, setIsRevealed] = useState(() => {
-    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      return true
-    }
-    return false
-  })
+  const [isRevealed, setIsRevealed] = useState(false)
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      setIsRevealed(true)
-      return
-    }
-
     const node = ref.current
     if (!node) return
 
@@ -41,7 +31,9 @@ export function useScrollReveal({
     }
 
     const observer = new IntersectionObserver(
-      ([entry]) => {
+      (entries) => {
+        const entry = entries[0]
+        if (!entry) return
         if (entry.isIntersecting) {
           setIsRevealed(true)
           if (once) {

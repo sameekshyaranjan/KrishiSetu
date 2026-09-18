@@ -65,15 +65,15 @@
    ============================================================ */
 .sr-item {
   opacity: 0;
-  transform: translateY(32px);
+  transform: translateY(20px);
   transition-property: opacity, transform;
-  transition-duration: 700ms;
+  transition-duration: 650ms;
   transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
   will-change: opacity, transform;
 }
 
 .sr-item.sr-scale {
-  transform: translateY(28px) scale(0.96);
+  transform: translateY(20px) scale(0.98);
 }
 
 .sr-item.sr-fade {
@@ -88,19 +88,6 @@
   transform: translateY(0) scale(1) !important;
 }
 
-/* Reduced motion preference override */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-  .sr-item {
-    opacity: 1 !important;
-    transform: none !important;
-    transition: none !important;
-  }
+.sr-item.sr-fade.sr-visible {
+  transform: none !important;
 }
