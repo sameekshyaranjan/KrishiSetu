@@ -2,29 +2,16 @@ import { useState } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import useAuth from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
-import { 
-  Sprout, 
-  Menu, 
-  X, 
-  TrendingUp, 
-  BookOpen, 
-  UserCheck, 
-  LogOut, 
-  LayoutDashboard, 
-  ShieldCheck, 
-  Briefcase,
-  CloudSun,
-  Snowflake
-} from 'lucide-react'
+import { Sprout, Menu, X } from 'lucide-react'
 
 export const Navbar = () => {
-  const [isOpen, setIsOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const { user, isAuthenticated, role, logout } = useAuth()
   const navigate = useNavigate()
 
   const handleLogout = async () => {
     await logout()
-    setIsOpen(false)
+    setMenuOpen(false)
     navigate('/login')
   }
 
@@ -35,196 +22,151 @@ export const Navbar = () => {
     return '/farmer/dashboard'
   }
 
-  const navLinkClasses = ({ isActive }) =>
-    `px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-      isActive
-        ? 'bg-primary/10 text-primary font-semibold'
-        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-    }`
+  const navLinkClass = ({ isActive }) =>
+    `py-2 transition-colors hover:text-primary ${isActive ? 'text-primary font-bold' : 'text-foreground'}`
+
+  const mobileNavLinkClass = ({ isActive }) =>
+    `border-b border-border py-4 transition-colors hover:text-primary ${isActive ? 'text-primary font-bold' : 'text-foreground'}`
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
-      <div className="container max-w-7xl mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-50 border-b border-border bg-background shadow-xs">
+      <div className="mx-auto grid h-18 max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center px-5 lg:grid-cols-[auto_1fr_auto] lg:px-8">
         
-        {/* Brand Logo */}
-        <Link to="/" className="flex items-center gap-2.5 font-bold text-lg text-foreground group">
-          <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20 group-hover:scale-105 transition-transform">
-            <Sprout className="w-5 h-5" />
-          </div>
-          <div className="flex flex-col">
-            <span className="leading-tight tracking-tight">KrishiSetu</span>
-            <span className="text-[10px] text-muted-foreground font-normal">Agri Intelligence</span>
-          </div>
+        {/* Exact Landing Page Logo */}
+        <Link 
+          to="/" 
+          className="flex min-w-0 items-center gap-3" 
+          aria-label="KrishiSetu home"
+          onClick={() => window.scrollTo({ top: 0, left: 0, behavior: 'instant' })}
+        >
+          <span className="grid size-9 shrink-0 place-items-center rounded-sm bg-primary text-primary-foreground">
+            <Sprout className="size-5" />
+          </span>
+          <span className="min-w-0">
+            <strong className="block truncate font-display text-2xl leading-none">KrishiSetu</strong>
+            <span className="mt-1 block truncate text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+              Karnataka Agri Exchange
+            </span>
+          </span>
         </Link>
 
-        {/* Desktop Navigation Links */}
-        <nav className="hidden md:flex items-center gap-1.5">
-          <NavLink to="/" end className={navLinkClasses}>
+        {/* Exact Landing Page Canonical Center Links */}
+        <nav className="hidden justify-center gap-7 text-[11px] font-bold uppercase tracking-[0.13em] lg:flex" aria-label="Main navigation">
+          <NavLink 
+            to="/" 
+            end 
+            className={navLinkClass}
+            onClick={() => window.scrollTo({ top: 0, left: 0, behavior: 'instant' })}
+          >
             Home
           </NavLink>
-          <NavLink to="/mandi-prices" className={navLinkClasses}>
-            <span className="flex items-center gap-1.5">
-              <TrendingUp className="w-4 h-4 text-emerald-500" />
-              Mandi Prices
-            </span>
+          <NavLink to="/mandi-prices" className={navLinkClass}>
+            Mandi Prices
           </NavLink>
-          <NavLink to="/schemes" className={navLinkClasses}>
-            <span className="flex items-center gap-1.5">
-              <BookOpen className="w-4 h-4 text-amber-500" />
-              Govt Schemes
-            </span>
+          <NavLink to="/schemes" className={navLinkClass}>
+            Govt Schemes
           </NavLink>
-          <NavLink to="/cold-storage" className={navLinkClasses}>
-            <span className="flex items-center gap-1.5">
-              <Snowflake className="w-4 h-4 text-cyan-500" />
-              Cold Storage
-            </span>
-          </NavLink>
-          <NavLink to="/farmer/weather" className={navLinkClasses}>
-            <span className="flex items-center gap-1.5">
-              <CloudSun className="w-4 h-4 text-sky-500" />
-              Weather Radar
-            </span>
+          <NavLink to="/cold-storage" className={navLinkClass}>
+            Cold Storage
           </NavLink>
         </nav>
 
-        {/* Desktop Authentication Controls */}
-        <div className="hidden md:flex items-center gap-3">
+        {/* Exact Landing Page Auth CTAs */}
+        <div className="hidden items-center gap-2 lg:flex">
           {isAuthenticated ? (
-            <div className="flex items-center gap-2">
-              <Link 
-                to={getDashboardPath()} 
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-card border border-border hover:border-primary/50 transition-all text-xs font-semibold text-foreground shadow-sm"
-              >
-                {role === 'farmer' && <Sprout className="w-3.5 h-3.5 text-primary" />}
-                {role === 'trader' && <Briefcase className="w-3.5 h-3.5 text-amber-600" />}
-                {role === 'admin' && <ShieldCheck className="w-3.5 h-3.5 text-purple-600" />}
-                <span className="truncate max-w-[120px]">{user?.name || 'My Portal'}</span>
-              </Link>
-
-              <Button 
-                asChild 
-                size="sm" 
-                className="rounded-xl text-xs h-8 shadow-sm font-medium"
-              >
-                <Link to={getDashboardPath()}>
-                  <LayoutDashboard className="w-3.5 h-3.5 mr-1.5" /> Dashboard
-                </Link>
+            <>
+              <Button variant="outline" size="sm" asChild>
+                <Link to={getDashboardPath()}>{user?.name || 'Dashboard'}</Link>
               </Button>
-
               <Button 
                 variant="ghost" 
                 size="sm" 
                 onClick={handleLogout}
-                className="rounded-xl text-xs h-8 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10"
+                className="text-destructive hover:bg-destructive/10 text-xs"
               >
-                <LogOut className="w-3.5 h-3.5" />
+                Sign out
               </Button>
-            </div>
+            </>
           ) : (
-            <div className="flex items-center gap-2">
-              <Button asChild variant="ghost" size="sm" className="rounded-xl text-xs h-8 font-medium">
-                <Link to="/login">Sign In</Link>
+            <>
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/login">Sign in</Link>
               </Button>
-              <Button asChild size="sm" className="rounded-xl text-xs h-8 shadow-sm font-semibold">
+              <Button variant="farmer" size="sm" asChild>
                 <Link to="/register">Register</Link>
               </Button>
-            </div>
+            </>
           )}
         </div>
 
         {/* Mobile Hamburger Toggle Button */}
-        <div className="flex md:hidden">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsOpen(!isOpen)}
-            className="p-2 h-9 w-9 text-muted-foreground hover:text-foreground"
-            aria-label="Toggle Menu"
-          >
-            {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          size="icon"
+          className="lg:hidden"
+          aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((value) => !value)}
+        >
+          {menuOpen ? <X className="size-4" /> : <Menu className="size-4" />}
+        </Button>
       </div>
 
-      {/* Mobile Drawer Menu */}
-      {isOpen && (
-        <div className="md:hidden border-b border-border bg-card/95 backdrop-blur px-4 pt-3 pb-5 space-y-3 animate-in slide-in-from-top-2 duration-200">
-          <nav className="flex flex-col space-y-1">
-            <Link
-              to="/"
-              onClick={() => setIsOpen(false)}
-              className="px-3 py-2 rounded-lg text-sm font-medium text-foreground hover:bg-muted"
-            >
-              Home
-            </Link>
-            <Link
-              to="/mandi-prices"
-              onClick={() => setIsOpen(false)}
-              className="px-3 py-2 rounded-lg text-sm font-medium text-foreground hover:bg-muted"
-            >
-              Live Mandi Rates
-            </Link>
-            <Link
-              to="/schemes"
-              onClick={() => setIsOpen(false)}
-              className="px-3 py-2 rounded-lg text-sm font-medium text-foreground hover:bg-muted"
-            >
-              Government Schemes
-            </Link>
-            <Link
-              to="/cold-storage"
-              onClick={() => setIsOpen(false)}
-              className="px-3 py-2 rounded-lg text-sm font-medium text-foreground hover:bg-muted flex items-center gap-2"
-            >
-              <Snowflake className="w-4 h-4 text-cyan-500" />
-              <span>Cold Storage Network</span>
-            </Link>
-            <Link
-              to="/farmer/weather"
-              onClick={() => setIsOpen(false)}
-              className="px-3 py-2 rounded-lg text-sm font-medium text-foreground hover:bg-muted flex items-center gap-2"
-            >
-              <CloudSun className="w-4 h-4 text-sky-500" />
-              <span>Weather Radar & Advisory</span>
-            </Link>
-          </nav>
-
-          <div className="pt-3 border-t border-border flex flex-col space-y-2">
+      {/* Exact Landing Page Mobile Navigation Sheet */}
+      {menuOpen && (
+        <nav className="grid border-t border-border bg-background px-5 py-3 text-xs font-bold uppercase tracking-[0.12em] lg:hidden" aria-label="Mobile navigation">
+          <NavLink 
+            to="/" 
+            end 
+            onClick={() => {
+              setMenuOpen(false)
+              window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+            }} 
+            className={mobileNavLinkClass}
+          >
+            Home
+          </NavLink>
+          <NavLink to="/mandi-prices" onClick={() => setMenuOpen(false)} className={mobileNavLinkClass}>
+            Mandi Prices
+          </NavLink>
+          <NavLink to="/schemes" onClick={() => setMenuOpen(false)} className={mobileNavLinkClass}>
+            Govt Schemes
+          </NavLink>
+          <NavLink to="/cold-storage" onClick={() => setMenuOpen(false)} className={mobileNavLinkClass}>
+            Cold Storage
+          </NavLink>
+          <div className="grid grid-cols-2 gap-2 pt-4">
             {isAuthenticated ? (
               <>
-                <Link
-                  to={getDashboardPath()}
-                  onClick={() => setIsOpen(false)}
-                  className="px-3 py-2 rounded-lg text-sm font-medium bg-primary/10 text-primary flex items-center gap-2"
-                >
-                  <LayoutDashboard className="w-4 h-4" />
-                  <span>Go to Dashboard</span>
-                </Link>
-                <button
-                  onClick={handleLogout}
-                  className="px-3 py-2 rounded-lg text-sm font-medium text-rose-500 hover:bg-rose-500/10 flex items-center gap-2 text-left"
-                >
-                  <LogOut className="w-4 h-4" />
-                  <span>Sign Out</span>
-                </button>
-              </>
-            ) : (
-              <div className="grid grid-cols-2 gap-2">
-                <Button asChild variant="outline" size="sm" className="w-full rounded-xl">
-                  <Link to="/login" onClick={() => setIsOpen(false)}>
-                    Sign In
+                <Button variant="outline" asChild>
+                  <Link to={getDashboardPath()} onClick={() => setMenuOpen(false)}>
+                    Dashboard
                   </Link>
                 </Button>
-                <Button asChild size="sm" className="w-full rounded-xl">
-                  <Link to="/register" onClick={() => setIsOpen(false)}>
+                <Button 
+                  variant="outline" 
+                  onClick={handleLogout}
+                  className="text-destructive"
+                >
+                  Sign out
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" asChild>
+                  <Link to="/login" onClick={() => setMenuOpen(false)}>
+                    Sign in
+                  </Link>
+                </Button>
+                <Button variant="farmer" asChild>
+                  <Link to="/register" onClick={() => setMenuOpen(false)}>
                     Register
                   </Link>
                 </Button>
-              </div>
+              </>
             )}
           </div>
-        </div>
+        </nav>
       )}
     </header>
   )
