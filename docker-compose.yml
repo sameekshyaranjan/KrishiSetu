@@ -61,6 +61,8 @@ services:
         condition: service_healthy
     networks:
       - krishisetu-network
+    healthcheck:
+      disable: true
     command: ["node", "workers/cronWorker.js"]
 
   # 4. Production Nginx Reverse Proxy & React Vite Single-Page Application
