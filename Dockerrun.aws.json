@@ -1,0 +1,65 @@
+{
+  "AWSEBDockerrunVersion": 2,
+  "containerDefinitions": [
+    {
+      "name": "krishisetu-redis",
+      "image": "redis:7-alpine",
+      "essential": true,
+      "memory": 256,
+      "portMappings": [
+        {
+          "hostPort": 6379,
+          "containerPort": 6379
+        }
+      ]
+    },
+    {
+      "name": "krishisetu-backend",
+      "image": "REPLACE_WITH_ECR_URI/krishisetu-backend:latest",
+      "essential": true,
+      "memory": 512,
+      "portMappings": [
+        {
+          "hostPort": 5000,
+          "containerPort": 5000
+        }
+      ],
+      "links": [
+        "krishisetu-redis"
+      ],
+      "environment": [
+        {
+          "name": "NODE_ENV",
+          "value": "production"
+        },
+        {
+          "name": "PORT",
+          "value": "5000"
+        },
+        {
+          "name": "USE_REDIS",
+          "value": "true"
+        },
+        {
+          "name": "REDIS_URL",
+          "value": "redis://krishisetu-redis:6379"
+        }
+      ]
+    },
+    {
+      "name": "krishisetu-frontend",
+      "image": "REPLACE_WITH_ECR_URI/krishisetu-frontend:latest",
+      "essential": true,
+      "memory": 256,
+      "portMappings": [
+        {
+          "hostPort": 80,
+          "containerPort": 80
+        }
+      ],
+      "links": [
+        "krishisetu-backend"
+      ]
+    }
+  ]
+}
