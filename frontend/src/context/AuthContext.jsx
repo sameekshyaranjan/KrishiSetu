@@ -4,6 +4,28 @@ import authService from '@/services/authService'
 export const AuthContext = createContext(null)
 
 const DEMO_FALLBACK_USERS = {
+  'demo.farmer@krishisetu.com': {
+    _id: 'FRM-DEMO-MANDYA-001',
+    name: 'Mallikarjun Gowda (Demo Farmer)',
+    email: 'demo.farmer@krishisetu.com',
+    mobile: '9845011001',
+    role: 'farmer',
+    district: 'Mandya',
+    village: 'Gejjalagere',
+    state: 'Karnataka',
+    cropsGrown: ['Paddy', 'Sugarcane', 'Ragi']
+  },
+  'demo.trader@krishisetu.com': {
+    _id: 'TRD-DEMO-BNG-001',
+    name: 'Basavaraj APMC Traders (Demo Trader)',
+    email: 'demo.trader@krishisetu.com',
+    mobile: '9845022001',
+    role: 'trader',
+    district: 'Bengaluru Urban',
+    state: 'Karnataka',
+    licenseNumber: 'KAR-APMC-BNG-2024-001',
+    companyName: 'Basavaraj Agro Commodities Pvt Ltd'
+  },
   'farmer1@krishisetu.com': {
     _id: 'FRM-DEMO-991',
     name: 'Ramesh Gowda',

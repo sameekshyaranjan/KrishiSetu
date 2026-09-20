@@ -131,39 +131,54 @@ export const Login = () => {
   }
 
   // 4. Quick Demo Autofill and Instant Login
-  const fillDemoAccount = async (role) => {
+  const fillDemoAccount = async (role, directLogin = true) => {
     if (role === 'farmer') {
-      setAuthMode('password')
-      setValue('email', 'farmer1@krishisetu.com')
-      setValue('password', 'password123')
-      setLoading(true)
-      const res = await loginWithPassword('farmer1@krishisetu.com', 'password123')
-      setLoading(false)
-      if (res.success) {
-        toast.success('Farmer demo session active!')
-        navigate('/farmer/dashboard')
+      setValue('email', 'demo.farmer@krishisetu.com')
+      setValue('password', 'Password@123')
+      if (directLogin) {
+        setLoading(true)
+        const res = await loginWithPassword('demo.farmer@krishisetu.com', 'Password@123')
+        setLoading(false)
+        if (res.success) {
+          toast.success('Welcome, Mallikarjun Gowda! (Demo Farmer)')
+          navigate(destinationPath(res.user?.role || 'farmer'), { replace: true })
+        } else {
+          toast.error(res.error || 'Failed to login as Demo Farmer')
+        }
+      } else {
+        setAuthMode('password')
       }
     } else if (role === 'trader') {
-      setAuthMode('password')
-      setValue('email', 'trader1@krishisetu.com')
-      setValue('password', 'password123')
-      setLoading(true)
-      const res = await loginWithPassword('trader1@krishisetu.com', 'password123')
-      setLoading(false)
-      if (res.success) {
-        toast.success('Trader demo session active!')
-        navigate('/trader/dashboard')
+      setValue('email', 'demo.trader@krishisetu.com')
+      setValue('password', 'Password@123')
+      if (directLogin) {
+        setLoading(true)
+        const res = await loginWithPassword('demo.trader@krishisetu.com', 'Password@123')
+        setLoading(false)
+        if (res.success) {
+          toast.success('Welcome, Basavaraj APMC Traders! (Demo Trader)')
+          navigate(destinationPath(res.user?.role || 'trader'), { replace: true })
+        } else {
+          toast.error(res.error || 'Failed to login as Demo Trader')
+        }
+      } else {
+        setAuthMode('password')
       }
     } else if (role === 'admin') {
-      setAuthMode('admin')
       setValue('email', 'admin@krishisetu.in')
       setValue('password', 'password123')
-      setLoading(true)
-      const res = await loginWithAdmin('admin@krishisetu.in', 'password123')
-      setLoading(false)
-      if (res.success) {
-        toast.success('Admin authentication verified!')
-        navigate('/admin/dashboard')
+      if (directLogin) {
+        setLoading(true)
+        const res = await loginWithAdmin('admin@krishisetu.in', 'password123')
+        setLoading(false)
+        if (res.success) {
+          toast.success('Admin authentication verified!')
+          navigate('/admin/dashboard', { replace: true })
+        } else {
+          toast.error(res.error || 'Failed to login as Admin')
+        }
+      } else {
+        setAuthMode('admin')
       }
     }
   }
@@ -202,7 +217,16 @@ export const Login = () => {
         </div>
 
         {/* Auth Mode Tabs */}
-        <div className="grid grid-cols-3 gap-1 bg-muted/60 p-1 rounded-sm border border-border text-xs font-semibold">
+        <div className="grid grid-cols-4 gap-1 bg-muted/60 p-1 rounded-sm border border-border text-xs font-semibold">
+          <button
+            type="button"
+            onClick={() => { setAuthMode('demo'); setOtpSent(false); }}
+            className={`py-1.5 rounded-sm transition-all cursor-pointer flex items-center justify-center gap-1 ${
+              authMode === 'demo' ? 'bg-primary text-primary-foreground shadow-xs font-bold' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Sparkles className="size-3" /> Demo
+          </button>
           <button
             type="button"
             onClick={() => { setAuthMode('password'); setOtpSent(false); }}
@@ -219,7 +243,7 @@ export const Login = () => {
               authMode === 'otp' ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            OTP Login
+            OTP
           </button>
           <button
             type="button"
@@ -232,6 +256,93 @@ export const Login = () => {
           </button>
         </div>
 
+        {/* MODE 0: Instant Sandbox Demo Accounts */}
+        {authMode === 'demo' && (
+          <div className="space-y-3.5">
+            <div className="bg-primary/5 border border-primary/20 rounded-md p-3 text-xs">
+              <p className="font-semibold text-primary flex items-center gap-1.5">
+                <Sparkles className="size-3.5" /> Instant Testing Sandbox
+              </p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Pre-configured Karnataka test accounts. Click below to sign in directly without typing credentials.
+              </p>
+            </div>
+
+            {/* Demo Farmer Card */}
+            <div className="border border-border/80 bg-background hover:border-primary/40 rounded-md p-3.5 space-y-2 transition-all">
+              <div className="flex items-start justify-between">
+                <div>
+                  <span className="inline-block px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 rounded mb-1">
+                    🌾 Verified Farmer
+                  </span>
+                  <h3 className="text-xs font-bold text-foreground">Mallikarjun Gowda</h3>
+                  <p className="text-[11px] text-muted-foreground">Mandya District • Crops: Paddy, Sugarcane, Ragi</p>
+                </div>
+              </div>
+              <div className="text-[11px] font-mono bg-muted/50 p-1.5 rounded text-muted-foreground flex justify-between">
+                <span>demo.farmer@krishisetu.com</span>
+                <span>Password@123</span>
+              </div>
+              <Button
+                type="button"
+                disabled={loading}
+                onClick={() => fillDemoAccount('farmer', true)}
+                variant="farmer"
+                className="w-full h-8 text-xs font-semibold cursor-pointer"
+              >
+                {loading ? <Loader2 className="size-3.5 animate-spin" /> : '⚡ Direct Login as Demo Farmer'}
+              </Button>
+            </div>
+
+            {/* Demo Trader Card */}
+            <div className="border border-border/80 bg-background hover:border-trader/40 rounded-md p-3.5 space-y-2 transition-all">
+              <div className="flex items-start justify-between">
+                <div>
+                  <span className="inline-block px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 rounded mb-1">
+                    💼 Verified APMC Trader
+                  </span>
+                  <h3 className="text-xs font-bold text-foreground">Basavaraj APMC Traders</h3>
+                  <p className="text-[11px] text-muted-foreground">Bengaluru Urban APMC • ₹5,00,000 Wallet Balance</p>
+                </div>
+              </div>
+              <div className="text-[11px] font-mono bg-muted/50 p-1.5 rounded text-muted-foreground flex justify-between">
+                <span>demo.trader@krishisetu.com</span>
+                <span>Password@123</span>
+              </div>
+              <Button
+                type="button"
+                disabled={loading}
+                onClick={() => fillDemoAccount('trader', true)}
+                variant="trader"
+                className="w-full h-8 text-xs font-semibold cursor-pointer"
+              >
+                {loading ? <Loader2 className="size-3.5 animate-spin" /> : '⚡ Direct Login as Demo Trader'}
+              </Button>
+            </div>
+
+            {/* Demo Admin Card */}
+            <div className="border border-border/80 bg-background hover:border-primary/40 rounded-md p-3 space-y-2 transition-all">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="inline-block px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 rounded mb-1">
+                    🛡️ System Admin
+                  </span>
+                  <h3 className="text-xs font-bold text-foreground">State APMC Officer (admin@krishisetu.in)</h3>
+                </div>
+              </div>
+              <Button
+                type="button"
+                disabled={loading}
+                onClick={() => fillDemoAccount('admin', true)}
+                variant="outline"
+                className="w-full h-8 text-xs font-semibold cursor-pointer"
+              >
+                {loading ? <Loader2 className="size-3.5 animate-spin" /> : '⚡ Direct Login as Admin'}
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* MODE 1: Standard Password Login (Farmer / Trader) */}
         {authMode === 'password' && (
           <form onSubmit={handleSubmit(onPasswordSubmit)} className="space-y-4">
@@ -242,7 +353,7 @@ export const Login = () => {
                 <input
                   type="email"
                   {...register('email', { required: 'Email is required' })}
-                  placeholder="farmer1@krishisetu.com"
+                  placeholder="demo.farmer@krishisetu.com"
                   className="w-full h-10 pl-9 pr-3 rounded-md bg-background border border-border text-xs focus:outline-none focus:ring-1 focus:ring-primary"
                 />
               </div>
@@ -376,29 +487,35 @@ export const Login = () => {
         {/* 1-Click Quick Demo Autofill & Login Bar */}
         <div className="pt-3 border-t border-border space-y-2">
           <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-            <Sparkles className="size-3 text-primary" /> Instant 1-Click Demo Login:
+            <Sparkles className="size-3 text-primary" /> Instant 1-Click Sandbox Login:
           </p>
           <div className="grid grid-cols-3 gap-1.5 text-xs">
             <button
               type="button"
-              onClick={() => fillDemoAccount('farmer')}
-              className="py-1.5 px-2 rounded-sm bg-muted/60 hover:bg-primary/10 hover:text-primary transition-colors text-muted-foreground border border-border font-semibold text-center cursor-pointer"
+              disabled={loading}
+              onClick={() => fillDemoAccount('farmer', true)}
+              className="py-1.5 px-2 rounded-sm bg-muted/60 hover:bg-emerald-500/10 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors text-muted-foreground border border-border font-semibold text-center cursor-pointer disabled:opacity-50"
+              title="Sign in instantly as Demo Farmer Mallikarjun Gowda"
             >
-              🌾 Farmer
+              🌾 Demo Farmer
             </button>
             <button
               type="button"
-              onClick={() => fillDemoAccount('trader')}
-              className="py-1.5 px-2 rounded-sm bg-muted/60 hover:bg-trader/15 hover:text-trader transition-colors text-muted-foreground border border-border font-semibold text-center cursor-pointer"
+              disabled={loading}
+              onClick={() => fillDemoAccount('trader', true)}
+              className="py-1.5 px-2 rounded-sm bg-muted/60 hover:bg-amber-500/10 hover:text-amber-700 dark:hover:text-amber-400 transition-colors text-muted-foreground border border-border font-semibold text-center cursor-pointer disabled:opacity-50"
+              title="Sign in instantly as Demo Trader Basavaraj APMC Traders"
             >
-              💼 Trader
+              💼 Demo Trader
             </button>
             <button
               type="button"
-              onClick={() => fillDemoAccount('admin')}
-              className="py-1.5 px-2 rounded-sm bg-muted/60 hover:bg-primary/10 hover:text-primary transition-colors text-muted-foreground border border-border font-semibold text-center cursor-pointer"
+              disabled={loading}
+              onClick={() => fillDemoAccount('admin', true)}
+              className="py-1.5 px-2 rounded-sm bg-muted/60 hover:bg-blue-500/10 hover:text-blue-700 dark:hover:text-blue-400 transition-colors text-muted-foreground border border-border font-semibold text-center cursor-pointer disabled:opacity-50"
+              title="Sign in instantly as APMC Admin Officer"
             >
-              🛡️ Admin
+              🛡️ Demo Admin
             </button>
           </div>
         </div>
