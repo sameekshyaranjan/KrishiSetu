@@ -1,6 +1,8 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 import storageService, { FALLBACK_COLD_STORAGES } from '@/services/storageService'
 import { Button } from '@/components/ui/button'
 import { 
@@ -22,8 +24,116 @@ import {
   X,
   Star,
   PackageCheck,
-  Calendar
+  Calendar,
+  RotateCcw,
+  LocateFixed
 } from 'lucide-react'
+
+// Fix Leaflet default icon paths if needed
+delete L.Icon.Default.prototype._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+})
+
+// Custom Leaflet Pin Icon Creator for KSWC / Govt vs Private Cold Hubs
+const createCustomPinIcon = (isGov, isSelected) => {
+  const bg = isGov ? '#059669' : '#2563eb'
+  const border = isSelected ? '#ffffff' : 'rgba(255,255,255,0.95)'
+  const scale = isSelected ? 'scale(1.25)' : 'scale(1)'
+  const ring = isSelected 
+    ? 'box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.6), 0 6px 16px rgba(0,0,0,0.35);' 
+    : 'box-shadow: 0 3px 10px rgba(0,0,0,0.25);'
+
+  return L.divIcon({
+    className: 'custom-leaflet-marker',
+    html: `
+      <div style="
+        background-color: ${bg};
+        border: 2px solid ${border};
+        ${ring}
+        width: 32px;
+        height: 32px;
+        border-radius: 50% 50% 50% 0;
+        transform-origin: bottom left;
+        transform: rotate(-45deg) ${scale};
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      ">
+        <div style="transform: rotate(45deg); display: flex; align-items: center; justify-content: center;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="2" y1="12" x2="22" y2="12"></line>
+            <line x1="12" y1="2" x2="12" y2="22"></line>
+            <path d="m20 16-4-4 4-4"></path>
+            <path d="m4 8 4 4-4 4"></path>
+            <path d="m16 4-4 4-4-4"></path>
+            <path d="m8 20 4-4 4 4"></path>
+          </svg>
+        </div>
+      </div>
+    `,
+    iconSize: [32, 32],
+    iconAnchor: [16, 32],
+    popupAnchor: [0, -32]
+  })
+}
+
+// User Current Location Pulse Marker
+const createUserLocationIcon = () => {
+  return L.divIcon({
+    className: 'user-location-marker',
+    html: `
+      <div style="position: relative; width: 24px; height: 24px; cursor: pointer;">
+        <div style="
+          position: absolute;
+          width: 100%;
+          height: 100%;
+          border-radius: 50%;
+          background: rgba(239, 68, 68, 0.45);
+          animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+        "></div>
+        <div style="
+          position: absolute;
+          top: 4px;
+          left: 4px;
+          width: 16px;
+          height: 16px;
+          border-radius: 50%;
+          background: #ef4444;
+          border: 2.5px solid #ffffff;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+        "></div>
+      </div>
+    `,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+    popupAnchor: [0, -12]
+  })
+}
+
+// Coordinate extractor supporting [lng, lat] GeoJSON or latitude/longitude properties
+const getCoords = (facility) => {
+  if (!facility) return null
+  if (Array.isArray(facility.location?.coordinates) && facility.location.coordinates.length >= 2) {
+    const lng = Number(facility.location.coordinates[0])
+    const lat = Number(facility.location.coordinates[1])
+    if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+      return [lat, lng]
+    }
+  }
+  if (facility.latitude && facility.longitude) {
+    const lat = Number(facility.latitude)
+    const lng = Number(facility.longitude)
+    if (!isNaN(lat) && !isNaN(lng)) {
+      return [lat, lng]
+    }
+  }
+  return null
+}
 
 // All 31 Karnataka Districts supported
 const KARNATAKA_DISTRICTS = [
@@ -48,6 +158,12 @@ export const ColdStorage = () => {
   const [userLocation, setUserLocation] = useState(null)
   const [locatingUser, setLocatingUser] = useState(false)
 
+  // Leaflet Map Refs
+  const mapContainerRef = useRef(null)
+  const mapInstanceRef = useRef(null)
+  const markersLayerRef = useRef(null)
+  const userMarkerRef = useRef(null)
+
   // Inquiry Modal State
   const [inquiryModalOpen, setInquiryModalOpen] = useState(false)
   const [inquiryForm, setInquiryForm] = useState({
@@ -58,11 +174,6 @@ export const ColdStorage = () => {
     arrivalDate: '',
     durationDays: 30
   })
-
-  // Fetch facilities on mount
-  useEffect(() => {
-    loadFacilities()
-  }, [])
 
   const loadFacilities = async () => {
     try {
@@ -76,6 +187,11 @@ export const ColdStorage = () => {
       console.warn('Using verified cold storage directory fallback:', err)
     }
   }
+
+  // Fetch facilities on mount
+  useEffect(() => {
+    loadFacilities()
+  }, [])
 
   // Filter facilities based on search, district, and quick chip
   const filteredFacilities = useMemo(() => {
@@ -117,6 +233,137 @@ export const ColdStorage = () => {
     return filteredFacilities[0]
   }, [filteredFacilities, selectedFacility])
 
+  // Initialize Leaflet OpenStreetMap
+  useEffect(() => {
+    if (!mapContainerRef.current) return
+
+    if (!mapInstanceRef.current) {
+      if (mapContainerRef.current._leaflet_id) {
+        delete mapContainerRef.current._leaflet_id
+      }
+
+      // Karnataka geographic center [14.5204, 75.7224]
+      const map = L.map(mapContainerRef.current, {
+        center: [14.5204, 75.7224],
+        zoom: 7,
+        scrollWheelZoom: true,
+        zoomControl: true
+      })
+
+      // Standard OpenStreetMap tiles (100% free, reliable)
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors',
+        maxZoom: 19
+      }).addTo(map)
+
+      markersLayerRef.current = L.layerGroup().addTo(map)
+      mapInstanceRef.current = map
+
+      setTimeout(() => {
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.invalidateSize()
+        }
+      }, 250)
+    }
+
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove()
+        mapInstanceRef.current = null
+        markersLayerRef.current = null
+      }
+    }
+  }, [])
+
+  // Sync Leaflet markers whenever filtered facilities or selectedFacility changes
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    const layer = markersLayerRef.current
+    if (!map || !layer) return
+
+    layer.clearLayers()
+
+    const bounds = []
+
+    filteredFacilities.forEach((facility) => {
+      const coords = getCoords(facility)
+      if (!coords) return
+      const [lat, lng] = coords
+
+      bounds.push([lat, lng])
+
+      const isSelected = (selectedFacility?._id || selectedFacility?.id) === (facility._id || facility.id)
+      const markerIcon = createCustomPinIcon(facility.isGovernmentOwned, isSelected)
+
+      const marker = L.marker([lat, lng], { icon: markerIcon })
+
+      const popupHtml = `
+        <div style="font-family: inherit; font-size: 12px; line-height: 1.4; min-width: 220px; padding: 2px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px;">
+            <span style="font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 9999px; background: ${facility.isGovernmentOwned ? 'rgba(5,150,105,0.15)' : 'rgba(59,130,246,0.15)'}; color: ${facility.isGovernmentOwned ? '#059669' : '#2563eb'};">
+              ${facility.isGovernmentOwned ? '🏛️ KSWC / GOVT' : '🏢 CERTIFIED PRIVATE'}
+            </span>
+            <span style="font-size: 11px; font-weight: 700; color: #059669;">₹${facility.costPerDay}/MT/day</span>
+          </div>
+          <h4 style="margin: 0 0 4px 0; font-size: 13px; font-weight: 700; color: #0f172a;">${facility.name}</h4>
+          <p style="margin: 0 0 6px 0; color: #64748b; font-size: 11px;">${facility.address}</p>
+          <div style="display: flex; gap: 8px; margin-bottom: 8px; font-size: 10px; color: #334155;">
+            <span>📦 <strong>${(facility.availableCapacity || Math.round((facility.capacity || 4000) * 0.7)).toLocaleString()}</strong> MT Avail.</span>
+            <span>🌡️ <strong>${facility.temperatureRange || '2°C to 8°C'}</strong></span>
+          </div>
+          <div style="display: flex; gap: 6px; margin-top: 6px;">
+            <a 
+              href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              style="flex: 1; text-align: center; background: #059669; color: #ffffff; padding: 5px 8px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 11px; display: inline-flex; align-items: center; justify-content: center; gap: 4px;"
+            >
+              Directions
+            </a>
+            ${facility.contactNumber ? `
+              <a 
+                href="tel:${facility.contactNumber}"
+                style="background: #f1f5f9; color: #0f172a; padding: 5px 8px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 11px; border: 1px solid #cbd5e1; display: inline-flex; align-items: center; justify-content: center;"
+              >
+                Call
+              </a>
+            ` : ''}
+          </div>
+        </div>
+      `
+
+      marker.bindPopup(popupHtml, { maxWidth: 280 })
+      marker.on('click', () => {
+        setSelectedFacility(facility)
+      })
+
+      layer.addLayer(marker)
+    })
+
+    // If a district is chosen, fit map to district bounds
+    if (selectedDistrict !== 'All Districts' && bounds.length > 0) {
+      if (bounds.length === 1) {
+        map.flyTo(bounds[0], 11, { duration: 1.0 })
+      } else {
+        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 12 })
+      }
+    }
+  }, [filteredFacilities, selectedFacility, selectedDistrict])
+
+  const handleSelectFacility = (facility) => {
+    setSelectedFacility(facility)
+    const coords = getCoords(facility)
+    if (coords && mapInstanceRef.current) {
+      mapInstanceRef.current.flyTo(coords, 12, { duration: 1.0 })
+    }
+  }
+
+  const handleResetMap = () => {
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.flyTo([14.5204, 75.7224], 7, { duration: 1.0 })
+    }
+  }
+
   // Handle GPS "Locate Near Me"
   const handleLocateMe = () => {
     if (!navigator.geolocation) {
@@ -131,6 +378,22 @@ export const ColdStorage = () => {
         setUserLocation({ lat: latitude, lng: longitude })
         setLocatingUser(false)
         toast.success('Your location detected! Sorting facilities by distance.')
+
+        // Drop user marker on map
+        if (mapInstanceRef.current) {
+          if (userMarkerRef.current) {
+            userMarkerRef.current.remove()
+          }
+
+          const userPin = L.marker([latitude, longitude], {
+            icon: createUserLocationIcon()
+          }).addTo(mapInstanceRef.current)
+
+          userPin.bindPopup('<b>📍 Your Detected Location</b>').openPopup()
+          userMarkerRef.current = userPin
+
+          mapInstanceRef.current.flyTo([latitude, longitude], 10, { duration: 1.5 })
+        }
 
         try {
           const nearby = await storageService.getNearbyStorages(latitude, longitude, 150)
@@ -355,7 +618,55 @@ export const ColdStorage = () => {
         </div>
       </div>
 
-      {/* 4. Two-Column Interactive Facility Directory & Detail Inspector */}
+      {/* 4. Interactive OpenStreetMap Karnataka Cold Chain Grid */}
+      <div className="bg-card border border-border rounded-md p-5 shadow-xs space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-md bg-primary/10 text-primary flex items-center justify-center font-bold">
+              <MapPin className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-foreground">Interactive Karnataka Grid Map (OpenStreetMap)</h2>
+              <p className="text-[11px] text-muted-foreground">Geographic distribution of cold storage hubs across Karnataka with real-time location mapping</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 text-[11px] font-semibold text-muted-foreground flex-wrap">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 inline-block" />
+              Govt / KSWC Hubs
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block" />
+              Private Cold Chains
+            </span>
+            {userLocation && (
+              <span className="flex items-center gap-1.5 text-red-600">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block animate-pulse" />
+                Your Location
+              </span>
+            )}
+            <button
+              onClick={handleResetMap}
+              className="px-2 py-1 rounded border border-border hover:bg-muted text-[10px] font-bold text-foreground transition-colors flex items-center gap-1 ml-auto"
+              title="Reset map to entire Karnataka"
+            >
+              <RotateCcw className="w-3 h-3" /> Reset View
+            </button>
+          </div>
+        </div>
+
+        {/* Leaflet Map Canvas */}
+        <div className="w-full h-[400px] sm:h-[460px] rounded-md overflow-hidden border border-border shadow-inner relative z-0">
+          <div ref={mapContainerRef} className="w-full h-full" />
+        </div>
+        <div className="flex flex-col sm:flex-row items-center justify-between text-[11px] text-muted-foreground px-1 gap-1">
+          <span>💡 Click any marker pin to view facility tariffs, available MT capacity, and driving directions.</span>
+          <span className="text-[10px]">OpenStreetMap &copy; Contributors</span>
+        </div>
+      </div>
+
+      {/* 5. Two-Column Interactive Facility Directory & Detail Inspector */}
       <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1.3fr] gap-6">
 
         {/* Column A: Facility List */}
@@ -402,7 +713,7 @@ export const ColdStorage = () => {
                 return (
                   <div
                     key={facility._id || facility.id}
-                    onClick={() => setSelectedFacility(facility)}
+                    onClick={() => handleSelectFacility(facility)}
                     className={`p-4 rounded-md border transition-all cursor-pointer text-left relative ${
                       isSelected
                         ? 'bg-primary/5 border-primary ring-1 ring-primary/30 shadow-xs'
