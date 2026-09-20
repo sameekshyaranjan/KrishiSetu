@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import useSocket from '@/hooks/useSocket'
 import chatService from '@/services/chatService'
@@ -35,6 +36,10 @@ const QUICK_FARMER_REPLIES = [
 export const FarmerChats = () => {
   const { user } = useAuth()
   const { on, off, socket, isConnected } = useSocket()
+  const [searchParams] = useSearchParams()
+
+  const traderIdParam = searchParams.get('traderId') || searchParams.get('userId')
+  const cropIdParam = searchParams.get('cropId') || searchParams.get('listingId')
 
   const [conversations, setConversations] = useState([])
   const [selectedConversation, setSelectedConversation] = useState(null)
@@ -48,23 +53,94 @@ export const FarmerChats = () => {
 
   const messagesEndRef = useRef(null)
 
+  // Helper to extract other participant information (Trader for Farmer)
+  const getOtherParty = (conv) => {
+    if (!conv) return { name: 'Trader Partner', company: '', district: 'Karnataka', mobile: '' }
+    const currentUserId = String(user?._id || user?.id || '')
+
+    // 1. Check participants for non-matching user ID
+    let p = conv.participants?.find((part) => {
+      const pId = String(part.user?._id || part.user?.id || part.user || '')
+      if (currentUserId && pId) {
+        return pId !== currentUserId
+      }
+      return part.userModel === 'Trader'
+    })
+
+    // 2. Fallback to participant where userModel === 'Trader'
+    if (!p) {
+      p = conv.participants?.find((part) => part.userModel === 'Trader')
+    }
+
+    const u = (p && typeof p.user === 'object') ? p.user : (conv.otherUser || {})
+    return {
+      name: u.name || u.companyName || conv.otherUser?.name || conv.otherUser?.companyName || 'Trader Partner',
+      company: u.companyName || conv.otherUser?.companyName || '',
+      district: u.district || conv.otherUser?.district || 'Karnataka',
+      mobile: u.mobile || conv.otherUser?.mobile || ''
+    }
+  }
+
   // 1. Fetch All Active Conversations for Farmer
   const loadConversations = async (keepSelection = true) => {
     try {
       const data = await chatService.getMyConversations()
-      setConversations(data)
+      let finalConversations = Array.isArray(data) ? [...data] : []
+      const currentUserId = String(user?._id || user?.id || '')
 
-      if (data.length > 0) {
+      // If arriving with specific traderId in URL query params
+      if (traderIdParam) {
+        const existingConv = finalConversations.find((c) =>
+          c.participants?.some((p) => {
+            const pId = String(p.user?._id || p.user?.id || p.user || '')
+            return pId === traderIdParam && pId !== currentUserId
+          })
+        )
+
+        if (existingConv) {
+          setSelectedConversation(existingConv)
+          setMobileViewChat(true)
+        } else {
+          // Fetch conversation or user details from database
+          const res = await chatService.getConversationWithUser(traderIdParam, cropIdParam)
+          if (res?.conversation) {
+            finalConversations = [res.conversation, ...finalConversations]
+            setSelectedConversation(res.conversation)
+          } else {
+            // Draft conversation initialized with recipient Trader profile
+            const draftConv = {
+              _id: `draft-${traderIdParam}`,
+              isDraft: true,
+              participants: [
+                { user: { _id: currentUserId, name: user?.name }, userModel: 'Farmer' },
+                {
+                  user: res?.otherUser || { _id: traderIdParam, name: 'Verified Trader' },
+                  userModel: 'Trader'
+                }
+              ],
+              listingId: cropIdParam ? { _id: cropIdParam } : null,
+              otherUser: res?.otherUser || { _id: traderIdParam, name: 'Verified Trader' },
+              lastMessage: '',
+              lastMessageAt: new Date().toISOString()
+            }
+            finalConversations = [draftConv, ...finalConversations]
+            setSelectedConversation(draftConv)
+          }
+          setMobileViewChat(true)
+        }
+      } else if (finalConversations.length > 0) {
         if (!keepSelection || !selectedConversation) {
-          setSelectedConversation(data[0])
+          setSelectedConversation(finalConversations[0])
         } else {
           // Sync selected conversation with updated metadata
-          const updated = data.find((c) => c._id === selectedConversation._id)
+          const updated = finalConversations.find((c) => c._id === selectedConversation._id)
           if (updated) setSelectedConversation(updated)
         }
       } else {
         setSelectedConversation(null)
       }
+
+      setConversations(finalConversations)
     } catch (err) {
       console.warn('[FarmerChats] Error loading conversations:', err.message)
     } finally {
@@ -74,11 +150,14 @@ export const FarmerChats = () => {
 
   useEffect(() => {
     loadConversations(false)
-  }, [])
+  }, [traderIdParam, cropIdParam])
 
   // 2. Fetch Messages for Selected Conversation
   const loadMessages = async (conversationId) => {
-    if (!conversationId) return
+    if (!conversationId || String(conversationId).startsWith('draft-')) {
+      setMessages([])
+      return
+    }
     setLoadingMessages(true)
     try {
       const res = await chatService.getConversationMessages(conversationId)
@@ -106,7 +185,7 @@ export const FarmerChats = () => {
 
   // 3. Join Conversation Room & Listen to Real-Time Inbound Messages
   useEffect(() => {
-    if (socket && selectedConversation?._id) {
+    if (socket && selectedConversation?._id && !selectedConversation.isDraft) {
       socket.emit('join_conversation', selectedConversation._id)
     }
 
@@ -149,7 +228,7 @@ export const FarmerChats = () => {
     on('newMessage', handleNewMessage)
     return () => {
       off('newMessage', handleNewMessage)
-      if (socket && selectedConversation?._id) {
+      if (socket && selectedConversation?._id && !selectedConversation.isDraft) {
         socket.emit('leave_conversation', selectedConversation._id)
       }
     }
@@ -169,18 +248,29 @@ export const FarmerChats = () => {
     setSending(true)
 
     try {
-      // Find other participant (Trader)
-      const otherParticipant = selectedConversation.participants?.find(
-        (p) => (p.user?._id || p.user) !== user?.id
-      )
-      const receiverId = otherParticipant?.user?._id || otherParticipant?.user
+      const currentUserId = String(user?._id || user?.id || '')
+      let otherParticipant = selectedConversation.participants?.find((p) => {
+        const pId = String(p.user?._id || p.user?.id || p.user || '')
+        if (currentUserId && pId) return pId !== currentUserId
+        return p.userModel === 'Trader'
+      })
+      if (!otherParticipant) {
+        otherParticipant = selectedConversation.participants?.find((p) => p.userModel === 'Trader')
+      }
+
+      const receiverId =
+        otherParticipant?.user?._id ||
+        otherParticipant?.user?.id ||
+        otherParticipant?.user ||
+        selectedConversation.otherUser?._id ||
+        traderIdParam
 
       const savedMsg = await chatService.sendMessage({
-        conversationId: selectedConversation._id,
+        conversationId: selectedConversation.isDraft ? null : selectedConversation._id,
         receiverId,
         receiverModel: 'Trader',
         content,
-        listingId: selectedConversation.listingId?._id || selectedConversation.listingId || null
+        listingId: selectedConversation.listingId?._id || selectedConversation.listingId || cropIdParam || null
       })
 
       if (savedMsg) {
@@ -189,14 +279,28 @@ export const FarmerChats = () => {
           return [...prev, savedMsg]
         })
 
-        // Update conversation list last message
-        setConversations((prev) =>
-          prev.map((c) =>
-            c._id === selectedConversation._id
-              ? { ...c, lastMessage: content, lastMessageAt: new Date().toISOString() }
-              : c
+        if (savedMsg.conversationId && selectedConversation.isDraft) {
+          const persistedConv = {
+            ...selectedConversation,
+            _id: savedMsg.conversationId,
+            isDraft: false,
+            lastMessage: content,
+            lastMessageAt: new Date().toISOString()
+          }
+          setSelectedConversation(persistedConv)
+          setConversations((prev) =>
+            prev.map((c) => (c._id === selectedConversation._id ? persistedConv : c))
           )
-        )
+        } else {
+          // Update conversation list last message
+          setConversations((prev) =>
+            prev.map((c) =>
+              c._id === selectedConversation._id
+                ? { ...c, lastMessage: content, lastMessageAt: new Date().toISOString() }
+                : c
+            )
+          )
+        }
       }
     } catch (err) {
       toast.error('Failed to send message. Please try again.')
@@ -208,30 +312,23 @@ export const FarmerChats = () => {
 
   // Filter conversations by search query
   const filteredConversations = useMemo(() => {
+    const currentUserId = String(user?._id || user?.id || '')
     return conversations.filter((conv) => {
-      const otherParticipant = conv.participants?.find(
-        (p) => (p.user?._id || p.user) !== user?.id
-      )
-      const traderName = otherParticipant?.user?.name || otherParticipant?.user?.companyName || ''
+      let otherParticipant = conv.participants?.find((p) => {
+        const pId = String(p.user?._id || p.user?.id || p.user || '')
+        if (currentUserId && pId) return pId !== currentUserId
+        return p.userModel === 'Trader'
+      })
+      if (!otherParticipant) {
+        otherParticipant = conv.participants?.find((p) => p.userModel === 'Trader')
+      }
+      const traderName = otherParticipant?.user?.name || otherParticipant?.user?.companyName || conv.otherUser?.name || conv.otherUser?.companyName || ''
       const cropName = conv.listingId?.name || ''
       const q = searchQuery.toLowerCase()
 
       return traderName.toLowerCase().includes(q) || cropName.toLowerCase().includes(q)
     })
-  }, [conversations, searchQuery, user?.id])
-
-  // Helper to extract other participant information
-  const getOtherParty = (conv) => {
-    if (!conv) return { name: 'Trader Partner', company: '', district: 'Karnataka', mobile: '' }
-    const p = conv.participants?.find((part) => (part.user?._id || part.user) !== user?.id)
-    const u = p?.user || {}
-    return {
-      name: u.name || u.companyName || 'Trader Partner',
-      company: u.companyName || '',
-      district: u.district || 'Karnataka',
-      mobile: u.mobile || ''
-    }
-  }
+  }, [conversations, searchQuery, user])
 
   const otherTrader = getOtherParty(selectedConversation)
   const activeCrop = selectedConversation?.listingId

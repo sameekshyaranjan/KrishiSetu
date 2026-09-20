@@ -257,12 +257,13 @@ export const TraderCropDetails = () => {
           </Button>
 
           <Button
+            id="message-farmer-btn"
             size="sm"
             variant="outline"
             onClick={() => setIsChatOpen(true)}
             className="rounded-xl text-xs font-bold h-9 px-4 border-amber-500/30 text-amber-600 hover:bg-amber-500/10 flex items-center gap-1.5"
           >
-            <MessageSquare className="w-4 h-4" /> Chat & Offer 💬
+            <MessageSquare className="w-4 h-4" /> Message Farmer 💬
           </Button>
         </div>
       </div>
@@ -338,12 +339,20 @@ export const TraderCropDetails = () => {
                 </div>
               </div>
 
-              <div className="text-right">
+              <div className="text-right flex flex-col items-end gap-1.5">
                 <div className="flex items-center justify-end gap-1 text-amber-600 font-bold text-sm">
                   <Star className="w-4 h-4 fill-amber-500 text-amber-500" />
                   <span>{lot.farmer.rating}</span>
                 </div>
                 <span className="text-[10px] text-muted-foreground">{lot.farmer.totalTrades} Fulfilled Trades</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsChatOpen(true)}
+                  className="rounded-xl text-[11px] font-bold h-7 px-2.5 border-amber-500/30 text-amber-600 hover:bg-amber-500/10 flex items-center gap-1"
+                >
+                  <MessageSquare className="w-3.5 h-3.5" /> Message Farmer
+                </Button>
               </div>
             </div>
 

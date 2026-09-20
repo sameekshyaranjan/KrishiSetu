@@ -72,6 +72,12 @@ export const AuthProvider = ({ children }) => {
           if (!storedUser.role) {
             storedUser.role = storedUser.gstNumber ? 'trader' : 'farmer'
           }
+          if (!storedUser.id && storedUser._id) {
+            storedUser.id = storedUser._id
+          }
+          if (!storedUser._id && storedUser.id) {
+            storedUser._id = storedUser.id
+          }
           setToken(storedToken)
           setUser(storedUser)
         } else {
@@ -126,9 +132,14 @@ export const AuthProvider = ({ children }) => {
       }
 
       const token = data.accessToken || data.token
+      const normalizedUser = data.user ? {
+        ...data.user,
+        id: data.user.id || data.user._id,
+        _id: data.user._id || data.user.id
+      } : null
       setToken(token)
-      setUser(data.user)
-      return { success: true, user: data.user, data }
+      setUser(normalizedUser)
+      return { success: true, user: normalizedUser, data }
     } catch (error) {
       const message = error.response?.data?.message || error.message || 'Login failed. Please check your credentials.'
       return { success: false, error: message }
@@ -158,9 +169,14 @@ export const AuthProvider = ({ children }) => {
       }
 
       const token = data.accessToken || data.token
+      const normalizedUser = data.user ? {
+        ...data.user,
+        id: data.user.id || data.user._id,
+        _id: data.user._id || data.user.id
+      } : null
       setToken(token)
-      setUser(data.user)
-      return { success: true, user: data.user, data }
+      setUser(normalizedUser)
+      return { success: true, user: normalizedUser, data }
     } catch (error) {
       const message = error.response?.data?.message || error.message || 'Verification failed'
       return { success: false, error: message }

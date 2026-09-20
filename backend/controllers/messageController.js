@@ -223,12 +223,62 @@ const getConversationWithUser = async (req, res, next) => {
       query.listingId = listingId;
     }
 
-    const conversation = await Conversation.findOne(query)
+    let conversation = await Conversation.findOne(query)
       .populate('participants.user', 'name companyName mobile district village profilePhoto')
       .populate('listingId', 'name category quantity unit basePrice status district images harvestStatus');
 
+    if (!conversation && listingId) {
+      // Fallback to conversation between the two users regardless of listing
+      conversation = await Conversation.findOne({
+        'participants.user': { $all: [req.user.id, otherUserId] }
+      })
+        .populate('participants.user', 'name companyName mobile district village profilePhoto')
+        .populate('listingId', 'name category quantity unit basePrice status district images harvestStatus');
+    }
+
+    // Always resolve the other participant's profile from conversation or DB
+    let otherUser = null;
+    let otherUserModel = req.user.role === 'farmer' ? 'Trader' : 'Farmer';
+
+    if (conversation) {
+      const otherPart = conversation.participants.find(p => {
+        const pId = String(p.user?._id || p.user?.id || p.user || '');
+        return pId !== String(req.user.id);
+      });
+      if (otherPart && otherPart.user) {
+        otherUser = typeof otherPart.user.toObject === 'function' ? otherPart.user.toObject() : { ...otherPart.user };
+        otherUserModel = otherPart.userModel || otherUserModel;
+      }
+    }
+
+    if (!otherUser) {
+      let dbUser = await Farmer.findById(otherUserId).select('name companyName mobile district village profilePhoto').lean();
+      if (dbUser) {
+        otherUser = dbUser;
+        otherUserModel = 'Farmer';
+      } else {
+        dbUser = await Trader.findById(otherUserId).select('name companyName mobile district village profilePhoto').lean();
+        if (dbUser) {
+          otherUser = dbUser;
+          otherUserModel = 'Trader';
+        }
+      }
+    }
+
+    if (otherUser) {
+      otherUser = {
+        ...otherUser,
+        userModel: otherUserModel,
+        role: otherUserModel.toLowerCase()
+      };
+    }
+
     if (!conversation) {
-      return res.status(200).json({ conversation: null, messages: [] });
+      return res.status(200).json({ 
+        conversation: null, 
+        messages: [],
+        otherUser
+      });
     }
 
     // Mark unread messages as read
@@ -241,7 +291,7 @@ const getConversationWithUser = async (req, res, next) => {
       .populate('sender', 'name companyName')
       .sort({ createdAt: 1 });
 
-    res.status(200).json({ conversation, messages });
+    res.status(200).json({ conversation, messages, otherUser });
   } catch (error) {
     next(error);
   }

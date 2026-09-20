@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import useSocket from '@/hooks/useSocket'
 import chatService from '@/services/chatService'
@@ -16,7 +17,8 @@ import {
   Gavel, 
   Loader2,
   MapPin,
-  RefreshCw
+  RefreshCw,
+  ExternalLink
 } from 'lucide-react'
 
 const QUICK_PROMPTS = [
@@ -55,6 +57,7 @@ export const TradeChatModal = ({
 }) => {
   const { user } = useAuth()
   const { on, off } = useSocket()
+  const navigate = useNavigate()
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(true)
   const [isSending, setIsSending] = useState(false)
@@ -63,7 +66,18 @@ export const TradeChatModal = ({
   const [showKannadaTranslation, setShowKannadaTranslation] = useState(true)
   const [counterRate, setCounterRate] = useState(String(crop.price || crop.basePrice || 2000))
   const [showCounterBox, setShowCounterBox] = useState(false)
+  const [activeRecipient, setActiveRecipient] = useState({
+    name: recipientName,
+    role: recipientRole
+  })
   const messagesEndRef = useRef(null)
+
+  useEffect(() => {
+    setActiveRecipient({
+      name: recipientName,
+      role: recipientRole
+    })
+  }, [recipientName, recipientRole])
 
   // 1. Fetch Real Conversation & Message History from MongoDB
   const loadChatHistory = async () => {
@@ -75,6 +89,32 @@ export const TradeChatModal = ({
       if (data?.conversation) {
         setConversationId(data.conversation._id)
       }
+
+      // Resolve recipient info dynamically from database response
+      const currentUserId = String(user?._id || user?.id || '')
+      let partner = null
+      if (data?.conversation?.participants) {
+        partner = data.conversation.participants.find((p) => {
+          const pId = String(p.user?._id || p.user?.id || p.user || '')
+          return currentUserId ? pId !== currentUserId : p.userModel === recipientRole
+        })
+      }
+
+      const dbName =
+        data?.otherUser?.name ||
+        partner?.user?.name ||
+        (recipientName !== 'Trade Partner' && recipientName !== 'Verified Farmer' ? recipientName : '') ||
+        data?.otherUser?.businessName ||
+        recipientName
+      const dbRole = data?.otherUser?.role || partner?.userModel || recipientRole
+
+      if (dbName) {
+        setActiveRecipient({
+          name: dbName,
+          role: dbRole
+        })
+      }
+
       setMessages(data?.messages || [])
     } catch (err) {
       console.warn('[TradeChatModal] Error loading messages:', err.message)
@@ -206,11 +246,11 @@ export const TradeChatModal = ({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-extrabold text-sm sm:text-base text-foreground">
-                  Direct Trade Negotiation: {recipientName}
+                  Direct Trade Negotiation: {activeRecipient.name}
                 </h3>
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 text-[10px] font-bold border border-emerald-500/20">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  {recipientRole} Channel
+                  {activeRecipient.role} Channel
                 </span>
               </div>
               <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
@@ -221,6 +261,22 @@ export const TradeChatModal = ({
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                onClose?.()
+                if (user?.role === 'trader') {
+                  navigate(`/trader/chats?farmerId=${recipientId}&cropId=${crop._id || ''}`)
+                } else if (user?.role === 'farmer') {
+                  navigate(`/farmer/chats?traderId=${recipientId}&cropId=${crop._id || ''}`)
+                }
+              }}
+              className="p-2 rounded-xl border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted/80 text-xs font-bold transition-all flex items-center gap-1"
+              title="Open in Dedicated Chat Room"
+            >
+              <ExternalLink className="w-4 h-4" />
+              <span className="hidden sm:inline text-[11px]">Chat Room</span>
+            </button>
+
             <button
               onClick={() => setShowKannadaTranslation(!showKannadaTranslation)}
               className={`p-2 rounded-xl border text-xs font-bold transition-all flex items-center gap-1 ${
@@ -267,15 +323,16 @@ export const TradeChatModal = ({
           {!loading && messages.length === 0 && (
             <div className="p-8 text-center space-y-2 rounded-2xl bg-muted/20 border border-dashed border-border">
               <MessageSquare className="w-8 h-8 text-muted-foreground mx-auto opacity-50" />
-              <p className="text-xs font-bold text-foreground">No prior messages with {recipientName}</p>
+              <p className="text-xs font-bold text-foreground">No prior messages with {activeRecipient.name}</p>
               <p className="text-[11px] text-muted-foreground">Send a direct message or propose a price offer to start negotiating!</p>
             </div>
           )}
 
           {/* Messages Feed */}
           {messages.map((m, idx) => {
-            const senderId = typeof m.sender === 'object' ? m.sender?._id : m.sender
-            const isMe = senderId === user?._id || m.senderModel?.toLowerCase() === user?.role
+            const senderId = typeof m.sender === 'object' ? String(m.sender?._id || m.sender?.id || '') : String(m.sender || '')
+            const currentUserId = String(user?._id || user?.id || '')
+            const isMe = (currentUserId && senderId === currentUserId) || m.senderModel?.toLowerCase() === user?.role?.toLowerCase()
             const isOffer = m.content?.includes('[FORMAL COUNTER-OFFER]')
 
             return (
@@ -284,7 +341,7 @@ export const TradeChatModal = ({
                 className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} space-y-1`}
               >
                 <span className="text-[10px] font-bold text-muted-foreground px-1">
-                  {isMe ? 'You' : recipientName}
+                  {isMe ? 'You' : activeRecipient.name}
                 </span>
 
                 <div
