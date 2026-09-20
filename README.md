@@ -12,7 +12,31 @@
 
 ## Overview
 
-KrishiSetu is a full-stack agritech platform that connects Karnataka's smallholder farmers directly with licensed APMC traders — eliminating middlemen, guaranteeing payments through escrow, and providing real-time mandi market intelligence.
+In Karnataka's traditional APMC (Agricultural Produce Market Committee) yards, smallholder farmers routinely lose **15–25%** of their crop value to middlemen, face delayed payments stretching 30–90 days, and lack visibility into real-time market prices across districts. KrishiSetu solves this by creating a **direct, zero-commission digital bridge** between farmers and licensed traders.
+
+### How It Works
+
+A farmer lists their harvest on KrishiSetu with quality grades, photos, and a reserve price. Traders across Karnataka discover and bid on listings through **real-time WebSocket-powered bidding rooms**, with support for counter-offers and bilateral negotiation. Once a bid is accepted, the platform **locks the full contract value in escrow** inside the trader's digital wallet — guaranteeing the farmer will be paid before produce even leaves the farm.
+
+The trader assigns a transporter, the farmer dispatches the lot and receives a **cryptographic 6-digit delivery OTP**. Funds are released from escrow to the farmer's wallet only when the OTP is verified at the delivery point — ensuring both parties are protected. If a dispute arises over quality or quantity, an APMC admin reviews photo evidence and issues a binding ruling (full refund, 85/15 split, or full payout).
+
+### What Makes KrishiSetu Different
+
+- **Escrow-first settlement** — no payment defaults; 100% of trade value is locked before transport begins
+- **Real-time bidding with counter-offers** — not a static listing board, but a live negotiation engine
+- **OTP-verified delivery handshake** — funds move only on physical confirmation, not on promise
+- **Live mandi intelligence** — Agmarknet price feeds across all 31 Karnataka districts with automated price threshold alerts
+- **Cold storage locator** — 46 geo-indexed Karnataka facilities searchable by proximity
+- **Government scheme registry** — 9 central and state agricultural welfare schemes with eligibility details
+- **Dispute arbitration** — quasi-judicial admin docket with evidence vault and enforceable rulings
+
+### Who Benefits
+
+| Stakeholder | Value |
+|---|---|
+| **Farmers** | Zero commission, guaranteed escrow-backed payments, cross-district price transparency, direct market access |
+| **Traders** | Verified produce grades, structured bidding, escrow protection against no-shows, streamlined logistics |
+| **APMC Admins** | Digital audit trail, dispute resolution tools, platform-wide analytics, scheme distribution |
 
 **Live Demo:** [http://13.61.35.96](http://13.61.35.96) *(Deployed on AWS EC2)*
 
