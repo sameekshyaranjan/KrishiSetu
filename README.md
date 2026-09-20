@@ -14,7 +14,7 @@
 
 KrishiSetu is a full-stack agritech platform that connects Karnataka's smallholder farmers directly with licensed APMC traders — eliminating middlemen, guaranteeing payments through escrow, and providing real-time mandi market intelligence.
 
-**Live Demo:** [https://krishisetu.vercel.app](https://krishisetu.vercel.app) *(frontend)* · Backend API on AWS EC2
+**Live Demo:** [http://13.61.35.96](http://13.61.35.96) *(Deployed on AWS EC2)*
 
 ---
 
