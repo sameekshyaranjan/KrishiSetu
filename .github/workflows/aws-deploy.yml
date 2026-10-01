@@ -18,7 +18,7 @@ env:
   ECR_BACKEND_REPOSITORY: krishisetu-backend
   ECR_FRONTEND_REPOSITORY: krishisetu-frontend
   ECS_CLUSTER: production-krishisetu-cluster
-  ECS_SERVICE: krishisetu-task-service-O3Sirewp
+  ECS_SERVICE: krishisetu-task-service-03Sirewp
   ECS_TASK_DEFINITION: aws/task-definition.json
 
 jobs:
@@ -51,6 +51,25 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Discover and Inspect ECS Services
+        id: inspect-ecs
+        run: |
+          echo "Inspecting ECS Cluster: ${{ env.ECS_CLUSTER }}"
+          SERVICES=$(aws ecs list-services --cluster ${{ env.ECS_CLUSTER }} --region ${{ env.AWS_REGION }} --query "serviceArns[]" --output text)
+          echo "Found services in cluster: $SERVICES"
+
+          if [ -n "$SERVICES" ] && [ "$SERVICES" != "None" ]; then
+            DETECTED_SERVICE=$(echo $SERVICES | awk '{print $1}' | awk -F'/' '{print $NF}')
+            echo "Auto-detected ECS service: $DETECTED_SERVICE"
+            echo "ECS_SERVICE=$DETECTED_SERVICE" >> $GITHUB_ENV
+          else
+            echo "WARNING: No active services returned from AWS ECS for cluster ${{ env.ECS_CLUSTER }}."
+            echo "Proceeding with default: ${{ env.ECS_SERVICE }}"
+          fi
+
+          echo "Inspecting AWS Secrets Manager:"
+          aws secretsmanager list-secrets --region ${{ env.AWS_REGION }} --query "SecretList[].Name" --output text || true
 
       - name: Log in to Amazon ECR
         id: login-ecr
