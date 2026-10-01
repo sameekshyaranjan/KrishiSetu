@@ -6,12 +6,12 @@
   ],
   "cpu": "1024",
   "memory": "2048",
-  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/ecsTaskExecutionRole",
-  "taskRoleArn": "arn:aws:iam::ACCOUNT_ID:role/krishisetuTaskRole",
+  "executionRoleArn": "arn:aws:iam::579505322227:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::579505322227:role/krishisetuTaskRole",
   "containerDefinitions": [
     {
       "name": "krishisetu-backend",
-      "image": "ACCOUNT_ID.dkr.ecr.ap-south-1.amazonaws.com/krishisetu-backend:latest",
+      "image": "579505322227.dkr.ecr.ap-south-1.amazonaws.com/krishisetu-backend:latest",
       "essential": true,
       "portMappings": [
         {
@@ -36,23 +36,23 @@
       "secrets": [
         {
           "name": "MONGO_URI",
-          "valueFrom": "arn:aws:secretsmanager:ap-south-1:ACCOUNT_ID:secret:krishisetu/MONGO_URI"
+          "valueFrom": "arn:aws:secretsmanager:ap-south-1:579505322227:secret:krishisetu/MONGO_URI"
         },
         {
           "name": "JWT_SECRET",
-          "valueFrom": "arn:aws:secretsmanager:ap-south-1:ACCOUNT_ID:secret:krishisetu/JWT_SECRET"
+          "valueFrom": "arn:aws:secretsmanager:ap-south-1:579505322227:secret:krishisetu/JWT_SECRET"
         },
         {
           "name": "JWT_REFRESH_SECRET",
-          "valueFrom": "arn:aws:secretsmanager:ap-south-1:ACCOUNT_ID:secret:krishisetu/JWT_REFRESH_SECRET"
+          "valueFrom": "arn:aws:secretsmanager:ap-south-1:579505322227:secret:krishisetu/JWT_REFRESH_SECRET"
         },
         {
           "name": "REDIS_URL",
-          "valueFrom": "arn:aws:secretsmanager:ap-south-1:ACCOUNT_ID:secret:krishisetu/REDIS_URL"
+          "valueFrom": "arn:aws:secretsmanager:ap-south-1:579505322227:secret:krishisetu/REDIS_URL"
         },
         {
           "name": "AWS_S3_BUCKET_NAME",
-          "valueFrom": "arn:aws:secretsmanager:ap-south-1:ACCOUNT_ID:secret:krishisetu/AWS_S3_BUCKET_NAME"
+          "valueFrom": "arn:aws:secretsmanager:ap-south-1:579505322227:secret:krishisetu/AWS_S3_BUCKET_NAME"
         }
       ],
       "logConfiguration": {
@@ -76,7 +76,7 @@
     },
     {
       "name": "krishisetu-frontend",
-      "image": "ACCOUNT_ID.dkr.ecr.ap-south-1.amazonaws.com/krishisetu-frontend:latest",
+      "image": "579505322227.dkr.ecr.ap-south-1.amazonaws.com/krishisetu-frontend:latest",
       "essential": true,
       "portMappings": [
         {
