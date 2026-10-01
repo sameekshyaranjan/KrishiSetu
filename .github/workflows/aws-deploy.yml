@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
 
 env:
-  AWS_REGION: ap-south-1
+  AWS_REGION: us-east-1
   ECR_BACKEND_REPOSITORY: krishisetu-backend
   ECR_FRONTEND_REPOSITORY: krishisetu-frontend
   ECS_CLUSTER: krishisetu-cluster
