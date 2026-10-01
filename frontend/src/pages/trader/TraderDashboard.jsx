@@ -58,6 +58,9 @@ export const TraderDashboard = () => {
         const crop = b.crop || b.cropListing || {}
         const rate = Number(b.amount || b.bidPrice || 0)
         const counterRate = Number(b.counterAmount || 0)
+        const resolvedHighest = Number(b.highestBid ?? b.currentHighestBid ?? crop.currentHighestBid ?? (b.status === 'countered' && counterRate ? counterRate : rate))
+        const isOutbid = b.isOutbid !== undefined ? Boolean(b.isOutbid) : (resolvedHighest > rate)
+
         return {
           _id: b._id,
           lotId: `LOT-${b._id?.slice(-6)}`,
@@ -72,7 +75,8 @@ export const TraderDashboard = () => {
           },
           cropId: crop._id || (typeof b.crop === 'string' ? b.crop : null),
           myBidAmount: rate,
-          highestBid: b.status === 'countered' && counterRate ? counterRate : rate,
+          highestBid: resolvedHighest,
+          highestBidder: b.highestBidder || (isOutbid ? 'Competitor' : 'You (Leading Offer)'),
           farmerCounterRate: counterRate,
           counterProposedBy: b.counterProposedBy,
           dispute: b.dispute || null,
@@ -87,10 +91,10 @@ export const TraderDashboard = () => {
             if (b.status === 'accepted') return 'accepted'
             if (b.status === 'cancelled' || b.status === 'withdrawn') return 'cancelled'
             if (b.status === 'countered') return 'countered'
-            if (b.status === 'rejected') return 'outbid'
+            if (b.status === 'rejected' || isOutbid) return 'outbid'
             return 'winning'
           })(),
-          bidCount: 1,
+          bidCount: Number(b.bidsCount || crop.bidsCount || 1),
           closingIn: 'Live',
           lastBidTime: new Date(b.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }

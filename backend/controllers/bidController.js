@@ -15,6 +15,32 @@ const invalidateCropsFeedCache = async () => {
   }
 };
 
+const notifyAndEmitCompetitors = async (cropId, currentTraderId, cropName, newAmount, bidObj) => {
+  try {
+    const competitorBids = await Bid.find({
+      crop: cropId,
+      trader: { $ne: currentTraderId },
+      status: { $in: ['pending', 'countered'] }
+    });
+
+    for (const compBid of competitorBids) {
+      if (compBid.trader) {
+        socketEmitter.emit('bid-updated', bidObj, compBid.trader.toString());
+        if (newAmount > Number(compBid.amount)) {
+          createNotification(
+            compBid.trader,
+            'Trader',
+            'Outbid Alert',
+            `You were outbid on ${cropName || 'a crop lot'}. New highest bid is ₹${newAmount}/Qtl.`
+          );
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[bidController] notifyAndEmitCompetitors error:', err.message);
+  }
+};
+
 const placeBid = async (req, res, next) => {
   try {
     const { cropId, amount, message } = req.body;
@@ -89,6 +115,7 @@ const placeBid = async (req, res, next) => {
 
       socketEmitter.emit('bid-updated', existingActiveBid, crop.farmer.toString());
       socketEmitter.emit('bid-updated', existingActiveBid, req.user.id.toString());
+      notifyAndEmitCompetitors(cropId, req.user.id, crop.name, numericAmount, existingActiveBid);
 
       return res.status(200).json(existingActiveBid);
     }
@@ -137,6 +164,7 @@ const placeBid = async (req, res, next) => {
 
       socketEmitter.emit('bid-updated', existingRejectedBid, crop.farmer.toString());
       socketEmitter.emit('bid-updated', existingRejectedBid, req.user.id.toString());
+      notifyAndEmitCompetitors(cropId, req.user.id, crop.name, numericAmount, existingRejectedBid);
 
       return res.status(200).json(existingRejectedBid);
     }
@@ -169,6 +197,7 @@ const placeBid = async (req, res, next) => {
 
     socketEmitter.emit('bid-updated', bid, crop.farmer.toString());
     socketEmitter.emit('bid-updated', bid, req.user.id.toString());
+    notifyAndEmitCompetitors(cropId, req.user.id, crop.name, numericAmount, bid);
 
     res.status(201).json(bid);
   } catch (error) {
@@ -220,8 +249,62 @@ const getMyBids = async (req, res, next) => {
     const Dispute = require('../models/Dispute');
 
     if (result && Array.isArray(result.data)) {
+      // Find all distinct crops referenced in these bids
+      const cropIds = [...new Set(result.data.map(b => {
+        const c = b.crop;
+        return c ? (c._id ? c._id.toString() : c.toString()) : null;
+      }).filter(Boolean))];
+
+      // Fetch all active bids across ANY trader for these crop lots
+      const allActiveBids = cropIds.length > 0
+        ? await Bid.find({
+            crop: { $in: cropIds },
+            status: { $in: ['pending', 'countered', 'accepted'] }
+          })
+          .populate('trader', 'name companyName district')
+          .sort({ amount: -1 })
+        : [];
+
+      // Group active bids by cropId
+      const bidsByCrop = {};
+      for (const ab of allActiveBids) {
+        const cId = ab.crop ? ab.crop.toString() : null;
+        if (!cId) continue;
+        if (!bidsByCrop[cId]) bidsByCrop[cId] = [];
+        bidsByCrop[cId].push(ab);
+      }
+
       result.data = await Promise.all(result.data.map(async (bidDoc) => {
         const bObj = bidDoc.toObject ? bidDoc.toObject() : bidDoc;
+        const cropIdStr = bObj.crop ? (bObj.crop._id ? bObj.crop._id.toString() : bObj.crop.toString()) : null;
+        const cropActiveBids = cropIdStr && bidsByCrop[cropIdStr] ? bidsByCrop[cropIdStr] : [];
+
+        // Highest bid placed by ANY trader on this crop lot
+        const topBid = cropActiveBids.length > 0 ? cropActiveBids[0] : null;
+        const cropBasePrice = bObj.crop && bObj.crop.basePrice ? Number(bObj.crop.basePrice) : 0;
+        const highestBidAmount = topBid ? Number(topBid.amount) : Math.max(Number(bObj.amount) || 0, cropBasePrice);
+
+        const myBidAmount = Number(bObj.amount) || 0;
+        const topBidTraderId = topBid ? (topBid.trader?._id || topBid.trader)?.toString() : null;
+        const isHighestBidder = topBidTraderId ? (topBidTraderId === req.user.id.toString()) : (myBidAmount >= highestBidAmount);
+
+        const highestBidderName = isHighestBidder
+          ? 'You (Top Bidder)'
+          : (topBid?.trader?.companyName || topBid?.trader?.name || 'Competitor Trader');
+
+        bObj.highestBid = highestBidAmount;
+        bObj.currentHighestBid = highestBidAmount;
+        bObj.highestBidder = highestBidderName;
+        bObj.isHighestBidder = isHighestBidder;
+        bObj.isOutbid = !isHighestBidder && (highestBidAmount > myBidAmount);
+        bObj.bidsCount = cropActiveBids.length || 1;
+
+        if (bObj.crop && typeof bObj.crop === 'object') {
+          bObj.crop.currentHighestBid = highestBidAmount;
+          bObj.crop.highestBid = highestBidAmount;
+          bObj.crop.bidsCount = cropActiveBids.length || 1;
+        }
+
         const tx = await Transaction.findOne({ bid: bObj._id });
         if (tx) {
           bObj.transaction = tx;
@@ -257,6 +340,7 @@ const updateBid = async (req, res, next) => {
     }
 
     const { amount, message } = req.body;
+    let cropObj = null;
 
     // Enforce only increasing bid amount (cannot decrease)
     if (amount) {
@@ -265,8 +349,8 @@ const updateBid = async (req, res, next) => {
       }
 
       // Check available balance for total amount = quantity * new amount
-      const crop = await Crop.findById(bid.crop);
-      const totalRequired = Number(crop ? crop.quantity : 1) * Number(amount);
+      cropObj = await Crop.findById(bid.crop);
+      const totalRequired = Number(cropObj ? cropObj.quantity : 1) * Number(amount);
       const Wallet = require('../models/Wallet');
       const wallet = await Wallet.findOne({ trader: req.user.id });
       if (!wallet || wallet.availableBalance < totalRequired) {
@@ -304,6 +388,7 @@ const updateBid = async (req, res, next) => {
 
     socketEmitter.emit('bid-updated', updatedBid, bid.farmer.toString());
     socketEmitter.emit('bid-updated', updatedBid, bid.trader.toString());
+    notifyAndEmitCompetitors(bid.crop, req.user.id, cropObj ? cropObj.name : 'crop lot', bid.amount, updatedBid);
 
     res.status(200).json(updatedBid);
   } catch (error) {
@@ -1011,6 +1096,7 @@ const bidHigherAfterRejection = async (req, res, next) => {
 
     socketEmitter.emit('bid-updated', bid, bid.farmer.toString());
     socketEmitter.emit('bid-updated', bid, bid.trader.toString());
+    notifyAndEmitCompetitors(bid.crop, req.user.id, crop.name, newAmount, bid);
 
     res.status(200).json({
       message: `New higher bid of ₹${newAmount}/Qtl submitted successfully!`,

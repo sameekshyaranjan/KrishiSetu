@@ -4,42 +4,234 @@ import { useAuth } from '@/hooks/useAuth'
 import cropService from '@/services/cropService'
 import bidService from '@/services/bidService'
 import { Button } from '@/components/ui/button'
+import { Dialog } from '@/components/ui/dialog'
+import { fieldClass, LISTING_GRID, lotCardClass, lotImageWrapClass } from '@/components/common/listingStyles'
+import {
+  SelectField,
+  SearchInput,
+  SegmentedTabs,
+  SummaryStrip,
+  Fact,
+  FactRow,
+  PhotoPill,
+  FormLabel,
+  ResultsMeta,
+  ListingCardSkeleton
+} from '@/components/common/ListingKit'
+import {
+  FALLBACK_IMAGE,
+  handleImageError,
+  formatINR,
+  formatINRCompact,
+  formatDate,
+  formatQuantity,
+  unitLabel,
+  categoryLabel
+} from '@/utils/listingFormat'
+import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
-import { 
-  ShoppingCart, 
-  Search, 
-  Filter, 
-  MapPin, 
-  Clock, 
-  Gavel, 
-  Sparkles, 
-  ShieldCheck, 
-  CheckCircle2, 
-  ArrowUpRight, 
-  TrendingDown, 
-  TrendingUp, 
-  Zap, 
-  DollarSign, 
-  Layers, 
-  RefreshCw, 
-  ChevronRight, 
-  Star, 
-  Info, 
-  X, 
+import {
+  ShoppingCart,
+  MapPin,
+  Gavel,
+  ArrowUpRight,
+  ArrowRight,
+  RefreshCw,
+  Wallet,
+  X,
   Camera,
-  Loader2
+  Loader2,
+  SearchX,
+  ShieldCheck
 } from 'lucide-react'
 
 import { KARNATAKA_DISTRICTS } from '@/constants/locations'
 
 const CATEGORY_TABS = [
-  { id: 'all', label: 'All Crops' },
+  { id: 'all', label: 'All' },
   { id: 'vegetables', label: 'Vegetables' },
-  { id: 'grains', label: 'Grains & Cereals' },
-  { id: 'spices', label: 'Spices & Cash Crops' }
+  { id: 'grains', label: 'Grains' },
+  { id: 'spices', label: 'Spices' }
 ]
 
 const DISTRICT_OPTIONS = ['All Districts', ...KARNATAKA_DISTRICTS]
+
+// The API already returns lots newest-first, so 'newest' keeps that order
+const SORT_OPTIONS = [
+  { value: 'newest', label: 'Newest first' },
+  { value: 'priceLow', label: 'Reserve: low to high' },
+  { value: 'priceHigh', label: 'Reserve: high to low' },
+  { value: 'highestVolume', label: 'Largest quantity' },
+  { value: 'fewestBids', label: 'Fewest bids' }
+]
+
+const SORTERS = {
+  newest: () => 0,
+  priceLow: (a, b) => (a.reservePrice || 0) - (b.reservePrice || 0),
+  priceHigh: (a, b) => (b.reservePrice || 0) - (a.reservePrice || 0),
+  highestVolume: (a, b) => (b.quantity || 0) - (a.quantity || 0),
+  fewestBids: (a, b) => (a.bidsCount || 0) - (b.bidsCount || 0)
+}
+
+const BID_INCREMENTS = [50, 100, 500]
+
+// Where the trader stands on a lot, derived from the API's myBid + currentHighestBid
+const getBidPosition = (lot) => {
+  if (!lot.myBid) return null
+  if (lot.myBid.status === 'countered') return 'countered'
+  return Number(lot.myBid.amount) >= (Number(lot.currentHighestBid) || 0) ? 'leading' : 'outbid'
+}
+
+const BID_POSITION_META = {
+  leading: { pill: "You're leading", dot: 'bg-emerald-500', chip: 'Leading', chipClass: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' },
+  outbid: { pill: 'Outbid', dot: 'bg-rose-500', chip: 'Outbid', chipClass: 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400' },
+  countered: { pill: 'Farmer countered', dot: 'bg-amber-500', chip: 'Countered', chipClass: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400' }
+}
+
+const traderPrimaryClass = 'bg-amber-600 text-white shadow-sm hover:bg-amber-700'
+
+// ---------------------------------------------------------------------------
+// Lot card
+// ---------------------------------------------------------------------------
+
+const MarketLotCard = ({ lot, onBid }) => {
+  const unit = unitLabel(lot.unit)
+  const totalPhotos = lot.images?.length || 0
+  const bidsCount = lot.bidsCount || 0
+  const highest = bidsCount > 0 ? Number(lot.currentHighestBid) || 0 : 0
+  const position = getBidPosition(lot)
+  const positionMeta = position ? BID_POSITION_META[position] : null
+  const lotValue = (Number(lot.quantity) || 0) * Math.max(highest, Number(lot.reservePrice) || 0)
+  const listedOn = formatDate(lot.listedAt)
+  const needsAction = !lot.myBid || position === 'outbid'
+
+  return (
+    <article className={lotCardClass(false)}>
+      {/* Image */}
+      <div className={lotImageWrapClass}>
+        <img
+          src={lot.image || FALLBACK_IMAGE}
+          alt={lot.cropName}
+          loading="lazy"
+          onError={handleImageError}
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03] motion-reduce:transition-none"
+        />
+        {positionMeta ? (
+          <PhotoPill dot={positionMeta.dot}>{positionMeta.pill}</PhotoPill>
+        ) : (
+          <PhotoPill dot="bg-emerald-500">Open for bids</PhotoPill>
+        )}
+        {totalPhotos > 1 && (
+          <span className="absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-medium text-white tabular-nums">
+            <Camera className="h-3 w-3" />
+            {totalPhotos}
+          </span>
+        )}
+      </div>
+
+      {/* Content */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex flex-1 flex-col p-4">
+          <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-500">
+            {categoryLabel(lot.category)}
+            {lot.cropType && lot.cropType !== lot.cropName && (
+              <span className="text-muted-foreground"> · {lot.cropType}</span>
+            )}
+          </p>
+          <h3 className="mt-1 truncate text-base font-semibold leading-snug text-foreground" title={lot.cropName}>
+            {lot.cropName}
+          </h3>
+          <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+            <MapPin className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">{lot.farmer.district}</span>
+            {listedOn && (
+              <>
+                <span aria-hidden="true" className="px-0.5">·</span>
+                <span className="shrink-0">Listed {listedOn}</span>
+              </>
+            )}
+          </p>
+          <p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+              {(lot.farmer.name || '?')[0].toUpperCase()}
+            </span>
+            <span className="truncate">
+              Sold by <span className="font-medium text-foreground">{lot.farmer.name}</span>
+            </span>
+          </p>
+
+          {lot.description && (
+            <p className="mt-2.5 line-clamp-2 text-[13px] leading-relaxed text-muted-foreground">
+              {lot.description}
+            </p>
+          )}
+
+          <div className="mt-auto pt-4">
+            <FactRow>
+              <Fact
+                label="Quantity"
+                value={(Number(lot.quantity) || 0).toLocaleString('en-IN')}
+                sub={Number(lot.quantity) === 1 ? unit.singular : unit.plural}
+              />
+              <Fact label="Reserve" value={formatINR(lot.reservePrice)} sub={`per ${unit.singular}`} />
+              <Fact
+                label="Highest bid"
+                value={highest > 0 ? formatINR(highest) : '—'}
+                valueClassName={highest > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'}
+                sub={bidsCount > 0 ? `${bidsCount} ${bidsCount === 1 ? 'bid' : 'bids'}` : 'No bids yet'}
+              />
+            </FactRow>
+
+            <div className="mt-2.5 flex items-center justify-between gap-2 px-0.5 text-xs">
+              {lot.myBid ? (
+                <>
+                  <span className="text-muted-foreground">Your bid</span>
+                  <span className="flex items-center gap-1.5">
+                    <span className={cn('rounded px-1.5 py-px text-[11px] font-semibold', positionMeta.chipClass)}>
+                      {positionMeta.chip}
+                    </span>
+                    <span className="font-semibold tabular-nums text-foreground">
+                      {formatINR(lot.myBid.amount)}
+                      <span className="font-normal text-muted-foreground"> / {unit.short}</span>
+                    </span>
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="text-muted-foreground">
+                    Lot value at {highest > 0 ? 'highest bid' : 'reserve'}
+                  </span>
+                  <span className="font-semibold tabular-nums text-foreground">{formatINRCompact(lotValue)}</span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-2 border-t border-border px-4 py-3">
+          <Button
+            onClick={() => onBid(lot)}
+            variant={needsAction ? 'default' : 'outline'}
+            className={cn('h-9 flex-1 rounded-lg text-[13px]', needsAction ? traderPrimaryClass : 'shadow-none')}
+          >
+            {lot.myBid ? <ArrowUpRight /> : <Gavel />}
+            {!lot.myBid ? 'Place bid' : position === 'outbid' ? 'Raise bid' : 'Increase bid'}
+          </Button>
+          <Button asChild variant="outline" className="h-9 flex-1 rounded-lg text-[13px] shadow-none">
+            <Link to={`/trader/crops/${lot._id}`}>
+              View details <ArrowRight />
+            </Link>
+          </Button>
+        </div>
+      </div>
+    </article>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
 
 export const TraderMarketplace = () => {
   const { user } = useAuth()
@@ -47,7 +239,7 @@ export const TraderMarketplace = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [selectedDistrict, setSelectedDistrict] = useState('All Districts')
-  const [sortBy, setSortBy] = useState('closingSoon') // 'closingSoon' | 'priceLow' | 'priceHigh' | 'highestVolume'
+  const [sortBy, setSortBy] = useState('newest') // 'newest' | 'priceLow' | 'priceHigh' | 'highestVolume' | 'fewestBids'
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [loading, setLoading] = useState(true)
 
@@ -65,6 +257,8 @@ export const TraderMarketplace = () => {
         const formatted = data.map((c, idx) => ({
           _id: c._id || `LOT-${idx + 101}`,
           cropName: c.name || c.cropType || 'Farm Fresh Commodity',
+          cropType: c.cropType,
+          description: c.description,
           variety: c.description || c.variety || c.cropType || 'Graded Produce',
           category: c.category || 'vegetables',
           grade: c.grade || 'Grade-A Premium',
@@ -86,6 +280,7 @@ export const TraderMarketplace = () => {
             verified: true
           },
           closingIn: c.closingIn || 'Live Bidding',
+          listedAt: c.createdAt,
           harvestDate: new Date(c.createdAt || Date.now()).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
         }))
 
@@ -169,446 +364,351 @@ export const TraderMarketplace = () => {
 
   // Filtered & Sorted Lots
   const filteredLots = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
     return lots
       .filter((lot) => {
         const matchesCategory = selectedCategory === 'all' || lot.category === selectedCategory
         const matchesDistrict = selectedDistrict === 'All Districts' || lot.farmer.district === selectedDistrict
-        const matchesSearch =
-          (lot.cropName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (lot.variety || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (lot.farmer.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (lot.farmer.district || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (lot._id || '').toLowerCase().includes(searchQuery.toLowerCase())
+        const matchesSearch = !q || [lot.cropName, lot.variety, lot.farmer.name, lot.farmer.district, lot._id]
+          .some((field) => (field || '').toLowerCase().includes(q))
 
         return matchesCategory && matchesDistrict && matchesSearch
       })
-      .sort((a, b) => {
-        if (sortBy === 'priceLow') return a.currentHighestBid - b.currentHighestBid
-        if (sortBy === 'priceHigh') return b.currentHighestBid - a.currentHighestBid
-        if (sortBy === 'highestVolume') return b.quantity - a.quantity
-        return 0 // default 'closingSoon'
-      })
+      .sort(SORTERS[sortBy] || SORTERS.newest)
   }, [lots, selectedCategory, selectedDistrict, searchQuery, sortBy])
 
+  // Presentational summary figures (derived from loaded lots only)
+  const myBidLots = lots.filter((l) => l.myBid)
+  const leadingCount = myBidLots.filter((l) => getBidPosition(l) === 'leading').length
+  const outbidCount = myBidLots.filter((l) => getBidPosition(l) === 'outbid').length
+  const counteredCount = myBidLots.filter((l) => getBidPosition(l) === 'countered').length
+  const uncontestedCount = lots.filter((l) => !(l.bidsCount > 0)).length
+  const districtCount = new Set(lots.map((l) => l.farmer.district)).size
+
+  const categoryTabs = CATEGORY_TABS.map((tab) => ({
+    key: tab.id,
+    label: tab.label,
+    count: tab.id === 'all' ? lots.length : lots.filter((l) => l.category === tab.id).length
+  }))
+
+  const hasActiveFilters = searchQuery.trim() !== '' || selectedCategory !== 'all' || selectedDistrict !== 'All Districts'
+  const clearFilters = () => {
+    setSelectedCategory('all')
+    setSelectedDistrict('All Districts')
+    setSearchQuery('')
+  }
+
+  const isInitialLoad = loading && lots.length === 0
+  const hasAnyLots = lots.length > 0
+
+  // Bid dialog derived values
+  const bidLot = selectedLotForBid
+  const bidUnit = unitLabel(bidLot?.unit)
+  const bidMin = bidLot
+    ? (bidLot.myBid ? bidLot.myBid.amount + 1 : (bidLot.currentHighestBid ? bidLot.currentHighestBid + 10 : bidLot.reservePrice))
+    : 0
+  const closeBidModal = () => {
+    if (!isSubmittingBid) setSelectedLotForBid(null)
+  }
+
   return (
-    <div className="space-y-6 sm:space-y-8">
-      
-      {/* 1. Header Banner & Live APMC Feed Controls */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
-        <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 text-amber-600 text-xs font-semibold border border-amber-500/20 mb-2">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Statewide APMC Live Commodity Bidding</span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
-            Karnataka Mandi Spot Marketplace
+    <div className="space-y-6">
+
+      {/* ================= Header ================= */}
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-[28px]">
+            Crop Marketplace
           </h1>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-            Browse verified farm-gate lots, inspect computer vision assay scores, and place binding auction bids with smart escrow protection.
+          <p className="mt-1 max-w-xl text-sm text-muted-foreground">
+            Browse farm-gate lots from across Karnataka and place bids backed by escrow protection.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-2">
           <Button
             variant="outline"
-            size="sm"
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className="rounded-xl text-xs font-semibold shadow-sm h-10 px-4 flex items-center gap-1.5"
+            className="h-10 w-10 rounded-lg bg-card p-0 shadow-none"
+            title="Refresh lots"
+            aria-label="Refresh lots"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-            <span>Refresh Feed</span>
+            <RefreshCw className={cn((isRefreshing || loading) && 'animate-spin')} />
           </Button>
-
-          <Button asChild size="sm" className="rounded-xl text-xs font-bold shadow-md h-10 px-4 bg-amber-600 hover:bg-amber-700 text-white">
+          <Button asChild variant="outline" className="h-10 flex-1 rounded-lg bg-card px-4 shadow-none sm:flex-none">
             <Link to="/trader/escrow">
-              <DollarSign className="w-4 h-4 mr-1" /> My Escrow Wallet
+              <Wallet /> Escrow wallet
             </Link>
           </Button>
         </div>
-      </div>
+      </header>
 
-      {/* 2. Filters, Categories & Live Search Hub */}
-      <div className="space-y-4">
-        
-        {/* Category Pill Tabs */}
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
-          {CATEGORY_TABS.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setSelectedCategory(tab.id)}
-              className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all shrink-0 ${
-                selectedCategory === tab.id
-                  ? 'bg-amber-600 text-white shadow-md'
-                  : 'bg-card border border-border text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+      {/* ================= Summary ================= */}
+      {hasAnyLots && (
+        <SummaryStrip
+          label="Marketplace summary"
+          items={[
+            {
+              label: 'Lots available',
+              value: lots.length,
+              hint: `from ${districtCount} ${districtCount === 1 ? 'district' : 'districts'}`
+            },
+            {
+              label: 'Your active bids',
+              value: myBidLots.length,
+              hint: myBidLots.length > 0
+                ? [
+                    `${leadingCount} leading`,
+                    outbidCount > 0 && `${outbidCount} outbid`,
+                    counteredCount > 0 && `${counteredCount} countered`
+                  ].filter(Boolean).join(' · ')
+                : 'no bids placed yet'
+            },
+            {
+              label: 'No bids yet',
+              value: uncontestedCount,
+              hint: 'open at reserve price'
+            }
+          ]}
+        />
+      )}
 
-        {/* Search, District & Sort Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-          
-          {/* Search Input */}
-          <div className="sm:col-span-6 relative">
-            <Search className="w-4 h-4 text-muted-foreground absolute left-3.5 top-3.5" />
-            <input
-              type="text"
+      {/* ================= Toolbar ================= */}
+      {hasAnyLots && (
+        <section className="space-y-3">
+          <SegmentedTabs
+            label="Filter by category"
+            tabs={categoryTabs}
+            value={selectedCategory}
+            onChange={setSelectedCategory}
+          />
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <SearchInput
+              accent="trader"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by crop, variety, farmer name, district, or Lot #..."
-              className="w-full h-11 pl-10 pr-4 rounded-xl bg-card border border-border text-xs focus:outline-none focus:ring-2 focus:ring-amber-500/40 font-medium"
+              onChange={setSearchQuery}
+              placeholder="Search crop, farmer, district or lot ID"
+              aria-label="Search lots"
+              className="sm:flex-1"
             />
-          </div>
-
-          {/* District Filter Dropdown */}
-          <div className="sm:col-span-3">
-            <select
-              value={selectedDistrict}
-              onChange={(e) => setSelectedDistrict(e.target.value)}
-              className="w-full h-11 px-3 rounded-xl bg-card border border-border text-xs focus:outline-none focus:ring-2 focus:ring-amber-500/40 font-medium"
-            >
-              {DISTRICT_OPTIONS.map((district) => (
-                <option key={district} value={district}>{district}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Sort Dropdown */}
-          <div className="sm:col-span-3">
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="w-full h-11 px-3 rounded-xl bg-card border border-border text-xs focus:outline-none focus:ring-2 focus:ring-amber-500/40 font-medium"
-            >
-              <option value="closingSoon">Ending Soonest ⏱️</option>
-              <option value="priceLow">Lowest Reserve Price</option>
-              <option value="priceHigh">Highest Reserve Price</option>
-              <option value="highestVolume">Highest Volume (Qtl)</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* 3. Commodity Lot Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredLots.map((lot) => {
-          const discountVsApmc = Math.round(((lot.apmcBenchmark - lot.currentHighestBid) / lot.apmcBenchmark) * 100)
-          const totalPhotos = lot.images?.length || 1
-
-          return (
-            <div
-              key={lot._id}
-              className="group rounded-3xl bg-card border border-border overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between"
-            >
-              <div>
-                {/* Image Section & Overlay Tags */}
-                <div className="relative h-52 w-full overflow-hidden bg-muted">
-                  <img
-                    src={lot.image}
-                    alt={lot.cropName}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                  
-                  {/* Top Badges */}
-                  <div className="absolute top-3 left-3 flex items-center gap-1.5">
-                    <span className="px-2.5 py-1 rounded-xl text-[10px] font-extrabold uppercase tracking-wider backdrop-blur-md bg-black/70 text-white border border-white/10 shadow-sm">
-                      {lot.grade}
-                    </span>
-                    {totalPhotos > 1 && (
-                      <span className="px-2 py-1 rounded-xl text-[10px] font-bold backdrop-blur-md bg-black/70 text-white flex items-center gap-1">
-                        <Camera className="w-3 h-3" /> {totalPhotos}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="absolute top-3 right-3 flex items-center gap-1.5">
-                    <span className="px-2.5 py-1 rounded-xl text-[10px] font-bold backdrop-blur-md bg-emerald-500/90 text-white flex items-center gap-1 shadow-sm">
-                      <Clock className="w-3 h-3" /> {lot.closingIn}
-                    </span>
-                  </div>
-
-                  {/* Bottom Lot Quantity Bar */}
-                  <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between px-3 py-1.5 rounded-2xl backdrop-blur-md bg-black/60 text-white text-xs font-semibold">
-                    <span className="font-mono">Lot #{lot._id}</span>
-                    <span className="font-bold text-amber-300">{lot.quantity} {lot.unit} Available</span>
-                  </div>
-                </div>
-
-                {/* Content Section */}
-                <div className="p-5 space-y-4">
-                  
-                  {/* Title & Origin */}
-                  <div>
-                    <h3 className="font-black text-base text-foreground group-hover:text-amber-600 transition-colors line-clamp-1">
-                      {lot.cropName}
-                    </h3>
-                    <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5 font-medium">
-                      {lot.variety}
-                    </p>
-                    
-                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/60 text-xs">
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center font-black text-[10px]">
-                          {lot.farmer.name[0]}
-                        </span>
-                        <div>
-                          <span className="font-bold text-foreground text-[11px] block leading-tight">
-                            {lot.farmer.name}
-                          </span>
-                          <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
-                            <MapPin className="w-3 h-3 text-amber-500" /> {lot.farmer.district}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="text-right">
-                        <span className="text-[10px] text-amber-600 font-bold flex items-center justify-end gap-0.5">
-                          <Star className="w-3 h-3 fill-amber-500 text-amber-500" /> {lot.farmer.rating}
-                        </span>
-                        <span className="text-[9px] text-muted-foreground">{lot.farmer.totalTrades} Trades</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Price Matrix HUD */}
-                  <div className="p-3.5 rounded-2xl bg-muted/40 border border-border/80 space-y-2 mt-4">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground font-medium">Highest Bid:</span>
-                      <span className="text-sm sm:text-base font-black text-amber-600 font-mono">
-                        {lot.currentHighestBid ? (
-                          `₹${lot.currentHighestBid.toLocaleString('en-IN')}/Qtl`
-                        ) : (
-                          <span className="text-xs font-semibold text-muted-foreground bg-muted/80 px-2 py-0.5 rounded-lg border border-border">
-                            No bids yet
-                          </span>
-                        )}
-                      </span>
-                    </div>
-
-                    {/* Personal Bid Indicator */}
-                    {lot.myBid && (
-                      <div className="flex items-center justify-between text-xs pt-1.5 border-t border-border/50">
-                        <span className="text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-1">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Your Bid:
-                        </span>
-                        <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/25">
-                          ₹{lot.myBid.amount.toLocaleString('en-IN')}/Qtl
-                        </span>
-                      </div>
-                    )}
-
-                    <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-border/60 text-muted-foreground">
-                      <span>Reserve: <strong className="text-foreground font-mono">₹{lot.reservePrice}/Qtl</strong></span>
-                      {lot.bidsCount > 0 ? (
-                        <span className="text-amber-600 font-bold flex items-center gap-0.5">
-                          <Gavel className="w-3 h-3" /> {lot.bidsCount} {lot.bidsCount === 1 ? 'Bid' : 'Bids'}
-                        </span>
-                      ) : (
-                        <span className="text-emerald-600 font-bold flex items-center gap-0.5">
-                          Awaiting first bid
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Card Bottom CTA Actions */}
-              <div className="p-5 pt-0 border-t border-border/60 flex items-center gap-2">
-                {lot.myBid ? (
-                  <Button
-                    size="sm"
-                    onClick={() => handleOpenBidModal(lot)}
-                    className="flex-1 rounded-xl text-xs font-bold h-10 bg-emerald-600 hover:bg-emerald-700 text-white shadow-md flex items-center justify-center gap-1.5"
-                  >
-                    <ArrowUpRight className="w-3.5 h-3.5" /> Increase Bid
-                  </Button>
-                ) : (
-                  <Button
-                    size="sm"
-                    onClick={() => handleOpenBidModal(lot)}
-                    className="flex-1 rounded-xl text-xs font-bold h-10 bg-amber-600 hover:bg-amber-700 text-white shadow-md flex items-center justify-center gap-1.5"
-                  >
-                    <Gavel className="w-3.5 h-3.5" /> Place Bid
-                  </Button>
-                )}
-
-                <Button
-                  asChild
-                  size="sm"
-                  variant="outline"
-                  className="flex-1 rounded-xl text-xs font-bold h-10 hover:bg-muted"
-                >
-                  <Link to={`/trader/crops/${lot._id}`}>
-                    Inspect Lot <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
-                  </Link>
-                </Button>
-              </div>
+            <div className="grid grid-cols-2 gap-2 sm:flex">
+              <SelectField
+                accent="trader"
+                value={selectedDistrict}
+                onChange={(e) => setSelectedDistrict(e.target.value)}
+                aria-label="Filter by district"
+                className="sm:w-48"
+                selectClassName="bg-card"
+              >
+                {DISTRICT_OPTIONS.map((district) => (
+                  <option key={district} value={district}>{district}</option>
+                ))}
+              </SelectField>
+              <SelectField
+                accent="trader"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                aria-label="Sort lots"
+                className="sm:w-48"
+                selectClassName="bg-card"
+              >
+                {SORT_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </SelectField>
             </div>
-          )
-        })}
-      </div>
+          </div>
+        </section>
+      )}
 
-      {/* 4. Empty State */}
-      {filteredLots.length === 0 && !loading && (
-        <div className="p-12 text-center rounded-3xl bg-card border border-border space-y-4 max-w-md mx-auto my-8">
-          <div className="w-16 h-16 rounded-full bg-amber-500/10 text-amber-600 flex items-center justify-center mx-auto">
-            <ShoppingCart className="w-8 h-8" />
-          </div>
-          <div className="space-y-1">
-            <h3 className="text-base font-bold text-foreground">No Crop Lots Available</h3>
-            <p className="text-xs text-muted-foreground">
-              {searchQuery || selectedCategory !== 'all' || selectedDistrict !== 'All Districts'
-                ? 'No arrivals match your current filters. Try changing category or clearing search.'
-                : 'There are currently no active crop lots posted on the APMC exchange.'}
-            </p>
-          </div>
+      {/* ================= Results meta ================= */}
+      {hasAnyLots && hasActiveFilters && filteredLots.length > 0 && (
+        <ResultsMeta shown={filteredLots.length} total={lots.length} onClear={clearFilters} />
+      )}
+
+      {/* ================= Grid ================= */}
+      {isInitialLoad ? (
+        <div className={LISTING_GRID} aria-busy="true">
+          {[...Array(3)].map((_, i) => <ListingCardSkeleton key={i} />)}
+        </div>
+      ) : filteredLots.length > 0 ? (
+        <section className={LISTING_GRID}>
+          {filteredLots.map((lot) => (
+            <MarketLotCard key={lot._id} lot={lot} onBid={handleOpenBidModal} />
+          ))}
+        </section>
+      ) : hasAnyLots ? (
+        /* Filtered to nothing */
+        <div className="flex flex-col items-center rounded-xl border border-dashed border-border bg-card px-6 py-12 text-center">
+          <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-muted text-muted-foreground">
+            <SearchX className="h-5 w-5" />
+          </span>
+          <p className="text-sm font-semibold text-foreground">No lots match these filters</p>
+          <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+            Try another district or search term, or clear the filters to see all {lots.length} lots.
+          </p>
+          <Button variant="outline" onClick={clearFilters} className="mt-4 h-9 rounded-lg shadow-none">
+            Clear filters
+          </Button>
+        </div>
+      ) : (
+        /* Market is empty */
+        <div className="rounded-xl border border-border bg-card px-6 py-12 text-center sm:py-16">
+          <span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/10 text-amber-600">
+            <ShoppingCart className="h-6 w-6" />
+          </span>
+          <h2 className="text-lg font-semibold text-foreground">No lots on the market right now</h2>
+          <p className="mx-auto mt-1.5 max-w-md text-sm text-muted-foreground">
+            Farmers post new harvest lots throughout the day. Check back soon, or refresh to see the latest arrivals.
+          </p>
           <Button
-            size="sm"
             variant="outline"
-            onClick={() => {
-              setSelectedCategory('all')
-              setSelectedDistrict('All Districts')
-              setSearchQuery('')
-            }}
-            className="rounded-xl text-xs"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="mt-6 h-10 rounded-lg px-5 shadow-none"
           >
-            Reset Filters
+            <RefreshCw className={cn(isRefreshing && 'animate-spin')} /> Refresh marketplace
           </Button>
         </div>
       )}
 
-      {/* 5. Bid Placement / Increase Modal */}
-      {selectedLotForBid && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in">
-          <div className="relative w-full max-w-lg bg-card border border-border rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
-            
-            <button
-              onClick={() => setSelectedLotForBid(null)}
-              className="absolute right-5 top-5 p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="space-y-1">
-              <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold border mb-1 ${
-                selectedLotForBid.myBid
-                  ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
-                  : 'bg-amber-500/10 text-amber-600 border-amber-500/20'
-              }`}>
-                {selectedLotForBid.myBid ? <ArrowUpRight className="w-3.5 h-3.5" /> : <Gavel className="w-3.5 h-3.5" />}
-                <span>{selectedLotForBid.myBid ? 'Increase Your Active Bid' : 'Binding Auction Offer'}</span>
+      {/* ================= Bid Placement / Increase Dialog ================= */}
+      <Dialog open={!!bidLot} onClose={closeBidModal} labelledBy="bid-dialog-title" className="max-h-[94vh] sm:max-w-lg">
+        {bidLot && (
+          <form onSubmit={handleSubmitBid} className="flex min-h-0 flex-1 flex-col">
+            <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4 sm:px-6 sm:py-5">
+              <div className="min-w-0">
+                <h2 id="bid-dialog-title" className="text-lg font-semibold tracking-tight text-foreground">
+                  {bidLot.myBid ? 'Increase your bid' : 'Place a bid'}
+                </h2>
+                <p className="mt-0.5 truncate text-sm text-muted-foreground">
+                  {bidLot.cropName} · {formatQuantity(bidLot.quantity, bidLot.unit)} · {bidLot.farmer.district}
+                </p>
+                <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">Lot #{bidLot._id}</p>
               </div>
-              <h2 className="text-xl font-extrabold text-foreground">
-                {selectedLotForBid.myBid
-                  ? `Increase Bid on Lot #${selectedLotForBid._id}`
-                  : `Place Inbound Bid on Lot #${selectedLotForBid._id}`}
-              </h2>
-              <p className="text-xs text-muted-foreground">
-                {selectedLotForBid.cropName} • {selectedLotForBid.quantity} {selectedLotForBid.unit}
-              </p>
+              <button
+                type="button"
+                onClick={closeBidModal}
+                aria-label="Close"
+                className="-mr-1.5 rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
 
-            <form onSubmit={handleSubmitBid} className="space-y-4 text-xs">
-              <div className="p-4 rounded-2xl bg-muted/40 border border-border/80 space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Highest Bid Across Traders:</span>
-                  <span className="font-mono font-bold text-foreground">
-                    {selectedLotForBid.currentHighestBid
-                      ? `₹${selectedLotForBid.currentHighestBid.toLocaleString('en-IN')}/Qtl`
-                      : 'No bids placed yet'}
-                  </span>
-                </div>
-                {selectedLotForBid.myBid && (
-                  <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-semibold">
-                    <span>Your Previous Bid:</span>
-                    <span className="font-mono font-bold">
-                      ₹{selectedLotForBid.myBid.amount.toLocaleString('en-IN')}/Qtl
-                    </span>
+            <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-6">
+              {/* Market position */}
+              <dl className="rounded-lg border border-border text-sm">
+                {[
+                  { label: 'Reserve price', value: `${formatINR(bidLot.reservePrice)} / ${bidUnit.short}` },
+                  {
+                    label: 'Highest bid',
+                    value: bidLot.currentHighestBid
+                      ? `${formatINR(bidLot.currentHighestBid)} / ${bidUnit.short}`
+                      : 'No bids yet',
+                    muted: !bidLot.currentHighestBid
+                  },
+                  bidLot.myBid && {
+                    label: 'Your current bid',
+                    value: `${formatINR(bidLot.myBid.amount)} / ${bidUnit.short}`,
+                    chip: BID_POSITION_META[getBidPosition(bidLot)]
+                  }
+                ].filter(Boolean).map(({ label, value, muted, chip }, idx) => (
+                  <div key={label} className={cn('flex items-center justify-between gap-4 px-4 py-2.5', idx > 0 && 'border-t border-border')}>
+                    <dt className="text-muted-foreground">{label}</dt>
+                    <dd className="flex items-center gap-2">
+                      {chip && (
+                        <span className={cn('rounded px-1.5 py-px text-[11px] font-semibold', chip.chipClass)}>{chip.chip}</span>
+                      )}
+                      <span className={cn('font-semibold tabular-nums', muted ? 'font-normal text-muted-foreground' : 'text-foreground')}>
+                        {value}
+                      </span>
+                    </dd>
                   </div>
-                )}
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">
-                    {selectedLotForBid.myBid ? 'Rule:' : 'Reserve Floor Price:'}
-                  </span>
-                  <span className="font-mono font-bold text-emerald-600">
-                    {selectedLotForBid.myBid
-                      ? `Must be strictly > ₹${selectedLotForBid.myBid.amount.toLocaleString('en-IN')}/Qtl`
-                      : `₹${selectedLotForBid.reservePrice} / Quintal`}
-                  </span>
-                </div>
-              </div>
+                ))}
+              </dl>
 
+              {/* Bid amount */}
               <div className="space-y-1.5">
-                <label className="font-bold text-foreground">
-                  {selectedLotForBid.myBid ? 'New Increased Bid (₹ per Quintal) *' : 'Your Bid Offer (₹ per Quintal) *'}
-                </label>
+                <FormLabel htmlFor="bid-amount" required hint={`₹ per ${bidUnit.singular}`}>
+                  {bidLot.myBid ? 'New bid' : 'Your bid'}
+                </FormLabel>
                 <div className="relative">
-                  <span className="absolute left-3.5 top-3 text-sm font-mono font-bold text-muted-foreground">₹</span>
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
                   <input
+                    id="bid-amount"
                     type="number"
                     required
-                    min={selectedLotForBid.myBid ? selectedLotForBid.myBid.amount + 1 : (selectedLotForBid.currentHighestBid ? selectedLotForBid.currentHighestBid + 10 : selectedLotForBid.reservePrice)}
+                    min={bidMin}
                     value={bidAmount}
                     onChange={(e) => setBidAmount(e.target.value)}
                     placeholder="Enter bid amount"
-                    className="w-full h-11 pl-8 pr-4 rounded-xl bg-background border border-border text-sm font-mono font-bold text-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+                    autoFocus
+                    className={cn(fieldClass('trader'), 'h-11 pl-7 text-base font-semibold tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none')}
                   />
                 </div>
-                {selectedLotForBid.myBid && (
-                  <p className="text-[11px] text-muted-foreground">
-                    Must be strictly higher than your previous bid of ₹{selectedLotForBid.myBid.amount.toLocaleString('en-IN')}/Qtl.
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                  <p className="text-xs text-muted-foreground">
+                    {bidLot.myBid
+                      ? `Must be higher than your current bid of ${formatINR(bidLot.myBid.amount)}.`
+                      : `Minimum ${formatINR(bidLot.reservePrice)} (reserve price).`}
                   </p>
-                )}
+                  <div className="flex gap-1.5">
+                    {BID_INCREMENTS.map((step) => (
+                      <button
+                        key={step}
+                        type="button"
+                        onClick={() => setBidAmount(String((Number(bidAmount) || bidMin) + step))}
+                        className="rounded-md border border-border bg-card px-2 py-1 text-[11px] font-medium tabular-nums text-foreground transition-colors hover:border-amber-500/50 hover:bg-amber-500/5"
+                      >
+                        +₹{step}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
 
-              {/* Total Escrow Value Calculation */}
-              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 space-y-1.5">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="font-semibold text-amber-900 dark:text-amber-300">Total Lot Contract Value:</span>
-                  <span className="text-base font-black text-amber-600 font-mono">
-                    ₹{((Number(bidAmount) || 0) * selectedLotForBid.quantity).toLocaleString('en-IN')}
-                  </span>
+              {/* Contract value */}
+              <div className="rounded-lg bg-muted/50 px-4 py-3">
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="text-xs text-muted-foreground">Total contract value</p>
+                  <p className="text-lg font-bold tabular-nums text-foreground">
+                    {formatINR((Number(bidAmount) || 0) * bidLot.quantity)}
+                  </p>
                 </div>
-                <p className="text-[10px] text-muted-foreground">
+                <p className="mt-0.5 text-right text-xs tabular-nums text-muted-foreground">
+                  {formatQuantity(bidLot.quantity, bidLot.unit)} × {formatINR(Number(bidAmount) || 0)}
+                </p>
+                <p className="mt-2 flex items-start gap-1.5 border-t border-border pt-2 text-[11px] leading-relaxed text-muted-foreground">
+                  <ShieldCheck className="mt-px h-3.5 w-3.5 shrink-0 text-emerald-600" />
                   Includes 1.50% APMC market cess and direct DBT payout escrow guarantee.
                 </p>
               </div>
+            </div>
 
-              <div className="flex items-center justify-end gap-3 pt-2 border-t border-border">
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={isSubmittingBid}
-                  onClick={() => setSelectedLotForBid(null)}
-                  className="rounded-xl text-xs h-10 px-4"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={isSubmittingBid}
-                  className={`rounded-xl text-xs font-bold h-10 px-6 text-white shadow-md flex items-center gap-2 ${
-                    selectedLotForBid.myBid ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-600 hover:bg-amber-700'
-                  }`}
-                >
-                  {isSubmittingBid ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Transmitting Bid...</span>
-                    </>
-                  ) : (
-                    <span>{selectedLotForBid.myBid ? 'Submit Increased Bid 📈' : 'Confirm & Transmit Bid 🔨'}</span>
-                  )}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+            <div className="flex items-center justify-end gap-2.5 border-t border-border bg-card px-5 py-4 sm:px-6">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isSubmittingBid}
+                onClick={closeBidModal}
+                className="h-10 rounded-lg px-5 shadow-none"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={isSubmittingBid}
+                className={cn('h-10 rounded-lg px-6 font-semibold', traderPrimaryClass)}
+              >
+                {isSubmittingBid && <Loader2 className="animate-spin" />}
+                {isSubmittingBid ? 'Submitting…' : bidLot.myBid ? 'Update bid' : 'Place bid'}
+              </Button>
+            </div>
+          </form>
+        )}
+      </Dialog>
     </div>
   )
 }

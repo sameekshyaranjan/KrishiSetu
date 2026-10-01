@@ -35,7 +35,8 @@ import { useSocket } from '@/hooks/useSocket'
 
 const STATUS_TABS = [
   { id: 'all', label: 'All Bids' },
-  { id: 'winning', label: 'Active / Pending ⏳' },
+  { id: 'winning', label: 'Active / Leading 👑' },
+  { id: 'outbid', label: 'Outbid ⚠️' },
   { id: 'countered', label: 'Farmer Counters 💬' },
   { id: 'rejected', label: 'Rejected by Farmer ❌' },
   { id: 'won', label: 'Accepted / Won 🏆' },
@@ -76,6 +77,29 @@ export const TraderBids = () => {
           const counterRate = Number(b.counterAmount || 0)
           const isCountered = b.status === 'countered'
           const cropImg = crop.images?.[0] || crop.image || 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=500&q=80'
+
+          // Highest bid placed by ANY trader on this crop lot (retrieved from backend DB calculation)
+          const resolvedHighestBid = Number(
+            b.highestBid ?? 
+            b.currentHighestBid ?? 
+            crop.currentHighestBid ?? 
+            crop.highestBid ?? 
+            (isCountered && b.counterProposedBy === 'farmer' ? counterRate : rate)
+          )
+
+          // Determine whether logged-in trader is outbid on this crop lot
+          const isOutbid = b.isOutbid !== undefined 
+            ? Boolean(b.isOutbid) 
+            : (b.status === 'pending' && resolvedHighestBid > rate)
+
+          const resolvedLeader = b.highestBidder || (
+            isCountered 
+              ? (b.counterProposedBy === 'farmer' ? 'Farmer Counter Offer' : 'You (Counter Proposal)') 
+              : isOutbid
+              ? 'Competitor Trader'
+              : 'You (Top Bidder)'
+          )
+
           return {
             _id: b._id,
             lotId: `LOT-${b._id?.slice(-6)}`,
@@ -87,11 +111,10 @@ export const TraderBids = () => {
             quantity: Number(crop.quantity) || 50,
             unit: crop.unit || 'Quintals',
             reservePrice: Number(crop.basePrice) || 2000,
-            myBidAmount: origRate,
-            highestBid: isCountered && b.counterProposedBy === 'farmer' ? counterRate : rate,
-            highestBidder: isCountered 
-              ? (b.counterProposedBy === 'farmer' ? 'Farmer Counter Offer' : 'You (Counter Proposal)') 
-              : 'You (Top Bidder)',
+            myBidAmount: rate,
+            highestBid: resolvedHighestBid,
+            highestBidder: resolvedLeader,
+            isOutbid,
             farmerCounterRate: counterRate,
             counterProposedBy: b.counterProposedBy,
             counterMessage: b.counterMessage,
@@ -114,10 +137,11 @@ export const TraderBids = () => {
               if (b.status === 'cancelled' || b.status === 'withdrawn') return 'cancelled'
               if (b.status === 'rejected') return 'rejected'
               if (b.status === 'countered') return 'countered'
+              if (isOutbid) return 'outbid'
               return 'winning'
             })(),
             closingIn: 'Live Bidding',
-            bidsCount: 1 + (b.negotiationHistory?.length || 0),
+            bidsCount: Number(b.bidsCount || crop.bidsCount || (1 + (b.negotiationHistory?.length || 0))),
             image: cropImg,
             images: crop.images || (cropImg ? [cropImg] : []),
             farmer: {
@@ -199,7 +223,7 @@ export const TraderBids = () => {
   const handleOpenRaiseModal = (bidItem, mode = 'increase') => {
     setRaiseBidLot(bidItem)
     setRaiseBidMode(mode)
-    const baseRate = Number(bidItem.myBidAmount || bidItem.highestBid || 0)
+    const baseRate = Math.max(Number(bidItem.highestBid || 0), Number(bidItem.myBidAmount || 0))
     setCustomBidAmount(String(baseRate + 50))
   }
 
@@ -211,9 +235,9 @@ export const TraderBids = () => {
       return
     }
 
-    const previousRate = Number(raiseBidLot.myBidAmount || raiseBidLot.highestBid || 0)
+    const previousRate = Math.max(Number(raiseBidLot.highestBid || 0), Number(raiseBidLot.myBidAmount || 0))
     if (parsed <= previousRate) {
-      toast.error('Your new bid must be higher than your previous bid.')
+      toast.error(`Your new bid must be higher than the current highest bid of ₹${previousRate.toLocaleString('en-IN')}/Qtl.`)
       return
     }
 
@@ -257,7 +281,7 @@ export const TraderBids = () => {
     e.preventDefault()
     const parsed = Number(autoBidCeilingInput)
     if (!parsed || parsed <= (autoBidLot?.highestBid || 0)) {
-      toast.error('Auto-bid ceiling must be greater than current highest bid')
+      toast.error(`Auto-bid ceiling must be greater than current highest bid (₹${autoBidLot?.highestBid}/Qtl)`)
       return
     }
 
@@ -286,6 +310,7 @@ export const TraderBids = () => {
   const winningCapital = bids
     .filter((b) => b.status === 'winning' || b.status === 'won')
     .reduce((acc, b) => acc + b.myBidAmount * b.quantity, 0)
+  const outbidCount = bids.filter((b) => b.status === 'outbid').length
   const rejectedCount = bids.filter((b) => b.status === 'rejected').length
 
   return (
@@ -341,9 +366,9 @@ export const TraderBids = () => {
         </div>
 
         <div className="p-5 rounded-3xl bg-card border border-border shadow-sm space-y-1">
-          <span className="text-xs font-bold text-muted-foreground">Rejected by Farmer</span>
-          <p className="text-2xl font-black text-rose-600">{rejectedCount} Lot{rejectedCount !== 1 ? 's' : ''}</p>
-          <span className="text-[11px] text-rose-500 font-bold">Can Submit Higher Bid</span>
+          <span className="text-xs font-bold text-muted-foreground">Outbid Lots</span>
+          <p className="text-2xl font-black text-rose-600">{outbidCount} Lot{outbidCount !== 1 ? 's' : ''}</p>
+          <span className="text-[11px] text-rose-500 font-bold">{outbidCount > 0 ? 'Raise Bid to Reclaim Lead' : (rejectedCount > 0 ? `${rejectedCount} Rejected by Farmer` : 'None • All Leading')}</span>
         </div>
 
         <div className="p-5 rounded-3xl bg-card border border-border shadow-sm space-y-1">
@@ -400,6 +425,8 @@ export const TraderBids = () => {
                   ? 'border-amber-500/40 bg-amber-500/[0.02]'
                   : bid.status === 'winning'
                   ? 'border-emerald-500/40 bg-emerald-500/[0.02]'
+                  : bid.status === 'outbid'
+                  ? 'border-rose-500/40 bg-rose-500/[0.02]'
                   : bid.status === 'rejected'
                   ? 'border-rose-500/40 bg-rose-500/[0.02]'
                   : bid.status === 'countered'
@@ -457,6 +484,8 @@ export const TraderBids = () => {
                       ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
                       : bid.status === 'winning'
                       ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
+                      : bid.status === 'outbid'
+                      ? 'bg-rose-500/10 text-rose-600 border border-rose-500/30'
                       : bid.status === 'rejected'
                       ? 'bg-rose-500/10 text-rose-600 border border-rose-500/20'
                       : bid.status === 'countered'
@@ -470,6 +499,7 @@ export const TraderBids = () => {
                     {bid.status === 'dispute_resolved' && <Scale className="w-3.5 h-3.5 text-purple-600" />}
                     {bid.status === 'disputed' && <Scale className="w-3.5 h-3.5 text-amber-600" />}
                     {bid.status === 'winning' && <CheckCircle2 className="w-3.5 h-3.5" />}
+                    {bid.status === 'outbid' && <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />}
                     {bid.status === 'rejected' && <XCircle className="w-3.5 h-3.5" />}
                     {bid.status === 'countered' && <Sparkles className="w-3.5 h-3.5" />}
                     {bid.status === 'won' && <ShieldCheck className="w-3.5 h-3.5" />}
@@ -481,7 +511,9 @@ export const TraderBids = () => {
                         : bid.status === 'disputed'
                         ? 'Disputed • In Arbitration ⚖️'
                         : bid.status === 'winning'
-                        ? 'Active Bid • Pending Response'
+                        ? 'Active Bid • Highest Offer 👑'
+                        : bid.status === 'outbid'
+                        ? 'Outbid • Raise Bid to Compete ⚠️'
                         : bid.status === 'rejected'
                         ? 'Bid Rejected by Farmer'
                         : bid.status === 'countered'
@@ -510,7 +542,7 @@ export const TraderBids = () => {
                 </div>
 
                 <div>
-                  <span className="text-[10px] text-muted-foreground block">Highest Competitor Bid</span>
+                  <span className="text-[10px] text-muted-foreground block">Highest Bid</span>
                   <span className={`text-sm font-black ${bid.status === 'outbid' ? 'text-rose-600' : 'text-emerald-600'}`}>
                     ₹{bid.highestBid.toLocaleString('en-IN')}/Qtl
                   </span>
@@ -530,6 +562,19 @@ export const TraderBids = () => {
                   </span>
                 </div>
               </div>
+
+              {/* Outbid Notice Banner */}
+              {bid.status === 'outbid' && (
+                <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-xs space-y-1">
+                  <p className="font-extrabold text-rose-700 dark:text-rose-400 flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span>You have been outbid! Current highest bid is ₹{bid.highestBid.toLocaleString('en-IN')}/Qtl</span>
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Another trader placed a higher bid of ₹{bid.highestBid.toLocaleString('en-IN')}/Qtl. Your current offer is ₹{bid.myBidAmount.toLocaleString('en-IN')}/Qtl. Increase your bid to reclaim the top position.
+                  </p>
+                </div>
+              )}
 
               {/* Farmer Counter Proposal Notice */}
               {bid.status === 'countered' && (
@@ -557,15 +602,20 @@ export const TraderBids = () => {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  {/* 1. ACTIVE / PENDING BID: [Increase Bid], [Chat], [Cancel Bid] */}
-                  {bid.status === 'winning' && (
+                  {/* 1. ACTIVE / PENDING OR OUTBID: [Increase/Raise Bid], [Chat], [Cancel Bid] */}
+                  {(bid.status === 'winning' || bid.status === 'outbid') && (
                     <>
                       <Button
                         size="sm"
                         onClick={() => handleOpenRaiseModal(bid, 'increase')}
-                        className="rounded-xl text-xs font-bold h-9 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                        className={`rounded-xl text-xs font-bold h-9 text-white shadow-sm ${
+                          bid.status === 'outbid'
+                            ? 'bg-rose-600 hover:bg-rose-700'
+                            : 'bg-emerald-600 hover:bg-emerald-700'
+                        }`}
                       >
-                        <TrendingUp className="w-3.5 h-3.5 mr-1" /> Increase Bid
+                        <TrendingUp className="w-3.5 h-3.5 mr-1" />
+                        {bid.status === 'outbid' ? 'Outbid: Raise Bid' : 'Increase Bid'}
                       </Button>
                       <Button
                         asChild
@@ -712,17 +762,23 @@ export const TraderBids = () => {
           <div className="bg-card border border-border rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-6">
             <div className="flex items-start justify-between border-b border-border pb-4">
               <div className="space-y-1">
-                <span className={`text-[10px] font-mono font-bold uppercase ${raiseBidMode === 'rebid' ? 'text-rose-600' : 'text-emerald-600'}`}>
+                <span className={`text-[10px] font-mono font-bold uppercase ${raiseBidMode === 'rebid' || raiseBidLot.status === 'outbid' ? 'text-rose-600' : 'text-emerald-600'}`}>
                   {raiseBidLot.lotId}
                 </span>
                 <h3 className="text-lg font-extrabold text-foreground">
-                  {raiseBidMode === 'rebid' ? 'Bid Higher after Farmer Rejection' : 'Increase Your Bid'}
+                  {raiseBidMode === 'rebid' 
+                    ? 'Bid Higher after Farmer Rejection' 
+                    : raiseBidLot.status === 'outbid'
+                    ? 'Outbid: Raise Bid to Lead'
+                    : 'Increase Your Bid'}
                 </h3>
                 <p className="text-xs text-muted-foreground">
                   {raiseBidMode === 'rebid' ? (
                     <>Previous rejected bid: <span className="font-bold text-rose-600">₹{raiseBidLot.highestBid}/Qtl</span>. Your new bid must be higher.</>
+                  ) : raiseBidLot.status === 'outbid' ? (
+                    <>You are currently outbid. Highest bid is <span className="font-bold text-rose-600">₹{raiseBidLot.highestBid}/Qtl</span> (Your offer: ₹{raiseBidLot.myBidAmount}/Qtl). Enter higher offer.</>
                   ) : (
-                    <>Current bid: <span className="font-bold text-emerald-600">₹{raiseBidLot.highestBid}/Qtl</span>. Enter higher offer.</>
+                    <>Current highest bid: <span className="font-bold text-emerald-600">₹{raiseBidLot.highestBid}/Qtl</span>. Enter higher offer.</>
                   )}
                 </p>
               </div>
@@ -742,13 +798,13 @@ export const TraderBids = () => {
                   <span className="absolute left-3.5 top-2.5 font-bold text-muted-foreground text-sm">₹</span>
                   <input
                     type="number"
-                    min={raiseBidLot.highestBid + 10}
+                    min={Math.max(Number(raiseBidLot.highestBid || 0), Number(raiseBidLot.myBidAmount || 0)) + 10}
                     step="10"
                     required
                     value={customBidAmount}
                     onChange={(e) => setCustomBidAmount(e.target.value)}
                     className={`w-full h-11 pl-8 pr-4 rounded-xl bg-background border text-sm font-bold focus:outline-none focus:ring-2 ${
-                      raiseBidMode === 'rebid' ? 'focus:ring-rose-500/40 border-rose-500/40' : 'focus:ring-emerald-500/40 border-emerald-500/40'
+                      raiseBidMode === 'rebid' || raiseBidLot.status === 'outbid' ? 'focus:ring-rose-500/40 border-rose-500/40' : 'focus:ring-emerald-500/40 border-emerald-500/40'
                     }`}
                   />
                 </div>
@@ -769,10 +825,10 @@ export const TraderBids = () => {
                 <Button 
                   type="submit" 
                   className={`rounded-xl text-xs font-bold h-10 text-white shadow-md ${
-                    raiseBidMode === 'rebid' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-emerald-600 hover:bg-emerald-700'
+                    raiseBidMode === 'rebid' || raiseBidLot?.status === 'outbid' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-emerald-600 hover:bg-emerald-700'
                   }`}
                 >
-                  {raiseBidMode === 'rebid' ? 'Submit Higher Bid' : 'Confirm Increased Bid'}
+                  {raiseBidMode === 'rebid' ? 'Submit Higher Bid' : raiseBidLot?.status === 'outbid' ? 'Submit Outbid Raise' : 'Confirm Increased Bid'}
                 </Button>
               </div>
             </form>
